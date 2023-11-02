@@ -8,6 +8,7 @@
 #include <libopencm3/cm3/nvic.h>
 
 #include "ringbuffer.h"
+#include "utils.h"
 
 
 #define TICK			1000     // 1ms
@@ -37,6 +38,34 @@ typedef struct  GPIO {
 	uint32_t port;
 }GPIO;
 
+
+#define CHECK_TASK(TASK, LOOPTICK) 	((LOOPTICK - TASK.lastTick >= TASK.rate) && (TASK.enable))
+
+
+
+typedef struct TaskHandle{
+    uint32_t lastTick;
+    uint32_t rate;	
+	bool enable;
+}TaskHandle;
+
+static TaskHandle createTask(uint32_t rate){
+	TaskHandle task;
+	task.lastTick = get_ticks();
+	task.rate = rate;
+	task.enable = true;
+	return task;
+}
+
+static void disableTask(TaskHandle *t){
+	t->enable = false;
+	return;
+}
+
+static void enableTask(TaskHandle *t){
+	t->enable = true;
+	return;
+}
 
 #endif // COMMON_h
 
