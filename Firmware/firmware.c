@@ -3,7 +3,7 @@
 #include "common/common.h"
 #include "drivers/serial.h"
 #include "drivers/pwm.h"
-#include "drivers/i2c.h"
+#include "inc/MPU6050.h"
 
 #define LED_PORT 		GPIOC
 #define LED_PIN			GPIO13
@@ -70,20 +70,37 @@ int main(void){
 	pwm_start_timer(TIM2);
 	pwm_set_dutyCycle(TIM2, TIM_OC1, 0.5f); // set to 50%
 	
-	// Initialize I2C Sensor
-	uint32_t i2c = i2c_setup(I2C1, GPIOB, SCL_PIN, SDA_PIN);
-	delay(100); 
-	uint8_t data = _i2c_read_reg(i2c, 0x68, 0x75);
-	if (data != 0x68){
-		serial_write(&ser1, (uint8_t *)"I2C Fail\n",10);
+	// Initialize I2C Sensor	
+	serial_write(&ser1, (uint8_t *)"IMU INIT BEGIN\n", 16);
+	MPU6050_t imu = initMPU6050(SDA_PIN, SCL_PIN, GPIOB);
+	if(!imu.initalized){
+		serial_write(&ser1, (uint8_t *)"IMU INIT FAIL\n", 15);
 	}
-	serial_write(&ser1, (uint8_t *)"I2C Success\n",13);
-	
+	MadgwickFilter mf = initMadgwick(500, 0.1f);
 
+
+	TaskHandle blinkTask = createTask(500);
+	TaskHandle uartTask = createTask(100);
+	TaskHandle imuTask = createTask(2);
+	//disableTas(&imuTask)
 	
 	for(;;){
-		gpio_toggle(Led.port, Led.pin);
-		serial_send(&ser1, (uint8_t *)"Hello world\n", 13);
+		uint32_t loopTick = get_ticks();
+		if(CHECK_TASK(blinkTask, loopTick)){
+			gpio_toggle(Led.port, Led.pin);
+			blinkTask.lastTick = loopTick;
+		}else if(CHECK_TASK(uartTask, loopTick)){
+			char buffer[60];
+			int datalen = mysprintf(buffer, 4,"%f:%f\n", imu.roll, imu.pitch );
+			serial_write(&ser1, (uint8_t *)buffer, datalen);
+			uartTask.lastTick = loopTick;
+		}else if(CHECK_TASK(imuTask, loopTick)){
+			readMPU6050(&imu);
+    		computeAngles(&imu.gyro, &imu.accel, &imu.roll, &imu.pitch);
+			MadgwickAHRSupdateIMU(&mf, imu.gyro.x, imu.gyro.y, imu.gyro.z, imu.accel.x, imu.accel.y, imu.accel.z);
+			imuTask.lastTick = loopTick;
+		}
+
 		delay(500);
 	}
 }
