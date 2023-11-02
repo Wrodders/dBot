@@ -9,6 +9,32 @@ typedef struct Serial{
     uint32_t perif;
 }Serial;
 
+
+#define UART_BUFFER_SIZE (16)
+
+static uint8_t uartRB[UART_BUFFER_SIZE];
+static Ring_Buffer tx_buffer = {.buffer = uartRB, .size = sizeof(uartRB)}; // Place holder for class
+
+
+void usart1_isr(void){
+    const bool overrun_occurred = usart_get_flag(USART1, USART_FLAG_ORE) == 1;
+    const bool received_data = usart_get_flag(USART1, USART_FLAG_RXNE) == 1;
+    const bool transmit_empty = usart_get_flag(USART1, USART_FLAG_TXE) == 1;
+
+    if (transmit_empty) {  // Transmit buffer is empty - send next byte
+        if (!ringbuffer_empty(&tx_buffer)) { // Data available in RingBuffer
+            // send element from ring buffer
+            USART_DR(USART1) = ringbuffer_get(&tx_buffer);
+
+        } else {
+            // Buffer is empty, disable TXE interrupt
+            USART_CR1(USART1) &= ~USART_CR1_TXEIE;
+        }
+    }
+}
+
+
+
 static Serial serial_init( uint32_t uartPerif, uint32_t gpioPort, uint32_t rxPin, uint32_t txPin, uint32_t gpioAF, uint8_t irq){
     //@Breif: Sets up USART Periferal on GPIOS
     //@Note: Requires GPIO and USART Clocks to be enabled
@@ -74,6 +100,22 @@ static void serial_write(Serial *ser, uint8_t *data, uint16_t size){
     }
 }
 
+static void serial_sendByte(Serial *ser, uint8_t byte){
+    //@Breif: Interupt Driven write byte to USARt FIFO
+    while (ringbuffer_full(&tx_buffer)) {} ; // If  blokc often, increase rb sieze
+    ringbuffer_put(&tx_buffer, byte); // input ring buffer
+    if ((USART_CR1(ser->perif) & USART_CR1_TXEIE) == 0) {
+        usart_enable_tx_interrupt(ser->perif);
+    }
+    return;
+}
 
+static void serial_send(Serial *ser, uint8_t *data, uint16_t size){
+    //@Breif: Intrupt Driven write array to USART FIFO
+    for (uint16_t i = 0; i < size; i++) {
+        serial_sendByte(ser, data[i]);
+    }
+    return;
+}
 
 #endif // SERIAL_H

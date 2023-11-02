@@ -7,6 +7,8 @@
 #include <libopencm3/cm3/vector.h>
 #include <libopencm3/cm3/nvic.h>
 
+#include "ringbuffer.h"
+
 
 #define TICK			1000     // 1ms
 #define CPU_FREQ		84000000 // 84Mhz

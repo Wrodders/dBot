@@ -49,14 +49,14 @@ int main(void){
 
 	GPIO Led = initGPIO(LED_PIN, LED_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 
-	Serial ser1 = serial_init(USART1, GPIOB, DEBUG_RX, DEBUG_TX, GPIO_AF7, 0);
+	Serial ser1 = serial_init(USART1, GPIOB, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
 	serial_config(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
 	serial_begin(&ser1); 
 
 	
 	for(;;){
 		gpio_toggle(Led.port, Led.pin);
-		serial_write(&ser1, (uint8_t *)"Hello world\n", 13);
+		serial_send(&ser1, (uint8_t *)"Hello world\n", 13);
 		delay(500);
 	}
 }
