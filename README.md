@@ -1,2 +1,5 @@
 # dBot
-Simple Differential Driver Robot Platform
+Simple Differential Drive Robot Platform
+
+
+
