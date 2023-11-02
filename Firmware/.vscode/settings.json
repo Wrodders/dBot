@@ -1,0 +1,15 @@
+{
+    "C_Cpp.intelliSenseEngineFallback": "enabled",
+    "C_Cpp.default.compilerPath": "/opt/homebrew/bin/arm-none-eabi-gcc",
+    "files.associations": {
+        "gpio.h": "c",
+        "vector.h": "c",
+        "systick.h": "c",
+        "usart_common_all.h": "c",
+        "rcc.h": "c",
+        "mpu6050.h": "c",
+        "common.h": "c",
+        "comms.h": "c",
+        "motor.h": "c"
+    }
+}
