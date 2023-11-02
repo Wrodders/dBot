@@ -3,12 +3,16 @@
 #include "common/common.h"
 #include "drivers/serial.h"
 #include "drivers/pwm.h"
+#include "drivers/i2c.h"
 
 #define LED_PORT 		GPIOC
 #define LED_PIN			GPIO13
+
 #define DEBUG_RX		GPIO7
 #define DEBUG_TX		GPIO6
 
+#define SDA_PIN			GPIO8
+#define SCL_PIN			GPIO9
 
 // ******* Clock Set Up ****************************************************** //
 static void clock_setup(void){
@@ -23,6 +27,9 @@ static void clock_setup(void){
 
 	// Timer
 	rcc_periph_clock_enable(RCC_TIM2); 
+
+	// I2C
+	rcc_periph_clock_enable(RCC_I2C1);
 
 	return;
 }
@@ -62,6 +69,15 @@ int main(void){
 	pwm_init_output_channel(TIM2, TIM_OC1,GPIOA, GPIO0, GPIO_AF1); 
 	pwm_start_timer(TIM2);
 	pwm_set_dutyCycle(TIM2, TIM_OC1, 0.5f); // set to 50%
+	
+	// Initialize I2C Sensor
+	uint32_t i2c = i2c_setup(I2C1, GPIOB, SCL_PIN, SDA_PIN);
+	delay(100); 
+	uint8_t data = _i2c_read_reg(i2c, 0x68, 0x75);
+	if (data != 0x68){
+		serial_write(&ser1, (uint8_t *)"I2C Fail\n",10);
+	}
+	serial_write(&ser1, (uint8_t *)"I2C Success\n",13);
 	
 
 	
