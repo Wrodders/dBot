@@ -2,6 +2,7 @@
 
 #include "common/common.h"
 #include "drivers/serial.h"
+#include "drivers/pwm.h"
 
 #define LED_PORT 		GPIOC
 #define LED_PIN			GPIO13
@@ -19,6 +20,9 @@ static void clock_setup(void){
 
 	// USART
 	rcc_periph_clock_enable(RCC_USART1);
+
+	// Timer
+	rcc_periph_clock_enable(RCC_TIM2); 
 
 	return;
 }
@@ -52,6 +56,13 @@ int main(void){
 	Serial ser1 = serial_init(USART1, GPIOB, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
 	serial_config(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
 	serial_begin(&ser1); 
+
+	// Initialize Timer PWM
+    pwm_config_timer(TIM2,84,25000); // set freq to period to 25000 ARR reg
+	pwm_init_output_channel(TIM2, TIM_OC1,GPIOA, GPIO0, GPIO_AF1); 
+	pwm_start_timer(TIM2);
+	pwm_set_dutyCycle(TIM2, TIM_OC1, 0.5f); // set to 50%
+	
 
 	
 	for(;;){
