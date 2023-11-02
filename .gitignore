@@ -11,6 +11,7 @@
 *.ilk
 *.map
 *.exp
+*.ld
 
 # Precompiled Headers
 *.gch
@@ -51,6 +52,7 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-
+#LibCM3
 *bin/
 */libopencm3/
+
