@@ -2,13 +2,14 @@
 
 Developemnt CLI/ GUI tools
 
+
 ## ComsCLI
-Raw Communication tool, takes input and points output to file descriptor(stdout, ipc socket, tcp port ect)
+Command Line interface for using the Serial ZMQ interface
+provides 
 
-## ComsTerm
-Terminal with topic filters for Serial Communication protocol.
-Opens Serial port, handhsakes with device. Parses messages and sends commands. 
 
-# Plotter
-Plots Topic Data in realtime, graph configurations can be saved or created in GUI. 
+## SerialZMQ
+Reads Serial Port and publishes messages over an IPC socket. 
+
+
 
