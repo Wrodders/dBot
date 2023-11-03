@@ -56,3 +56,6 @@ dkms.conf
 *bin/
 */libopencm3/
 
+#python
+*__pycache__/
+*logfile.log
