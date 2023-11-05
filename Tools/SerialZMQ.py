@@ -7,19 +7,18 @@ import lorem
 import time
 from typing import Optional
 from logger import getmylogger
+import sys
 
 log = getmylogger(__name__)
 
 
-
-
 class SerialDevice():
 
-    def __init__(self, context):
+    def __init__(self):
 
         self.id = None
         self.pubAddr =  "ipc://SHARED"
-        self.ctx = context
+        self.ctx = zmq.Context.instance()
 
         self.port = serial.Serial()
 
@@ -60,21 +59,19 @@ class SerialDevice():
         try:
             while self.readAlive:
                 runtime = time.time() - start_time
-                if runtime > duration :
+                if runtime > duration & duration != 0:
                     break
                 msg = self._placeHolder()
                 pub.send_string(msg)
-                log.debug(msg)
-
-                #time.sleep(0.05)
+                #log.debug(msg)
         except Exception as e:
             log.error("Exeption in Update: ", e)
-            
-        log.info('Serial Update Stopped')
-        log.info(f"Update() Ran for {duration} seconds")
-        log.info("Closing PUB socket")
-        self.readAlive = False
-        pub.close()
+        finally:
+            log.info('Serial Update Stopped')
+            log.info(f"Update() Ran for {runtime} seconds")
+            log.info("Closing PUB socket")
+            #self.readAlive = False
+            pub.close()
         return # exit thread
 
     # Public Functions
@@ -106,6 +103,7 @@ class SerialDevice():
         '''Disconnect from serial device'''
         if self.port.is_open == False:
             log.warning("Disconnect Error: Serial Port Is Already Closed")
+            self._stopUpdate()
             return False
         try:
             self._stopUpdate() # Stop Read Thread
@@ -132,16 +130,20 @@ if __name__ ==  "__main__":
     ctx = zmq.Context()
 
     print("Starting Serial Device Init")
-    dev = SerialDevice('Serial', ctx)
-    ports = dev.scanUSB()
-    dev.printPorts(ports);
-    if len(ports):
-        if dev.connect(ports[0].device, 115200):
-            dev.readAlive = True
-            dev.printInfo()
-            try:    
-                dev._update()
-
-            except KeyboardInterrupt:
-                dev.disconnect()
+    dev = SerialDevice()
+    ports = dev.scanUSB("usb")
+    if len(ports) > 0:
+        for p in ports:
+            log.info(f"Found Port: {p.device}, Description: {p.description}")
+        dev.connect(ports[0].device, 115200)
+    else:
+        log.warning("No Ports Found")
+    dev.readAlive = True
+    for key, value in dev.getInfo().items():
+        log.info(f'{key} : {value}')
+    log.info(f"Running Update Forever")
+    try:    
+        dev._update(0)
+    except KeyboardInterrupt:
+        dev.disconnect()
                 

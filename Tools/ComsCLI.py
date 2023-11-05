@@ -1,48 +1,76 @@
 from SerialZMQ import SerialDevice
+
 from logger import getmylogger
 import typer
 from typing import Optional
 from rich import print
 import zmq
-
+import sys
+import subprocess
 
 app = typer.Typer()
 ctx = zmq.Context()
 log = getmylogger(__name__)
-dev = SerialDevice(ctx)
+dev = SerialDevice()
 
 
 @app.command()
-def ports(key : Optional[str] = "usb") -> bool:
-    ports = dev.scanUSB(key)
-    if len(ports) == 0:
-       log.warning("No Ports Found")
-       return False
-    for p in ports:
-        print(f"Found Port: {p.device}, Description: {p.description}")
-    return True
+def streamport(portname :Optional [str] = None, baud: Optional[int] = 9600, duration: Optional[int] = 60):
+    """
+    Scans or Opens Serial port, publishes data to socket
+    """
+    log.info("Starting Serial Device Stream")
+    dev = SerialDevice()
+    if portname == None:
+        ports = dev.scanUSB("usb")
+        if len(ports) > 0:
+            for p in ports:
+                log.info(f"Found Port: {p.device}, Description: {p.description}")
+            dev.connect(ports[0].device, 115200)
+        else:
+            log.warning("No Ports Found")
+    dev.readAlive = True
+    for key, value in dev.getInfo().items():
+        log.info(f'{key} : {value}')
+    log.info(f"Running Update for {duration} seconds")
+    try:    
+        dev._update(duration)
+    except KeyboardInterrupt:
+        dev.disconnect()
 
 
 @app.command()
-def begin(portname : str, baud: Optional[int] = 9600, duration: Optional[int] = 10):
-
-    if dev.connect(portname, baud ):
-        dev.readAlive = True
-        info()
+def substream(topic: Optional[str] = "", output : Optional[str] = None):
+    """
+    Subscribes and filters a data socket
+    """
+    if output == None:
+        sub = ctx.socket(zmq.SUB)
+        sub.connect("ipc://SHARED")
+        sub.setsockopt( zmq.SUBSCRIBE, topic.encode())
+        log.info("Begin Sub Stream")
         try:
-            dev._update(duration)
+            while True:
+                try:
+                    data = sub.recv().decode()
+                    print(data) # output
+                except Exception as e:
+                    log.error(f"Expeption in testSub: {e}")
+                    break
+            log.info("Exit test SUB")
+            sub.close()
         except KeyboardInterrupt:
-            dev.disconnect()
+            log.info("Exit text sub ")
+    elif output == "console":
+        try:
+            subprocess.run(["python3", "console.py", topic])
+        except Exception as e:
+            log.error(e)
+        finally:
+            raise typer.Exit()   
 
 
-@app.command()
-def info():
-    info = dev.getInfo()
-    print('------------')
-    for key, value in info.items():
-        print(f'{key} : {value}')
-    print('------------')
-    
+
 
 
 

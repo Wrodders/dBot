@@ -14,11 +14,14 @@ import zmq
 import threading
 
 from collections import namedtuple
+import argparse
 
 
+from logger import getmylogger
 
 cmdFormat = namedtuple('cmd', ['cmdId', 'cmdDesc' ])
 
+log = getmylogger(__name__)
 
 
 class ConsoleApp(QWidget):
@@ -27,7 +30,7 @@ class ConsoleApp(QWidget):
     
     def __init__(self, topic):
         super().__init__()
-        self.title = topic
+        self.title = "topic/"+topic
         self.topic = topic
         self.subAddr = 'ipc://SHARED' 
 
@@ -45,8 +48,11 @@ class ConsoleApp(QWidget):
         self.receiver.start()
 
     def exitHandler(self):
-        self.receiver.socket.close()
-        print("Exiting Console: ", self.title)
+        try:
+            self.receiver.socket.close()
+        except Exception as e:
+            log.errro(e)
+        log.info(f"Exiting Console: {self.title} ")
 
     def initUI(self):
         # Set Up Terminal UI
@@ -103,7 +109,12 @@ class ConsoleApp(QWidget):
     # Function Buttons
     def editFilter(self):
         #placehodler for filter implemtnation 
-        pass
+     
+        text, ok = QInputDialog.getText(self, 'Filter', self.topic)
+        if ok:
+            self.topic = text
+            self.setWindowTitle(self.topic)
+            self.receiver.topic = self.topic
 
     def editPref(self):
         #placeholder for preferences implementattion
@@ -142,29 +153,31 @@ class ZMQReceiver(QObject):
     def _execute(self):
         '''Execute Thread'''
 
-        print("Started ZMQ Receiver")
+        log.info("Started ZMQ Receiver")
         self.socket = self.context.socket(zmq.SUB)
         self.socket.connect(self.subAddr)
-        self.socket.setsockopt( zmq.SUBSCRIBE, b"")
+        self.socket.setsockopt( zmq.SUBSCRIBE, self.topic)
        
         while True:
             try:
                 data = self.socket.recv().decode()
                 self.socketDataSig.emit(data)
             except Exception as e:
-                print("Expeption in Zmq Recviever: ")
-                print(e)
+                log.errror(f"Expeption in Zmq Recviever:{e} ")
                 break
-        print("exit ZMQ Thread")
+        log.info(f"exit ZMQ Thread Sub: {self.topic}")
 
         self.socket.close()
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Console App")
+    parser.add_argument("topic", help="Filter topic")
+    args = parser.parse_args()
 
         # Create GUI
     app = QApplication(sys.argv)
-    window = ConsoleApp("serial", )
+    window = ConsoleApp(args.topic)
     app.lastWindowClosed.connect(window.exitHandler)
    
     window.show()
