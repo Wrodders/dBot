@@ -377,8 +377,8 @@
       "no_connect_dangling": "warning",
       "pin_not_connected": "error",
       "pin_not_driven": "error",
-      "pin_to_pin": "error",
-      "power_pin_not_driven": "ignore",
+      "pin_to_pin": "warning",
+      "power_pin_not_driven": "error",
       "similar_labels": "warning",
       "simulation_model_issue": "ignore",
       "unannotated": "error",
@@ -471,14 +471,6 @@
     [
       "0748d653-bd5c-474d-b3cc-9d9b984930a0",
       ""
-    ],
-    [
-      "2b0fb7f9-1896-45cc-9be0-5b7fa270f2f4",
-      "PSU"
-    ],
-    [
-      "92ad062b-239c-4bb0-b821-bdcab0fb4151",
-      "Driver"
     ]
   ],
   "text_variables": {}
