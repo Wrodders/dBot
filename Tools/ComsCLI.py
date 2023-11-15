@@ -70,6 +70,12 @@ def substream(topic: Optional[str] = "", output : Optional[str] = None):
             raise typer.Exit()   
 
 
+@app.command()
+def scanusb():
+    dev = SerialDevice()
+    ports = dev.scanUSB("")
+    for p in ports:
+        print(f"Found Port: {p.device}, Description: {p.description}")
 
 
 
