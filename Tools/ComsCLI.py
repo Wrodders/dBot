@@ -1,4 +1,5 @@
 from SerialZMQ import SerialDevice
+from console import ConsoleApp
 
 from logger import getmylogger
 import typer
@@ -7,6 +8,10 @@ from rich import print
 import zmq
 import sys
 import subprocess
+
+from PyQt6 import QtCore
+from PyQt6.QtCore import *
+from PyQt6.QtWidgets import *
 
 app = typer.Typer()
 ctx = zmq.Context()
@@ -63,7 +68,18 @@ def substream(topic: Optional[str] = "", output : Optional[str] = None):
             log.info("Exit text sub ")
     elif output == "console":
         try:
-            subprocess.run(["python3", "console.py", topic])
+            #subprocess.run(["python3", "console.py", topic])
+
+            while True:
+                app = QApplication(sys.argv)
+                window = ConsoleApp(topic)
+                app.lastWindowClosed.connect(window.exitHandler)
+                window.show()
+                try:
+                    sys.exit(app.exec())
+                except KeyboardInterrupt:
+                    window.exitHandler()
+
         except Exception as e:
             log.error(e)
         finally:

@@ -125,25 +125,4 @@ class SerialDevice():
         }
         return info
 
-if __name__ ==  "__main__":
 
-    ctx = zmq.Context()
-
-    print("Starting Serial Device Init")
-    dev = SerialDevice()
-    ports = dev.scanUSB("usb")
-    if len(ports) > 0:
-        for p in ports:
-            log.info(f"Found Port: {p.device}, Description: {p.description}")
-        dev.connect(ports[0].device, 115200)
-    else:
-        log.warning("No Ports Found")
-    dev.readAlive = True
-    for key, value in dev.getInfo().items():
-        log.info(f'{key} : {value}')
-    log.info(f"Running Update Forever")
-    try:    
-        dev._update(0)
-    except KeyboardInterrupt:
-        dev.disconnect()
-                

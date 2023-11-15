@@ -26,7 +26,8 @@ log = getmylogger(__name__)
 
 class ConsoleApp(QWidget):
 
-    consoleDataSig = QtCore.pyqtSignal(str)
+    updateSig = QtCore.pyqtSignal(str)
+
     
     def __init__(self, topic):
         super().__init__()
@@ -45,6 +46,7 @@ class ConsoleApp(QWidget):
         # Create ZMQ Receiver
         self.receiver = ZMQReceiver(self.topic, self.subAddr)
         self.receiver.socketDataSig.connect(self.updateConsole)
+        self.updateSig.connect(self.receiver._updateFilt)
         self.receiver.start()
 
     def exitHandler(self):
@@ -65,29 +67,20 @@ class ConsoleApp(QWidget):
         self.setLayout(self.layout)
 
         # Create Widgets
-        self.filterBtn = QPushButton("Filter")
-        self.prefBtn = QPushButton("Preferences")
-
         self.console = QTextEdit()
         self.console.setReadOnly(True)
         self.console.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.console.setAcceptRichText(True)
         self.console.setStyleSheet("background-color: black; color: green;")
-        self.input = QLineEdit()
-        self.sendBtn = QPushButton("Send")
-        
+
+    
         # Add Widgets to Layout
-        self.layout.addWidget(self.filterBtn, 0, 0)
-        self.layout.addWidget(self.prefBtn, 0, 1)
-        self.layout.addWidget(self.console, 1, 0, 4, 4)
-        self.layout.addWidget(self.input, 5, 0,1, 3)
-        self.layout.addWidget(self.sendBtn,5, 3)
+        self.layout.addWidget(self.console, 0, 0, 4, 4)
+
 
     def connectSignals(self):
         '''Connect GUI Signals'''
-        self.sendBtn.clicked.connect(self.sendCmd)
-        self.filterBtn.clicked.connect(self.editFilter)
-        self.prefBtn.clicked.connect(self.editPref)
+        pass
 
     def clearConsole(self):
         '''Clear Console'''
@@ -105,31 +98,7 @@ class ConsoleApp(QWidget):
             self.console.clear()
         self.console.append(data)
 
-
-    # Function Buttons
-    def editFilter(self):
-        #placehodler for filter implemtnation 
-     
-        text, ok = QInputDialog.getText(self, 'Filter', self.topic)
-        if ok:
-            self.topic = text
-            self.setWindowTitle(self.topic)
-            self.receiver.topic = self.topic
-
-    def editPref(self):
-        #placeholder for preferences implementattion
-        pass
-
-
-    def sendCmd(self):
-        cmdStr = self.input.text()
-        self.input.clear()
-        self.console.append(cmdStr)
-        #place Holder to parsing mapping and sending command
-
-
     # helper functions
-
     def textFormater(self)->str:
         # Formats text and 
         pass
@@ -140,7 +109,7 @@ class ConsoleApp(QWidget):
 class ZMQReceiver(QObject):
 
     socketDataSig = QtCore.pyqtSignal(str)
-
+   
     def __init__(self, topic, subAddr ): 
         super().__init__()
         self.subAddr = subAddr
@@ -149,6 +118,9 @@ class ZMQReceiver(QObject):
         
     def start(self):
         threading.Thread(target=self._execute, daemon=True).start()
+
+    def _updateFilt(self, topic : str):
+        self.topic = topic.encode()
         
     def _execute(self):
         '''Execute Thread'''
@@ -168,20 +140,3 @@ class ZMQReceiver(QObject):
         log.info(f"exit ZMQ Thread Sub: {self.topic}")
 
         self.socket.close()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Console App")
-    parser.add_argument("topic", help="Filter topic")
-    args = parser.parse_args()
-
-        # Create GUI
-    app = QApplication(sys.argv)
-    window = ConsoleApp(args.topic)
-    app.lastWindowClosed.connect(window.exitHandler)
-   
-    window.show()
-    try:
-        sys.exit(app.exec())
-    except KeyboardInterrupt:
-        window.exitHandler()
