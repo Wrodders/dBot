@@ -74,6 +74,9 @@ int main(void){
 	serial_write(&ser1, (uint8_t *)"IMU INIT BEGIN\n", 16);
 	MPU6050_t imu = initMPU6050(SDA_PIN, SCL_PIN, GPIOB);
 	if(!imu.initalized){
+		char buffer[60];
+		int datalen = mysprintf(buffer, 4,"%d\n", imu.data);
+		serial_write(&ser1, (uint8_t *)buffer, datalen);
 		serial_write(&ser1, (uint8_t *)"IMU INIT FAIL\n", 15);
 	}
 	MadgwickFilter mf = initMadgwick(500, 0.1f);
@@ -82,7 +85,7 @@ int main(void){
 	TaskHandle blinkTask = createTask(500);
 	TaskHandle uartTask = createTask(100);
 	TaskHandle imuTask = createTask(2);
-	//disableTas(&imuTask)
+
 	
 	for(;;){
 		uint32_t loopTick = get_ticks();
@@ -91,7 +94,7 @@ int main(void){
 			blinkTask.lastTick = loopTick;
 		}else if(CHECK_TASK(uartTask, loopTick)){
 			char buffer[60];
-			int datalen = mysprintf(buffer, 4,"%f:%f\n", imu.roll, imu.pitch );
+			int datalen = mysprintf(buffer, 4,"%f:%f\n", imu.roll, imu.pitch);
 			serial_write(&ser1, (uint8_t *)buffer, datalen);
 			uartTask.lastTick = loopTick;
 		}else if(CHECK_TASK(imuTask, loopTick)){
@@ -101,6 +104,6 @@ int main(void){
 			imuTask.lastTick = loopTick;
 		}
 
-		delay(500);
+
 	}
 }

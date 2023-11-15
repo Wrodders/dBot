@@ -39,6 +39,7 @@ typedef struct Calib_t{
 }Calib_t;
 
 typedef struct MPU6050_t{
+    uint8_t data;
     bool initalized;
     vector_t accel;
     vector_t gyro;
@@ -177,7 +178,8 @@ static MPU6050_t initMPU6050(uint32_t sda, uint32_t scl, uint32_t port){
     if (data != MPU6050_ADDR){
         delay(100); // debug
         imu.initalized = false;
-        return imu;
+        imu.data = data;
+        //return imu;
     }
     configMPU6050(imu.i2c);
     wakeMPU6050(imu.i2c);
