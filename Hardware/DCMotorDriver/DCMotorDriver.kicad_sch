@@ -1,0 +1,55 @@
+(kicad_sch (version 20230121) (generator eeschema)
+
+  (uuid 0748d653-bd5c-474d-b3cc-9d9b984930a0)
+
+  (paper "A4")
+
+  (title_block
+    (title "DC Motor Controller")
+    (date "2023-11-06")
+    (rev "0.1")
+    (company "WROBOTICS")
+  )
+
+  (lib_symbols
+  )
+
+
+  (sheet (at 88.9 76.2) (size 38.1 38.1) (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0.0000))
+    (uuid 2b0fb7f9-1896-45cc-9be0-5b7fa270f2f4)
+    (property "Sheetname" "PSU" (at 88.9 75.4884 0)
+      (effects (font (size 1.27 1.27)) (justify left bottom))
+    )
+    (property "Sheetfile" "PSU.kicad_sch" (at 88.9 114.8846 0)
+      (effects (font (size 1.27 1.27)) (justify left top))
+    )
+    (instances
+      (project "DCMotorDriver"
+        (path "/0748d653-bd5c-474d-b3cc-9d9b984930a0" (page "2"))
+      )
+    )
+  )
+
+  (sheet (at 139.7 76.2) (size 38.1 38.1) (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0.0000))
+    (uuid 92ad062b-239c-4bb0-b821-bdcab0fb4151)
+    (property "Sheetname" "Driver" (at 139.7 75.4884 0)
+      (effects (font (size 1.27 1.27)) (justify left bottom))
+    )
+    (property "Sheetfile" "driver.kicad_sch" (at 139.7 114.8846 0)
+      (effects (font (size 1.27 1.27)) (justify left top))
+    )
+    (instances
+      (project "DCMotorDriver"
+        (path "/0748d653-bd5c-474d-b3cc-9d9b984930a0" (page "3"))
+      )
+    )
+  )
+
+  (sheet_instances
+    (path "/" (page "1"))
+  )
+)
