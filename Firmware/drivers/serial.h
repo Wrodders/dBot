@@ -47,7 +47,7 @@ static Serial serial_init( uint32_t uartPerif, uint32_t gpioPort, uint32_t rxPin
         USART_CR1(uartPerif) |= USART_CR1_RXNEIE;   // enable interupt receive data Shift Register not empty                           
         
         USART_SR(uartPerif) &= ~USART_SR_TXE; // clear TX Empty flag before enabling interupt
-        USART_CR1(uartPerif) |= USART_CR1_TXEIE; // enable TX inteupt
+        
         
         nvic_enable_irq(irq); // enable interupt in NVIC
     }
@@ -61,8 +61,7 @@ static void serial_config(Serial *serial, uint32_t baud, uint32_t dataBits, uint
     //@Breif: Configures USART parameteres
     uint32_t usart = serial->perif;
 
-    USART_CR1(usart) = (USART_CR1(usart) & ~USART_MODE_MASK) | USART_MODE_TX_RX; // enable TX and RX
-    uint32_t clock = rcc_apb2_frequency;
+    USART_CR1(usart) = (USART_CR1(usart) & ~USART_MODE_MASK) | USART_MODE_TX; // enable TX
     if(usart == USART2){
         clock = rcc_apb1_frequency;
     }
@@ -102,17 +101,17 @@ static void serial_write(Serial *ser, uint8_t *data, uint16_t size){
 
 static void serial_sendByte(Serial *ser, uint8_t byte){
     //@Breif: Interupt Driven write byte to USARt FIFO
-    while (ringbuffer_full(&tx_buffer)) {} ; // If  blokc often, increase rb sieze
+    while (ringbuffer_full(&tx_buffer)) {} ; // If  block often, increase rb sieze
     ringbuffer_put(&tx_buffer, byte); // input ring buffer
     if ((USART_CR1(ser->perif) & USART_CR1_TXEIE) == 0) {
-        usart_enable_tx_interrupt(ser->perif);
+        USART_CR1(ser->perif) |= USART_CR1_TXEIE; // enable TX interupt
     }
     return;
 }
 
 static void serial_send(Serial *ser, uint8_t *data, uint16_t size){
     //@Breif: Intrupt Driven write array to USART FIFO
-    for (uint16_t i = 0; i < size; i++) {
+    for (uint16_t i = 0; i < size ; i++) {
         serial_sendByte(ser, data[i]);
     }
     return;
