@@ -60,5 +60,9 @@ dkms.conf
 *__pycache__/
 *logfile.log
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 #kicad
 Hardware/*
