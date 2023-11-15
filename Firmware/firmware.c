@@ -56,7 +56,8 @@ int main(void){
 	
 	for(;;){
 		gpio_toggle(Led.port, Led.pin);
-		serial_send(&ser1, (uint8_t *)"Hello world\n", 13);
+		serial_write(&ser1, (uint8_t *)"Hello world\n", 13);
+		//serial_send(&ser1, (uint8_t *)"Bye Universe\n", 14);
 		delay(500);
 	}
 }
