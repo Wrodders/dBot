@@ -4,7 +4,7 @@ def getmylogger(name) -> logging.getLogger():
     file_formatter = logging.Formatter('%(asctime)s~%(levelname)s~%(message)s~module:%(module)s~function:%(module)s')
     console_formatter = logging.Formatter('%(levelname)s -- %(message)s')
     
-    file_handler = logging.FileHandler("logfile.log")
+    file_handler = logging.FileHandler("logfile.log", mode='w')
     file_handler.setLevel(logging.WARN)
     file_handler.setFormatter(file_formatter)
     console_handler = logging.StreamHandler()
