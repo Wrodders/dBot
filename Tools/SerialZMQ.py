@@ -46,8 +46,9 @@ class SerialDevice():
             return False
         
     def _grabMessage(self):
-        rxbuf = self.port.readline().decode()[:-1]
-        return rxbuf
+        line = self.port.readline().decode(('utf-8')).strip()[:-1] # remove \n
+        line = ''.join(char for char in line if char.isprintable()) # remove null chars
+        return line
         
     def _placeHolder(self, rate: Optional[float] = 0.1):
 
@@ -68,9 +69,13 @@ class SerialDevice():
                     runtime = time.time() - start_time
                     if runtime > duration & duration != 0:
                         break
-                    msg = self._placeHolder()
-                    pub.send_string(msg)
-                    csv_writer.writerow([msg])
+                    if self.port.is_open:
+                        msg = self._grabMessage()
+                    else:
+                        msg = self._placeHolder()
+                    if msg != "":
+                        pub.send_string(msg)
+                        csv_writer.writerow([msg])
                 #log.debug(msg)
         except Exception as e:
             log.error("Exeption in Update: ", e)

@@ -24,11 +24,7 @@ cmdFormat = namedtuple('cmd', ['cmdId', 'cmdDesc' ])
 log = getmylogger(__name__)
 
 
-class ConsoleApp(QWidget):
-
-    updateSig = QtCore.pyqtSignal(str)
-
-    
+class ConsoleApp(QWidget):    
     def __init__(self, topic):
         super().__init__()
         self.title = "topic/"+topic
@@ -46,7 +42,7 @@ class ConsoleApp(QWidget):
         # Create ZMQ Receiver
         self.receiver = ZMQReceiver(self.topic, self.subAddr)
         self.receiver.socketDataSig.connect(self.updateConsole)
-        self.updateSig.connect(self.receiver._updateFilt)
+      
         self.receiver.start()
 
     def exitHandler(self):
