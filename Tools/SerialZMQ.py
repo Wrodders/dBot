@@ -1,16 +1,12 @@
 import serial
 import serial.tools.list_ports
-from collections import namedtuple
-import zmq
 
-import lorem
-import time
+import time, csv, zmq
 from typing import Optional
-from logger import getmylogger
+
+from utils import getmylogger
 from sensorSim import SimSensor
-import sys
-import random
-import csv
+
 log = getmylogger(__name__)
 
 

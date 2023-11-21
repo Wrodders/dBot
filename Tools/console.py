@@ -4,20 +4,16 @@ Futher filtering of topic can be done in app
 
 '''
 
-import sys
+
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 
-import zmq
-import threading
-
 from collections import namedtuple
-import argparse
 
-
-from logger import getmylogger
+from utils import getmylogger
+from utils import ZMQReceiver
 
 cmdFormat = namedtuple('cmd', ['cmdId', 'cmdDesc' ])
 
@@ -102,37 +98,3 @@ class ConsoleApp(QWidget):
 
 
 
-class ZMQReceiver(QObject):
-
-    socketDataSig = QtCore.pyqtSignal(str)
-   
-    def __init__(self, topic, subAddr ): 
-        super().__init__()
-        self.subAddr = subAddr
-        self.topic = topic.encode()
-        self.context = zmq.Context.instance()
-        
-    def start(self):
-        threading.Thread(target=self._execute, daemon=True).start()
-
-    def _updateFilt(self, topic : str):
-        self.topic = topic.encode()
-        
-    def _execute(self):
-        '''Execute Thread'''
-
-        log.info("Started ZMQ Receiver")
-        self.socket = self.context.socket(zmq.SUB)
-        self.socket.connect(self.subAddr)
-        self.socket.setsockopt( zmq.SUBSCRIBE, self.topic)
-       
-        while True:
-            try:
-                data = self.socket.recv().decode()
-                self.socketDataSig.emit(data)
-            except Exception as e:
-                log.errror(f"Expeption in Zmq Recviever:{e} ")
-                break
-        log.info(f"exit ZMQ Thread Sub: {self.topic}")
-
-        self.socket.close()
