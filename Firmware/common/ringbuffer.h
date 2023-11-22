@@ -1,14 +1,22 @@
 #ifndef RING_BUFFER_H
 #define RING_BUFFER_H
 
-#define RING_BUFFER_SIZE 16
+#define RING_BUFFER_SIZE 64
 
 typedef struct RingBuffer{
-    uint8_t buf[RING_BUFFER_SIZE];
-    uint8_t size;
-    uint8_t head;
-    uint8_t tail;
+    volatile uint8_t buf[RING_BUFFER_SIZE];
+    volatile uint8_t size;
+    volatile uint8_t head;
+    volatile uint8_t tail;
 }RingBuffer;
+
+
+static RingBuffer ringbuffer_create(uint16_t size){
+    //@Breif: Create Ring Buffer
+    RingBuffer rb = {0};
+    rb.size = size;
+    return rb;
+}
 
 static void ringbuffer_put( RingBuffer *rb, const uint8_t data){
     //@Breif: Add one byte to ring buffer
@@ -20,9 +28,10 @@ static void ringbuffer_put( RingBuffer *rb, const uint8_t data){
 static uint8_t ringbuffer_get(RingBuffer *rb){
     //@Breif: Remove one byte from ring buffer
     const uint8_t data = rb->buf[rb->tail++];
-    rb->tail = rb->tail == rb->size ? 0 : rb->tail; // reset head if end
+    rb->tail = rb->tail == rb->size ? 0 : rb->tail; // reset tail if end
     return data;
 }
+
 
 static uint8_t ringbuffer_peek(const RingBuffer *rb){
     //@Breif: Get one byte from ring buffer withought removing it

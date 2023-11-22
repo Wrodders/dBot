@@ -56,21 +56,33 @@ int main(void){
 	Serial ser1 = serialInit(USART1, GPIOA, GPIO10, GPIO9, GPIO_AF7, NVIC_USART1_IRQ);
 	serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
 
-	TaskHandle uartTask = createTask(100);
+	TaskHandle txTask = createTask(100);
+	TaskHandle rxTask = createTask(100);
 
 	GPIO LED = initGPIO(GPIO5, GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
-	float pi = 3.141;
+	uint32_t len = 0;
+	uint8_t data[20] = {0};
 	for(;;){
 		uint32_t loopTick = get_ticks();
-		gpio_toggle(GPIOA, GPIO5);
-		delay(1000);
-		
-		if(CHECK_TASK(uartTask, loopTick)){
-			char buffer[50];
-			pi =pi+0.001;
+		if(CHECK_TASK(rxTask, loopTick)){
+			
+			if(ringbuffer_empty(&rx1_rb) == 0){
+				len = serialReceive(&ser1,data, 10);
+				if(len != 0){
+					serialSend(&ser1, data, len); // debug trasmit bakc out
+				}
+			}
+			rxTask.lastTick = loopTick;
+		}
+		if(CHECK_TASK(txTask, loopTick)){
+			
+			if(ringbuffer_full(&tx1_rb) == 0){
+				serialSend(&ser1, "HelloWorld\n", 12);
 
-		
-			uartTask.lastTick = loopTick;
+			}
+			
+
+			txTask.lastTick = loopTick;
 		}
 
 

@@ -10,8 +10,7 @@
 Usage: 
 1. serial_init()
 2. serial_config()
-3. serial_begin()  
-
+ 
 Write (blocking) serial_write()
 Write TX ISR    serial_send()
 Read (Blocking) serial_read()          
@@ -28,8 +27,8 @@ typedef struct Serial{
 
 
 // ***** GLOBAL USART RING BUFFERS for ISR *****
-RingBuffer rx1_rb = {.size=RING_BUFFER_SIZE};
-RingBuffer tx1_rb = {.size=RING_BUFFER_SIZE};
+RingBuffer rx1_rb  = {.size = 64};
+RingBuffer tx1_rb =  {.size = 64};
 
 
 
@@ -38,12 +37,22 @@ void usart1_isr(void){
     const bool received_data = usart_get_flag(USART1, USART_FLAG_RXNE) == 1;
     const bool transmit_empty = usart_get_flag(USART1, USART_FLAG_TXE) == 1;
 
-    uint8_t data = 0;
+    volatile uint8_t data = 0;
 
     if(received_data){
-        if(!ringbuffer_full(&rx1_rb)){
-            data = (USART_DR(USART1) & USART_DR_MASK) +1;
-            USART_DR(USART1) = data;
+        if(ringbuffer_full(&rx1_rb) == 0){
+            data = (USART_DR(USART1) & USART_DR_MASK);
+            //gpio_toggle(GPIOA, GPIO5);
+            ringbuffer_put(&rx1_rb, data);
+        } // IF Ring bufffer full susequent data will be discared 
+    }
+    if(transmit_empty){
+        if(ringbuffer_empty(&tx1_rb) == 0){
+            data = ringbuffer_get(&tx1_rb);// get byte from ring buffer
+            USART_DR(USART1) = data & USART_DR_MASK; // write byte
+        }
+        else{
+            usart_disable_tx_interrupt(USART1); // Full contents of buffer have been written
         }
     }
 }
@@ -95,11 +104,45 @@ static void serialWrite(Serial *ser, uint8_t *data, uint16_t size){
 
     for(int i =0; i<size; i++){
         while(!(USART_SR(ser->perif) & USART_SR_TXE)){}; // wait for shift registe to be empty
-        USART_DR(ser->perif) = data[i] & USART_DR_MASK;
+        USART_DR(ser->perif) = data[i] & USART_DR_MASK; // write byte
         while(!(USART_SR(ser->perif) & USART_SR_TC)){}; // wait for transmistion to complete
     }
 }
 
+static void serialRead(Serial *ser, uint8_t *buf, uint16_t size){
+    for(int i =0; i< size; i++){
+        while((USART_SR(ser->perif) & USART_SR_RXNE)){}; // wait for data to be avalibal in receive shift resgter
+        buf[i] = (USART_DR(ser->perif) & USART_DR_MASK) + 1;// test
+    }
+}
+
+static bool serialAvailable(Serial *ser){
+    return (USART_SR(ser->perif) & USART_SR_RXNE); 
+}
+
+
+static void serialSend(Serial *ser, uint8_t *data, uint16_t size){
+    //@Breif: adds data to ring buffer and sets up ISR trasmit
+
+    for(int i =0; i < size; i++){
+        while(ringbuffer_full(&tx1_rb) == 1){}; // if blcoks here often increare size
+        ringbuffer_put(&tx1_rb, data[i]); // add to ring buffer
+    }
+    usart_enable_tx_interrupt(ser->perif); // Set up ISR 
+}
+
+static uint8_t serialReceive(Serial *ser, uint8_t *buf, uint16_t size){
+    //@Breif: Reads size bytes from ring buffer 
+    int i = 0;
+    for(i; i < size; i++){
+        if(ringbuffer_empty(&rx1_rb) ==  1){
+            gpio_toggle(GPIOA, GPIO5);
+            return i; // exit
+        }
+        buf[i] = ringbuffer_get(&rx1_rb) + 1; //test
+    }
+    return i;
+}
     
 
 
