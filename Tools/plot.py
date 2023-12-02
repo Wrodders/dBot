@@ -32,9 +32,7 @@ class MainWindow(QWidget):
 
         # Create the widget
         plotWidget = MatplotlibWidget(self, )
-        controlTab = ControlTab()
         self.layout.addWidget(plotWidget)
-        self.layout.addWidget(controlTab,1,0,2,4)
 
         self.initSignals()
 
@@ -45,44 +43,6 @@ class MainWindow(QWidget):
             "Value": 0,
             "Format": ":x" #value after frist : delim
         }]
-
-
-class ControlTab(QWidget):
-    def __init__(self):
-        super(ControlTab, self).__init__()
-
-        self.tabelHeaders = ["Signal", "Value", "Deviation", "Frequency"]
-
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
-    
-        #Create widgests 
-        self.addSigBtn = QPushButton("Add Signal")
-        self.addSigBtn.setMinimumWidth(150)
-        self.addSigBtn.setMaximumWidth(300)
-
-        self.tableWidget = QTableWidget()
-        self.tableWidget.setMaximumWidth(300)
-        self.tableWidget.setRowCount(3)  # Number of rows
-        self.tableWidget.setColumnCount(4)  # Number of columns
-        self.tableWidget.setHorizontalHeaderLabels(self.tabelHeaders)
-        data = [
-            ["Signal 1", "10", "0.5", "50"],
-            ["Signal 2", "20", "1.0", "30"],
-            ["Signal 3", "15", "0.8", "40"],
-            ["Signal 4", "25", "1.2", "60"],
-            ["Signal 5", "18", "0.6", "45"]
-        ]
-        for row, values in enumerate(data):
-            for col, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                self.tableWidget.setItem(row, col, item)
-                # Make certain fields non-editable
-        self.tableWidget.setAlternatingRowColors(True)
-
-        self.tableWidget.resizeColumnsToContents()
-        self.layout.addWidget(self.tableWidget)
-        self.layout.addWidget(self.addSigBtn)
 
 
 class MatplotlibWidget(QWidget):
@@ -143,9 +103,6 @@ class MatplotlibWidget(QWidget):
 
     def moving_average(self, data, window_size):
         return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
-
-
-
 
 
 
