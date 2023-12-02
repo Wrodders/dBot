@@ -1,7 +1,7 @@
 
 import zmq
-from logger import getmylogger
-import time
+from utils import getmylogger
+
 
 log = getmylogger(__name__)
 

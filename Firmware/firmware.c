@@ -19,6 +19,7 @@ static void clock_setup(void){
 	// Black pill has 25mhz external crystal
 	rcc_clock_setup_pll(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_84MHZ]);
 	// GPIO
+	rcc_periph_clock_enable(RCC_GPIOA);
 	rcc_periph_clock_enable(RCC_GPIOC);
 	rcc_periph_clock_enable(RCC_GPIOB);
 
@@ -59,16 +60,18 @@ int main(void){
 	systick_setup(); // 1ms Tick
 
 	GPIO Led = initGPIO(LED_PIN, LED_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
+	GPIO DrvEn = initGPIO(GPIO4, GPIOA,GPIO_MODE_OUTPUT,GPIO_PUPD_NONE );
+	gpio_set(DrvEn.port,DrvEn.pin);
 
 	Serial ser1 = serial_init(USART1, GPIOB, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
 	serial_config(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
 	serial_begin(&ser1); 
 
 	// Initialize Timer PWM
-    pwm_config_timer(TIM2,84,25000); // set freq to period to 25000 ARR reg
+    pwm_config_timer(TIM2,84,25000); // set freq to period to 25000 ARR regß
 	pwm_init_output_channel(TIM2, TIM_OC1,GPIOA, GPIO0, GPIO_AF1); 
 	pwm_start_timer(TIM2);
-	pwm_set_dutyCycle(TIM2, TIM_OC1, 0.5f); // set to 50%
+	pwm_set_dutyCycle(TIM2, TIM_OC1, 1); // set to 50%
 	
 	// Initialize I2C Sensor	
 	serial_write(&ser1, (uint8_t *)"IMU INIT BEGIN\n", 16);

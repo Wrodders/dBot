@@ -1,4 +1,0 @@
-(sym_lib_table
-  (version 7)
-  (lib (name "DCDriver")(type "KiCad")(uri "${KIPRJMOD}/DCDriver.kicad_sym")(options "")(descr ""))
-)

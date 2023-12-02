@@ -1,13 +1,11 @@
 from SerialZMQ import SerialDevice
 from console import ConsoleApp
+from utils import getmylogger
 
-from logger import getmylogger
 import typer
 from typing import Optional
 from rich import print
-import zmq
-import sys
-import subprocess
+import sys, zmq
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import *
