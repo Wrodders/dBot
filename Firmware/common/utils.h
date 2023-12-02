@@ -149,7 +149,7 @@ static int mysprintf(char *buf, uint8_t dp, char *format, ...){
                 break;
             case INT:
                 uint32_t val2 = va_arg(args,uint32_t);
-                bIdx +=itoa(&buf[bIdx],val2, 10);
+                bIdx += itoa(&buf[bIdx],val2, 10);
                 state = TEXT;
                 fIdx += 2;
                 break;                
