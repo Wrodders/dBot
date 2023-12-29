@@ -9,6 +9,7 @@
 
 #include "ringbuffer.h"
 #include "utils.h"
+#include "queue.h"
 
 
 #ifndef NULL

@@ -11,5 +11,8 @@
         "common.h": "c",
         "comms.h": "c",
         "motor.h": "c"
-    }
+    },
+    "cSpell.words": [
+        "acklogalged"
+    ]
 }
