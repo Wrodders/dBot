@@ -16,7 +16,7 @@ log = getmylogger(__name__)
 class MatplotlibWidget(QWidget):
     def __init__(self, parent=None):
         super(MatplotlibWidget, self).__init__(parent)
-        self.topic = ""
+        self.topic = "A/"
         self.subAddr = 'ipc://SHARED' 
         # Create a figure and axis for the plot
         self.x_len = 200
@@ -96,7 +96,7 @@ class ZMQReceiver(QObject):
        
         while True:
             try:
-                data = self.socket.recv().decode()
+                data = self.socket.recv().decode()[2:]
                 self.socketDataSig.emit(data)
             except Exception as e:
                 log.errror(f"Expeption in Zmq Recviever:{e} ")
