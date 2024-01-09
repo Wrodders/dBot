@@ -14,5 +14,6 @@
     },
     "cSpell.words": [
         "acklogalged"
-    ]
+    ],
+    "editor.detectIndentation": false
 }

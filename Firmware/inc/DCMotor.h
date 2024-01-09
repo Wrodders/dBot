@@ -5,11 +5,17 @@
 /*************************
  * DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
  * Supports:
- * Vector Voltage Control
- * Break & Stop
+ * Voltage Control of Speed and direction
+ * Break & Stop & Coast
  * Acceleration Soft Start/Stop
- * NOTE: TIMER PERIF RCC Must be initialized previsoulsy. 
-*/
+ * NOTE: TIMER PERIF RCC Must be initialized previously. 
+ * 
+ * Closed Loop Control
+ * Velocity
+ * Position
+ * Torque
+ * 
+**************************/
 
 #include "../common/common.h"
 #include "../drivers/pwm.h"
@@ -32,7 +38,7 @@ typedef struct Driver{
 
 typedef struct Motor {
     Driver drv;
-    Encoder *enc;
+    Encoder *enc; 
     bool flipDir; 
     float gR; // gear ratio
     float speed; // shaft speed

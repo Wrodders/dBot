@@ -4,6 +4,14 @@
 
 #include "../common/common.h"
 
+/*
+Hall effect encoder 12 CPR
+
+*/
+
+
+
+
 #define PI  3.14159
 
 typedef struct Encoder {

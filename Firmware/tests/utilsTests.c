@@ -70,6 +70,7 @@ void test_mysprintf(void) {
     assert(strcmp(buf, "Float: 3.141") == 0);
 
     assert(mysprintf(buf, 4,"%f:%f:%f", 0.12345,0.98765,-1.456789) ==  21);
+    
 
     assert(mysprintf(buf, 3, "Value: %d, Float: %f, Text: %s", 4,3.14159,"hello" ) == 35);
     assert(strcmp(buf, "Value: 4, Float: 3.141, Text: hello") == 0);

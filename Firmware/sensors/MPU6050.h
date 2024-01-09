@@ -6,13 +6,6 @@
 #include "../drivers/i2c.h"
 #include <math.h>
 
-
-
-typedef struct vector_t{
-    float x,y,z;
-}vector_t;
-
-
 // MPU6050 Config Registers
 #define MPU6050_ADDR 0x68 // MPU6050 I2C Address
 #define MPU6050_WHO_AM_I 0x75 // Returns address of device (0x68)
@@ -41,14 +34,15 @@ typedef struct Calib_t{
 typedef struct MPU6050_t{
     uint8_t data;
     bool initalized;
-    vector_t accel;
-    vector_t gyro;
+    vector_t accel; //xyz
+    vector_t gyro; // xyz
     Calib_t offset; // Calibration offset
     float roll, pitch; // estimation results
-    uint32_t i2c;
+    uint32_t i2c; //STM32 I2C Device handler
 }MPU6050_t;
 
 
+// *** // *** // INTERNAL // *** // **** // 
 
 static void resetMPU6050(uint32_t i2c){
     // Reset device
@@ -166,11 +160,18 @@ static void calibAccel(MPU6050_t *imu, int samples){
 
 }
 
-static MPU6050_t initMPU6050(uint32_t sda, uint32_t scl, uint32_t port){
+
+// *** // **** // PUBLIC // **** // **** // 
+
+
+static MPU6050_t initMPU6050(uint32_t port, uint32_t scl, uint32_t sda){
     // Initialize MPU6050 Sensor
     MPU6050_t imu;
-    imu.i2c = i2c_setup(I2C1, port, sda, scl);
+    imu.i2c = i2c_setup(I2C1, port, scl, sda);
     delay(100); 
+
+    resetMPU6050(imu.i2c);
+    wakeMPU6050(imu.i2c);
 
     // Set Config Registers
     // Read WHO_AM_I register
@@ -247,151 +248,6 @@ static void getRawAngle(vector_t *accel, float *roll, float *pitch){
 }
 
 
-// ********* Madgwick Filter Functions *****************************************************// 
-typedef struct MadgwickFilter {
-  float    beta;
-  float    q0;
-  float    q1;
-  float    q2;
-  float    q3;
-  float    freq;
-  float    inv_freq;
-  uint32_t counter;
-}MadgwickFilter;
-
-
-// Fast inverse square-root
-// See: http://en.wikipedia.org/wiki/Fast_inverse_square_root
-
-static float invSqrt(float x) {
-    union {
-    float    f;
-    uint32_t i;
-    } conv;
-
-    float       x2;
-    const float threehalfs = 1.5F;
-
-    x2     = x * 0.5F;
-    conv.f = x;
-    conv.i = 0x5f3759df - (conv.i >> 1); // ????
-    conv.f = conv.f * (threehalfs - (x2 * conv.f * conv.f));
-    return conv.f;
-}
-
-static MadgwickFilter initMadgwickfilter(void) {
-    MadgwickFilter filter;
-    configMadqwickFilter(&filter, 100.0f, 0.1f);
-    resetMadgwickFilter(&filter);
-    return filter;
-}
-
-static bool configMadqwickFilter(MadgwickFilter *filter, float freq, float beta){
-    if (!filter) {
-    return false;
-  }
-  filter->beta     = beta;
-  filter->freq     = freq;
-  filter->inv_freq = 1.0f / freq;
-  return true;
-}
-
-
-static bool resetMadgwickFilter(MadgwickFilter *filter){
-     if (!filter) {
-    return false;
-  }
-  filter->q0      = 1.0f;
-  filter->q1      = 0.0f;
-  filter->q2      = 0.0f;
-  filter->q3      = 0.0f;
-  filter->counter = 0;
-  return true;
-}
-
-static bool updateMadgwickFilter(MadgwickFilter *filter, float gx, float gy, float gz, float ax, float ay, float az){
-    float recipNorm;
-    float s0, s1, s2, s3;
-    float qDot1, qDot2, qDot3, qDot4;
-    float _2q0, _2q1, _2q2, _2q3, _4q0, _4q1, _4q2, _8q1, _8q2, q0q0, q1q1, q2q2, q3q3;
-
-    // No need to check filter pointer -- it's checked by _update()
-
-    // Rate of change of quaternion from gyroscope
-    qDot1 = 0.5f * (-filter->q1 * gx - filter->q2 * gy - filter->q3 * gz);
-    qDot2 = 0.5f * (filter->q0 * gx + filter->q2 * gz - filter->q3 * gy);
-    qDot3 = 0.5f * (filter->q0 * gy - filter->q1 * gz + filter->q3 * gx);
-    qDot4 = 0.5f * (filter->q0 * gz + filter->q1 * gy - filter->q2 * gx);
-
-    // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
-    if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
-    // Normalise accelerometer measurement
-    recipNorm = invSqrt(ax * ax + ay * ay + az * az);
-    ax       *= recipNorm;
-    ay       *= recipNorm;
-    az       *= recipNorm;
-
-    // Auxiliary variables to avoid repeated arithmetic
-    _2q0 = 2.0f * filter->q0;
-    _2q1 = 2.0f * filter->q1;
-    _2q2 = 2.0f * filter->q2;
-    _2q3 = 2.0f * filter->q3;
-    _4q0 = 4.0f * filter->q0;
-    _4q1 = 4.0f * filter->q1;
-    _4q2 = 4.0f * filter->q2;
-    _8q1 = 8.0f * filter->q1;
-    _8q2 = 8.0f * filter->q2;
-    q0q0 = filter->q0 * filter->q0;
-    q1q1 = filter->q1 * filter->q1;
-    q2q2 = filter->q2 * filter->q2;
-    q3q3 = filter->q3 * filter->q3;
-
-    // Gradient decent algorithm corrective step
-    s0        = _4q0 * q2q2 + _2q2 * ax + _4q0 * q1q1 - _2q1 * ay;
-    s1        = _4q1 * q3q3 - _2q3 * ax + 4.0f * q0q0 * filter->q1 - _2q0 * ay - _4q1 + _8q1 * q1q1 + _8q1 * q2q2 + _4q1 * az;
-    s2        = 4.0f * q0q0 * filter->q2 + _2q0 * ax + _4q2 * q3q3 - _2q3 * ay - _4q2 + _8q2 * q1q1 + _8q2 * q2q2 + _4q2 * az;
-    s3        = 4.0f * q1q1 * filter->q3 - _2q1 * ax + 4.0f * q2q2 * filter->q3 - _2q2 * ay;
-    recipNorm = invSqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);             // normalise step magnitude
-    s0       *= recipNorm;
-    s1       *= recipNorm;
-    s2       *= recipNorm;
-    s3       *= recipNorm;
-
-    // Apply feedback step
-    qDot1 -= filter->beta * s0;
-    qDot2 -= filter->beta * s1;
-    qDot3 -= filter->beta * s2;
-    qDot4 -= filter->beta * s3;
-    }
-
-    // Integrate rate of change of quaternion to yield quaternion
-    filter->q0 += qDot1 * filter->inv_freq;
-    filter->q1 += qDot2 * filter->inv_freq;
-    filter->q2 += qDot3 * filter->inv_freq;
-    filter->q3 += qDot4 * filter->inv_freq;
-
-    // Normalise quaternion
-    recipNorm   = invSqrt(filter->q0 * filter->q0 + filter->q1 * filter->q1 + filter->q2 * filter->q2 + filter->q3 * filter->q3);
-    filter->q0 *= recipNorm;
-    filter->q1 *= recipNorm;
-    filter->q2 *= recipNorm;
-    filter->q3 *= recipNorm;
-
-    filter->counter++;
-    return true;
-
-}
-
-
-static bool computeEulerAngles(MadgwickFilter *filter, float *roll, float *pitch, float *yaw){
-    if (!filter) {return false;}
-    // Calc Angles
-    *roll = asinf(-2.0f * (filter->q1 * filter->q3 - filter->q0 * filter->q2));
-    *pitch = atan2f(filter->q0 * filter->q1 + filter->q2 * filter->q3, 0.5f - filter->q1 * filter->q1 - filter->q2 * filter->q2);
-    *yaw = atan2f(filter->q1 * filter->q2 + filter->q0 * filter->q3, 0.5f - filter->q2 * filter->q2 - filter->q3 * filter->q3);
-    
-    return true;
-}
 
 #endif
 

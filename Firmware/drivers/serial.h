@@ -79,7 +79,8 @@ void usart1_isr(void){
 
 // ************ SETUP ***************************** // 
 static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t txPin, uint32_t pinMode, uint32_t irq ){
-    //@Breif: Initializes the USART Peripheral Hardware
+    //@Brief: Initializes the USART Peripheral Hardware
+    //@Brief: If irc == NULL serial device will be confirmed without ISR 
     gpio_mode_setup(port, GPIO_MODE_AF, GPIO_PUPD_NONE, rxPin | txPin);
     gpio_set_af(port, pinMode, rxPin| txPin);
 
@@ -118,10 +119,11 @@ static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t s
 }
 
 // *********** POLLING *************************** //
+//@Note: This doesent fully work when the ISR is enabled ???? gives some wired values on read
+
 static void serialWrite(Serial *ser, uint8_t *data, uint16_t size){
     //@Brief: Writes Bytes to USART Trasmit Data Register 
     //@Note: Blocking, waits on transmit complete
-
     for(int i =0; i<size; i++){
         while((USART_SR(ser->perif) & USART_SR_TXE) == 0){}; // wait for shift registe to be empty
         USART_DR(ser->perif) = data[i] & USART_DR_MASK; // write byte

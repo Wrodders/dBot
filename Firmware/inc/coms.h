@@ -13,19 +13,21 @@ The Device; on which this firmware is executed, acts as a data publisher.
 Unique Topics are used in a Pub Sub model where another program acts as a Subscriber.
 It is the Subscribers responsibilty to correctly interpret the messages per topic.
 The Device may only publish over a set list of topics, which can be activated/deactivated.
-The Device may list the format & description of each topic at start up and/or upon request.
+gstThe Device may list the format & description of each topic at start up and/or upon request.
 
 Messages are framed as 
-|-----+-----+-------+- - - +-------|
-| SOF | LEN | TOPIC | DATA | CKSUM |
-| 1   | 2   | 2     | ...  | 2     | 
-|-----+-----+-------+- - - +-------|
+|-----+-----+-------+------+-------+- - - +-------+-------|
+| SOF | LEN | DELIM |TOPIC | DELIM | DATA | DELIM | CKSUM |
+| 1   | 2   | 1     | 2    | 1     | ...   | 1     | 2    |
+|-----+-----+-------+------+-------+- - - +-------+-------|
 
 SOF -- Start of Frame (0x3C / < )
 LEN -- Size of Data (bytes)
 TOPIC -- Hashed Topic String Identifier 
 DATA -- LEN bytes of data
 CKSUM -- 2 byte XOR 
+
+Message Frames Have a Max Size
 
 Topics must declare their message protocols in a format specifier string, e.g "%0.2f:%c:%d:%02d"
 This will be used to encode a message into the frame, and allows the subscriber to correctly decode it. 
@@ -44,62 +46,100 @@ Commands must register their input and response format.
 All Commands have a timeout. Error messages are transmitted back over the Error topic. 
 Parameters to be passed to commands may be specified as required or optional with default values
 
-A succesful command message will be parsed, executed, its responds over cmdResp topic and its acklogalged over cmdRet topic
+A successful command message will be parsed, executed, its responds over cmdResp topic and its acklogalged over cmdRet topic
 Error in any part of this process will result in a Failed cmdRet and an accompanying error message 
 over error topic identifiable by command id
-
 
 */
 
 
-
-#define QUEUE_SIZE 3
 #define START_BYTE '<' // hex 0x3C 
 #define STOP_BYTE  '>' // 
 #define DELIM_BYTE ',' // hex 0x3A
-#define MSG_TOPIC_SIZE 2
-#define MSG_HEADER_SISE  MSG_TOPIC_SIZE + 1 + 1  //TOPIC Delim SIZE
-#define MAX_MSG_DATA_SIZE 54 
-#define MAX_MSG_PACKET_SIZE (sizeof(START_BYTE) + MSG_HEADER_SISE + sizeof(DELIM_BYTE) + MAX_MSG_DATA_SIZE + sizeof(DELIM_BYTE) + sizeof(STOP_BYTE))
+#define TOPIC_SIZE 2
+#define CKSUM_SIZE 2
+#define MAX_MSG_DATA_SIZE 64
+#define MSG_OVERHEAD_SIZE  sizeof(START_BYTE) + 2 + 1 + TOPIC_SIZE + 1 + CKSUM_SIZE
+#define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
+ 
 
-typedef enum MsgState{
-    MSG_WAIT = 0,
-    MSG_START,
-    MSG_ID,
-    MSG_SIZE,
-    MSG_DATA,
-    MSG_COMPLETE
-}MsgState;
+#define QUEUE_SIZE 3
 
-typedef struct Message{
-    MsgState state;
-    char topic[2]; 
+#define MAX_TOPICS 10
+#define NAME_SIZE 10
+#define MAX_DATA_ARGS 5
+#define FORMAT_SIZE (MAX_DATA_ARGS * 2) + MAX_DATA_ARGS - 1
+
+
+
+typedef struct MsgFrame{
     uint8_t size;
-    char data[MAX_MSG_DATA_SIZE];
-}Message;
+    char buf[MAX_MSG_FRAME_SIZE]; 
+}MsgFrame;
 
-typedef struct MsgPacket{
-    uint8_t size;
-    char buf[MAX_MSG_PACKET_SIZE]; 
-}MsgPacket;
 
-typedef enum MsgTopic{
-    DEBUG,
-    IMU,
-    SPEED,
-    VBAT
+typedef struct MsgTopic{
+    char id[TOPIC_SIZE];
+    char name[NAME_SIZE]; 
+    char delim;
+    char fmt[FORMAT_SIZE]; // argument format
+    uint8_t numArgs; 
+    bool active;
 }MsgTopic;
 
+typedef struct MsgHandler{
+    uint8_t count;
+    MsgTopic *topics[MAX_TOPICS];
+}MsgHandler;
 
-// ********* Command Interface *******************************************//
+static MsgTopic initTopic(char *name, const char delim, char *format, uint8_t numArgs){
+    MsgTopic tp;
+
+    if(uCpy(tp.name, name, NAME_SIZE) == 0){tp.active = false;}
+
+    if(numArgs > MAX_DATA_ARGS){tp.active = false;}
+    tp.numArgs = numArgs;
+    if(uCpy(tp.fmt, format, FORMAT_SIZE) == 0){tp.active = false;}
+    tp.delim = delim;
+    tp.active = true;
+    return tp;
+}
+
+static void activateTopic(MsgTopic *tp){ tp->active = true;}
+
+static void disableTopic(MsgTopic *tp){ tp->active = false;}
+
+static int addTopic(MsgHandler *handler, MsgTopic *tp){
+    if(handler == NULL && tp == NULL){return -1;}
+    if(handler->count >= MAX_TOPICS){return -1;}
+    handler->topics[handler->count++] = tp;
+    // ecode index into letters
+    int base = 26;
+    tp->id[0] = 'A' + (handler->count/base) - 1;
+    tp->id[1] = 'A' + (handler->count % base);
+
+}
+
+static *MsgTopic getTopic(MsgHandler *handler, char *id){
+    int base = 26; // Number of letters in the alphabet
+    int idx = 0;
+    idx += (letters[0] - 'A' + 1) * base;
+    idx += letters[1] - 'A' + 1;
+    
+}
 
 
 
 
-//****** Queue ***********************************************************//
 
-QUEUE_DECLARATION(serTXQueue, MsgPacket, QUEUE_SIZE);
-QUEUE_DEFINITION(serTXQueue, MsgPacket);
+
+
+
+
+//****** Transmission Queue ***********************************************************//
+
+QUEUE_DECLARATION(serTXQueue, MsgFrame, QUEUE_SIZE);
+QUEUE_DEFINITION(serTXQueue, MsgFrame);
 
 struct serTXQueue sertxQueue;
 
@@ -118,7 +158,7 @@ static void publish(const char *buf, uint8_t dataSize, MsgTopic topic){
     #define SIZE_IDX = 3, // skip delim
     #define DATA_IDX = 5, //skip delim
     
-    MsgPacket packet;
+    MsgFrame packet;
     uint8_t idx = 0;
     uint8_t payloadSize;
     if (dataSize > MAX_MSG_DATA_SIZE){
@@ -129,6 +169,7 @@ static void publish(const char *buf, uint8_t dataSize, MsgTopic topic){
     }
     packet.buf[idx++] = START_BYTE;
     packet.buf[idx++] = topic;
+
     packet.buf[idx++] = DELIM_BYTE;
     packet.buf[idx++] = payloadSize; 
     packet.buf[idx++] = DELIM_BYTE;
@@ -145,7 +186,7 @@ static void publish(const char *buf, uint8_t dataSize, MsgTopic topic){
 
 static bool sendPckt(Serial *ser){
     //@Breif: Pulls message from queue and sends to UART buffer
-    MsgPacket pckt;
+    MsgFrame pckt;
     enum dequeue_result res = serTXQueue_dequeue(&sertxQueue,&pckt);
     if(res == DEQUEUE_RESULT_EMPTY){
         return false;
