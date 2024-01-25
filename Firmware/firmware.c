@@ -2,36 +2,54 @@
 
 #include "common/common.h"
 #include "drivers/serial.h"
-#include "drivers/pwm.h"
-#include "inc/MPU6050.h"
+#include "inc/imu.h"
+
+
+
 
 #define LED_PORT 		GPIOC
 #define LED_PIN			GPIO13
 
-#define DEBUG_RX		GPIO7
-#define DEBUG_TX		GPIO6
+// Debug UART 
+#define DEBUG_USART		USART1
+#define DEBUG_PORT		GPIOA
+#define DEBUG_RX		GPIO10 // UART1 PB7/8
+#define DEBUG_TX		GPIO9
 
-#define SDA_PIN			GPIO8
-#define SCL_PIN			GPIO9
+// Bluetooth UART
+#define BT_USART		USART6
+#define BT_PORT			GPIOA
+#define BT_TX			GPIO11
+#define BTRX			GPIO12
+
+// MPU6050 IMU @ I2C1 on GPIOB 
+#define I2C_PORT		GPIOB 
+#define I2C_SDA			GPIO9
+#define I2C_SCL			GPIO8
+
+// DRV8833 2-CH PWM DC Motor Controller 
+#define PWMA_TIM 		TIM2
+#define PWMA_PORT		GPIOA
+#define PWMACH1_PIN		GPIO0
+#define PWMACH2_PIN		GPIO1
+#define PWMB_TIM		TIM2
+#define PWMB_PORT		GPIOA
+#define PWMBCH3_PIN		GPIO2
+#define PWMBCH4_PIN		GPIO3
 
 // ******* Clock Set Up ****************************************************** //
 static void clock_setup(void){
 	// Black pill has 25mhz external crystal
 	rcc_clock_setup_pll(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_84MHZ]);
-	// GPIO
+	// Peripheral enables
 	rcc_periph_clock_enable(RCC_GPIOA);
-	rcc_periph_clock_enable(RCC_GPIOC);
 	rcc_periph_clock_enable(RCC_GPIOB);
+	rcc_periph_clock_enable(RCC_GPIOC);
 
-	// USART
+
 	rcc_periph_clock_enable(RCC_USART1);
 
-	// Timer
-	rcc_periph_clock_enable(RCC_TIM2); 
-
-	// I2C
 	rcc_periph_clock_enable(RCC_I2C1);
-
 	return;
 }
 
@@ -42,71 +60,67 @@ static void systick_setup(void){
 	return;
 }
 
-// **** GPIO Setup ************************************************************** //
-static GPIO initGPIO(uint32_t pin, uint32_t port, uint32_t mode, uint32_t pupd) {
-	GPIO p;
-	p.pin = pin;
-	p.port = port;
-
-	gpio_mode_setup(p.port, mode, pupd, p.pin);
-	return p;
-}
-
-
-
 
 int main(void){
+
+	// ***** SETUP ********** //
 	clock_setup(); // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup(); // 1ms Tick
 
-	GPIO Led = initGPIO(LED_PIN, LED_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
-	GPIO DrvEn = initGPIO(GPIO4, GPIOA,GPIO_MODE_OUTPUT,GPIO_PUPD_NONE );
-	gpio_set(DrvEn.port,DrvEn.pin);
 
-	Serial ser1 = serial_init(USART1, GPIOB, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
-	serial_config(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-	serial_begin(&ser1); 
-
-	// Initialize Timer PWM
-    pwm_config_timer(TIM2,84,25000); // set freq to period to 25000 ARR regß
-	pwm_init_output_channel(TIM2, TIM_OC1,GPIOA, GPIO0, GPIO_AF1); 
-	pwm_start_timer(TIM2);
-	pwm_set_dutyCycle(TIM2, TIM_OC1, 1); // set to 50%
+	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 	
-	// Initialize I2C Sensor	
-	serial_write(&ser1, (uint8_t *)"IMU INIT BEGIN\n", 16);
-	MPU6050_t imu = initMPU6050(SDA_PIN, SCL_PIN, GPIOB);
-	if(!imu.initalized){
-		char buffer[60];
-		int datalen = mysprintf(buffer, 4,"%d\n", imu.data);
-		serial_write(&ser1, (uint8_t *)buffer, datalen);
-		serial_write(&ser1, (uint8_t *)"IMU INIT FAIL\n", 15);
-	}
-	MadgwickFilter mf = initMadgwick(500, 0.1f);
+    Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
+	serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
+	serialSend(&ser1, (uint8_t *)"Hello World\n", 13);
+
+	//MPU6050_t mpu6050 = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
+    IMU imu = {0};
+    uint8_t len;
+	uint8_t buf[20] = {0}; // Transmit data buffer
+	//if(mpu6050.initalized == false){
+	//	len = mysprintf((char *)buf, 0, "FAIL: %d :\n", mpu6050.data);
+    //    serialSend(&ser1, buf, len);
+	//}
 
 
-	TaskHandle blinkTask = createTask(500);
-	TaskHandle uartTask = createTask(100);
-	TaskHandle imuTask = createTask(2);
 
-	
+    // ***** Create Fixed time Tasks ***** // 
+
+    TaskHandle blinkTask = createTask(1000); // 1sec = 1 Hz 
+    TaskHandle mpu6050Task = createTask(1); // 2ms = 500 Hz 
+    TaskHandle imuTask = createTask(1); // 50ms = 200 Hz
+    TaskHandle serialTask = createTask(100); // 100ms = 10hz
+    mpu6050Task.enable = false;
+    imuTask.enable = false;
+    uint32_t loopTick;
+    uint32_t imuTickTime = 0;
+
 	for(;;){
-		uint32_t loopTick = get_ticks();
-		if(CHECK_TASK(blinkTask, loopTick)){
-			gpio_toggle(Led.port, Led.pin);
-			blinkTask.lastTick = loopTick;
-		}else if(CHECK_TASK(uartTask, loopTick)){
-			char buffer[60];
-			int datalen = mysprintf(buffer, 4,"%f:%f\n", imu.roll, imu.pitch);
-			serial_write(&ser1, (uint8_t *)buffer, datalen);
-			uartTask.lastTick = loopTick;
-		}else if(CHECK_TASK(imuTask, loopTick)){
-			readMPU6050(&imu);
-    		computeAngles(&imu.gyro, &imu.accel, &imu.roll, &imu.pitch);
-			MadgwickAHRSupdateIMU(&mf, imu.gyro.x, imu.gyro.y, imu.gyro.z, imu.accel.x, imu.accel.y, imu.accel.z);
-			imuTask.lastTick = loopTick;
-		}
+        loopTick = get_ticks();
+        if(CHECK_TASK(mpu6050Task, loopTick)){
+            //readMPU6050(&mpu6050);
+            mpu6050Task.lastTick = loopTick;
+        }
 
+        else if(CHECK_TASK(imuTask, loopTick)){
+            //updateOrientation(&imu, &mpu6050.accel, &mpu6050.gyro);
+            imuTask.lastTick = loopTick;
+        }
+        else if(CHECK_TASK(blinkTask, loopTick)){
+            gpio_toggle(led.port, led.pin);    
+            blinkTask.lastTick = loopTick;
+        }
+        else if(CHECK_TASK(serialTask, loopTick)){
+            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",mpu6050.accel.x, mpu6050.accel.y, mpu6050.accel.z);
+            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",imu.roll, imu.pitch, imu.yaw);
+            len = mysprintf((char *)buf, 3,"%d:%f\n",get_ticks(), (float)(get_ticks()/1000));
+		    serialSend(&ser1, buf,len );
+            serialTask.lastTick = loopTick;
+        }
 
 	}
+
+	
+	
 }

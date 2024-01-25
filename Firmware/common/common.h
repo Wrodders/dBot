@@ -9,7 +9,12 @@
 
 #include "ringbuffer.h"
 #include "utils.h"
+#include "queue.h"
 
+
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
 
 #define TICK			1000     // 1ms
 #define CPU_FREQ		84000000 // 84Mhz
@@ -33,15 +38,27 @@ static void delay(uint32_t milleseconds) {
   return;
 }
 
+
+// ************* GPIO ************ //
 typedef struct  GPIO {
 	uint32_t pin;
 	uint32_t port;
 }GPIO;
 
+static GPIO initGPIO(uint32_t pin, uint32_t port, uint32_t mode, uint32_t pupd) {
+	GPIO p;
+	p.pin = pin;
+	p.port = port;
+
+	gpio_mode_setup(p.port, mode, pupd, p.pin);
+	return p;
+}
+
+
+
+// ********* TASKS ************** //
 
 #define CHECK_TASK(TASK, LOOPTICK) 	((LOOPTICK - TASK.lastTick >= TASK.rate) && (TASK.enable))
-
-
 
 typedef struct TaskHandle{
     uint32_t lastTick;
@@ -66,6 +83,11 @@ static void enableTask(TaskHandle *t){
 	t->enable = true;
 	return;
 }
+
+
+
+
+
 
 #endif // COMMON_h
 

@@ -12,8 +12,8 @@ static void _i2c_reset(uint32_t i2cPerif){
 static uint32_t i2c_setup(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin, uint32_t sdaPin){
     //@Breif: Configures I2C Peripheral on GPIO pins
     //@Note: Requieres Clocks to be enabeld for GPIO's & I2C
-
-    gpio_mode_setup(gpioPort, GPIO_MODE_AF, GPIO_PUPD_NONE,  sclPin| sdaPin); 
+    // ENUSRE PUPD_PULLUP IS ENABLED !!!!!!
+    gpio_mode_setup(gpioPort, GPIO_MODE_AF, GPIO_PUPD_PULLUP,  sclPin| sdaPin); 
     gpio_set_output_options(gpioPort, GPIO_OTYPE_OD, GPIO_OSPEED_50MHZ, sclPin | sdaPin);
     gpio_set_af(gpioPort, GPIO_AF4, sclPin | sdaPin);
 
@@ -26,12 +26,9 @@ static uint32_t i2c_setup(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin,
     i2c_set_ccr(i2cPerif, 0x8019); // Set the bus clock frequency
 
     i2c_set_trise(i2cPerif, 43); // Max Rise time
-   
     i2c_peripheral_enable(i2cPerif);
     return i2cPerif;
 }
-
-
 
 
 static uint16_t i2c_read_seq(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t *data, uint16_t len) {
@@ -145,7 +142,7 @@ static void _i2c_write_reg(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t dat
     // I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED EV6: BUSY, MSL, ADDR, TXE and TRA 
     while (!(  (I2C_SR1(i2c) & (I2C_SR1_TxE | I2C_SR1_ADDR)) & 
                (I2C_SR2(i2c) & (I2C_SR2_MSL | I2C_SR2_BUSY | I2C_SR2_TRA)) ));
-    //(void)I2C_SR2(i2c);
+    (void)I2C_SR2(i2c);
 
     i2c_send_data(i2c, reg);
     // I2C_EVENT_MASTER_BYTE_TRANSMITTED EV8_2: TRA, BUSY, MSL, TXE and BTF 

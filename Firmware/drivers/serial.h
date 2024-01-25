@@ -4,118 +4,197 @@
 #include "../common/common.h"
 #include <libopencm3/stm32/usart.h>
 
+/******* USART Serial Driver **********
+Usage: 
+1. serial_init()
+2. serial_config()
+ 
+Write (blocking) serial_write()
+Write TX ISR    serial_send()
+Read (Blocking) serial_read()          
+Read (RX ISR)   serial_receive()
+**************************************/
 
 typedef struct Serial{
     uint32_t perif;
+    RingBuffer *rxBuf;
+    RingBuffer *txBuf;
+    bool recvFlag;
 }Serial;
 
+// ***** GLOBAL USART RING BUFFERS for ISR *****
+RingBuffer rx1_rb  = {.size = 64};
+RingBuffer tx1_rb =  {.size = 64};
 
-#define UART_BUFFER_SIZE (16)
+// ************** ISR's ************************** // 
+static RingBuffer *getRingBuffer(uint32_t usart){
+    RingBuffer *rb;
+    switch(usart){ // assign global ring buffers
+        case USART1:
+            rb = &tx1_rb;
+            break;
+        default:
+            return NULL; // exit 
+    }
+    return rb;
+}
 
-static uint8_t uartRB[UART_BUFFER_SIZE];
-static Ring_Buffer tx_buffer = {.buffer = uartRB, .size = sizeof(uartRB)}; // Place holder for class
 
+
+static void usartTX_ISR(uint32_t usart){
+    //@Brief: Generic ISR Handler for TX USART
+    RingBuffer *rb = getRingBuffer(usart);
+    volatile uint8_t data = 0;
+    if(ringbuffer_empty(rb) == 0){
+        data = ringbuffer_get(rb); 
+        USART_DR(usart) = data & USART_DR_MASK; // write byte
+    }
+    else{
+        usart_disable_tx_interrupt(usart); // Full contents of buffer have been written
+    }
+}
+
+static void usartRX_ISR(uint32_t usart){
+    //@Brief: Generic ISR Handler for RX USART
+    RingBuffer *rb = getRingBuffer(usart);
+    volatile uint8_t data = 0;
+    if(ringbuffer_full(&rx1_rb) == 0){
+        data = (USART_DR(USART1) & USART_DR_MASK);
+        ringbuffer_put(&rx1_rb, data);
+    } // If ring buffer full subsequent data will be discared 
+}
 
 void usart1_isr(void){
     const bool overrun_occurred = usart_get_flag(USART1, USART_FLAG_ORE) == 1;
     const bool received_data = usart_get_flag(USART1, USART_FLAG_RXNE) == 1;
     const bool transmit_empty = usart_get_flag(USART1, USART_FLAG_TXE) == 1;
 
-    if (transmit_empty) {  // Transmit buffer is empty - send next byte
-        if (!ringbuffer_empty(&tx_buffer)) { // Data available in RingBuffer
-            // send element from ring buffer
-            USART_DR(USART1) = ringbuffer_get(&tx_buffer);
-
-        } else {
-            // Buffer is empty, disable TXE interrupt
-            USART_CR1(USART1) &= ~USART_CR1_TXEIE;
-        }
+    if(received_data){
+        usartRX_ISR(USART1);
+    }
+    if(transmit_empty){
+       usartTX_ISR(USART1);
     }
 }
 
+// ************ SETUP ***************************** // 
+static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t txPin, uint32_t pinMode, uint32_t irq ){
+    //@Brief: Initializes the USART Peripheral Hardware
+    //@Brief: If irc == NULL serial device will be confirmed without ISR 
+    gpio_mode_setup(port, GPIO_MODE_AF, GPIO_PUPD_NONE, rxPin | txPin);
+    gpio_set_af(port, pinMode, rxPin| txPin);
 
-
-static Serial serial_init( uint32_t uartPerif, uint32_t gpioPort, uint32_t rxPin, uint32_t txPin, uint32_t gpioAF, uint8_t irq){
-    //@Breif: Sets up USART Periferal on GPIOS
-    //@Note: Requires GPIO and USART Clocks to be enabled
-    gpio_mode_setup(gpioPort, GPIO_MODE_AF, GPIO_PUPD_NONE, rxPin | txPin); // tx RX
-    gpio_set_af(gpioPort, gpioAF, rxPin | txPin);
-
-    USART_CR1(uartPerif) &= ~USART_CR1_UE;  // Disable UART for configuration
+    usart_disable(perif);
 
     if(irq != 0){
-        USART_CR1(uartPerif) |= USART_CR1_RXNEIE;   // enable interupt receive data Shift Register not empty                           
-        
-        USART_SR(uartPerif) &= ~USART_SR_TXE; // clear TX Empty flag before enabling interupt
-        USART_CR1(uartPerif) |= USART_CR1_TXEIE; // enable TX inteupt
-        
-        nvic_enable_irq(irq); // enable interupt in NVIC
+        usart_enable_rx_interrupt(perif);
+        nvic_enable_irq(irq); // enable irq in nvic
     }
 
     Serial ser;
-    ser.perif = uartPerif;
-    return ser;
-}
-
-static void serial_config(Serial *serial, uint32_t baud, uint32_t dataBits, uint32_t stopBits, uint32_t parity, uint32_t flowcontrol){
-    //@Breif: Configures USART parameteres
-    uint32_t usart = serial->perif;
-
-    USART_CR1(usart) = (USART_CR1(usart) & ~USART_MODE_MASK) | USART_MODE_TX_RX; // enable TX and RX
-    uint32_t clock = rcc_apb2_frequency;
-    if(usart == USART2){
-        clock = rcc_apb1_frequency;
+    ser.perif = perif;
+    // Assign Global Ring Buffer 
+    switch(perif){
+        case USART1:
+            ser.rxBuf = &rx1_rb;
+            ser.txBuf = &tx1_rb;
+            break;
+        default:
+            break;
     }
-    USART_BRR(usart) = (clock + baud / 2) / baud; // set baudrate     
-    if (dataBits == 8) { 
-		USART_CR1(usart) &= ~USART_CR1_M; // * 8 bit word
-	} else {
-		USART_CR1(usart) |= USART_CR1_M;  // 9 bit word
-	}
-
-    USART_CR2(usart) = (USART_CR2(usart) & ~USART_CR2_STOPBITS_MASK) | stopBits;     // clear and set stop bits
-    USART_CR1(usart) = (USART_CR1(usart) & ~USART_PARITY_MASK) | parity;            // clear and set parity bits
-    USART_CR3(usart) = (USART_CR3(usart) & ~USART_FLOWCONTROL_MASK) | flowcontrol;  // clear and set flow controll bits
-    return;
+    return ser;    
 }
 
-static void serial_begin(Serial *ser){
-    //@Breif: Enables USART
-    USART_CR1(ser->perif) |= USART_CR1_UE;  // Enable
-    return; 
+static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t stopBits, uint32_t parity, uint32_t flowcontroll ){
+    //@Breif: Configures USART Parameters
+
+    uint32_t usart = ser->perif;
+    usart_set_mode(usart, USART_MODE_TX_RX);
+    usart_set_baudrate(usart, baud );
+    usart_set_databits(usart, databits);
+    usart_set_stopbits(usart, stopBits);
+    usart_set_parity(usart, parity);
+    usart_set_flow_control(usart, flowcontroll);
+    usart_enable(usart);
 }
 
+// *********** POLLING *************************** //
+//@Note: This doesent fully work when the ISR is enabled ???? gives some wired values on read
 
-static void serial_writeByte(Serial *ser, uint8_t byte){
-    //@breif: Blocking write byte to USART TX FIFO
-    while(!(USART_SR(ser->perif) & USART_SR_TXE)){}; // wait for shift registe to be empty
-    USART_DR(ser->perif) = byte;
-    while(!(USART_SR(ser->perif) & USART_SR_TC)){}; // wait for transmistion to complete
-}
-
-static void serial_write(Serial *ser, uint8_t *data, uint16_t size){
-    //@breif: blocking send array to USART FIFO
-    for(uint16_t i = 0; i < size; i++){
-        serial_writeByte(ser, data[i]);
+static void serialWrite(Serial *ser, uint8_t *data, uint16_t size){
+    //@Brief: Writes Bytes to USART Trasmit Data Register 
+    //@Note: Blocking, waits on transmit complete
+    for(int i =0; i<size; i++){
+        while((USART_SR(ser->perif) & USART_SR_TXE) == 0){}; // wait for shift registe to be empty
+        USART_DR(ser->perif) = data[i] & USART_DR_MASK; // write byte
     }
 }
 
-static void serial_sendByte(Serial *ser, uint8_t byte){
-    //@Breif: Interupt Driven write byte to USARt FIFO
-    while (ringbuffer_full(&tx_buffer)) {} ; // If  blokc often, increase rb sieze
-    ringbuffer_put(&tx_buffer, byte); // input ring buffer
-    if ((USART_CR1(ser->perif) & USART_CR1_TXEIE) == 0) {
-        usart_enable_tx_interrupt(ser->perif);
+static void serialRead(Serial *ser, uint8_t *buf, uint16_t size){
+    //@Brief: Reads from USART Receive Data Register
+    //@Note: Blocking, waits on data available
+    for(int i =0; i< size; i++){
+        while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; // wait for data to be avalibal in receive shift resgter
+        buf[i] = (USART_DR(ser->perif) & USART_DR_MASK);
     }
-    return;
 }
 
-static void serial_send(Serial *ser, uint8_t *data, uint16_t size){
-    //@Breif: Intrupt Driven write array to USART FIFO
-    for (uint16_t i = 0; i < size; i++) {
-        serial_sendByte(ser, data[i]);
+static uint8_t serialReadLine(Serial *ser, uint8_t *buf, uint8_t size){
+    //@Brief: Reads USART Data Register until \n 
+    //@Note: Blocking, waits on data available
+    uint8_t c, i;
+    for(i = 0; i < size; i++){
+        while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; // wait for data
+        c = (USART_DR(ser->perif) & USART_DR_MASK);
+        if(c == '\n'){
+            buf[i] = '\0'; // null terminate
+            return i;
+        }
+        buf[i] = c;
     }
-    return;
+    return i;
 }
+
+static bool serialAvailable(Serial *ser){
+    //Brief: Checks if Data available in USART Receive Register
+    return (USART_SR(ser->perif) & USART_SR_RXNE); 
+}
+
+// *********** ISR DRIVEN *********************** //
+
+static void serialSend(Serial *ser, uint8_t *data, uint16_t size){
+    //@Breif: adds data to ring buffer and sets up ISR trasmit
+    //@Note: Blocks if ringbuffer full
+
+    for(int i =0; i < size; i++){
+        while(ringbuffer_full(ser->txBuf) == 1){}; 
+        ringbuffer_put(ser->txBuf, data[i]);
+    }
+    usart_enable_tx_interrupt(ser->perif); // Set up ISR 
+}
+
+static uint8_t serialReceive(Serial *ser, uint8_t *buf, uint16_t size){
+    //@Brief: reads size bytes from ring buffer 
+    //@Note: Blocks, Returns number of bytes read
+    int i = 0;
+    for(; i < size; i++){
+        while(ringbuffer_empty(ser->rxBuf) == 1){};
+        buf[i] = ringbuffer_get(ser->rxBuf);
+    }
+    return i;
+}
+
+static uint8_t serialGrab(Serial *ser, uint8_t *buf, uint16_t size){
+    //@Brief: Attempts to read size bytes from ring buffer
+    //@Note: If less bytes available returns num of bytes read
+    int i = 0;
+    for(; i < size; i++){
+        if(ringbuffer_empty(ser->rxBuf) == 1){return i;}
+        buf[i] = ringbuffer_get(ser->rxBuf);
+    }
+    return i;
+
+}
+    
 
 #endif // SERIAL_H
