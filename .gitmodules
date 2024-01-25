@@ -1,6 +1,3 @@
-[submodule "Tools/--name"]
-	path = Tools/--name
-	url = https://github.com/Wrodders/ComsTerm
 [submodule "Tools/ComsTerm"]
 	path = Tools/ComsTerm
 	url = https://github.com/Wrodders/ComsTerm
