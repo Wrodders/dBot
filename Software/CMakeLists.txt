@@ -1,29 +1,30 @@
-cmake_minimum_required(VERSION 3.10)
-project(serialComs C)
+# CMake version
+cmake_minimum_required(VERSION 3.12)
 
+# Project name
+project(dbot)
 
-set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+# Set the output directories
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# Add source files
-set(SRC_FILES
-    serialComs.c
+# Add your source files
+set(SOURCES
+    src/main.c
     lib/stringlib.c
 )
 
-# Add header files
-set(LIB_FILES
-    lib/stringlib.h
-)
+# Create the executable
+add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Create an executable
-add_executable(serialComs ${SRC_FILES})
 
-# Include the inc/ folder for header files
-target_include_directories(serialComs PRIVATE lib)
+target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
 
-# Create a library
-add_library(stringlib STATIC lib/stringlib.c)
+# Optionally, you can organize your source files into folders
+# source_group("src" FILES ${SOURCES})
 
-# Link the library to the executable
-target_link_libraries(serialComs PRIVATE stringlib)
+# Optionally, you can add include directories
+target_include_directories(${PROJECT_NAME} PRIVATE inc lib)
+
+

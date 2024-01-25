@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "czmq.h": "c",
+        "czmq_library.h": "c",
+        "czmq_prelude.h": "c",
+        "zmq.h": "c"
+    },
+    "cSpell.words": [
+        "zsock"
+    ]
+}
