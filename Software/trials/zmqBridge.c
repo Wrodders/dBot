@@ -6,8 +6,6 @@
 #include <czmq.h>
 
 
-
-
 int main(int argc, char **argv){
 
     zsock_t *responder = zsock_new(ZMQ_REP);

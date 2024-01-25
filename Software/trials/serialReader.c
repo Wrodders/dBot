@@ -1,11 +1,21 @@
-#include "../common/common.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libserialport.h>
+#include <unistd.h>
+
+
 #include "../inc/serialComs.h"
+
 
 
 void printUsage() {
     printf("Usage: serial_udp_bridge <serial_port> <baud_rate>\n");
 }
 
+/*
+Reads from serial port to STDOUT
+*/
 int main(int argc, char **argv){
 
     if (argc != 3) {
@@ -25,7 +35,6 @@ int main(int argc, char **argv){
         return -1;
     }
     
-
     sp_flush(port, SP_BUF_INPUT);
     while (1) {
         char buffer[256];
@@ -33,7 +42,7 @@ int main(int argc, char **argv){
 
         if (len > 0) {
             buffer[len] = '\0'; // Null-terminate the received data
-            printf("%d:%s", len, buffer);
+            fputs(buffer, stdout);
             fflush(stdout);
         }
     }
