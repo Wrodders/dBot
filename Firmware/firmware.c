@@ -2,7 +2,9 @@
 
 #include "common/common.h"
 #include "drivers/serial.h"
-#include "sensors/MPU6050.h"
+#include "inc/imu.h"
+
+
 
 
 #define LED_PORT 		GPIOC
@@ -10,9 +12,9 @@
 
 // Debug UART 
 #define DEBUG_USART		USART1
-#define DEBUG_PORT		GPIOB
-#define DEBUG_RX		GPIO7 // UART1 PB7/8
-#define DEBUG_TX		GPIO6
+#define DEBUG_PORT		GPIOA
+#define DEBUG_RX		GPIO10 // UART1 PB7/8
+#define DEBUG_TX		GPIO9
 
 // Bluetooth UART
 #define BT_USART		USART6
@@ -67,30 +69,55 @@ int main(void){
 
 
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
-	Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
+	
+    Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
 	serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-	serialSend(&ser1, "hello\n", 7);
+	serialSend(&ser1, (uint8_t *)"Hello World\n", 13);
 
-	MPU6050_t imu = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
-	uint8_t l;
-	if(imu.initalized == false){
-		char ahh[10]; 
-		l = mysprintf(ahh, 0, "FAIL: %d :\n", imu.data);
-	}
+	//MPU6050_t mpu6050 = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
+    IMU imu = {0};
+    uint8_t len;
+	uint8_t buf[20] = {0}; // Transmit data buffer
+	//if(mpu6050.initalized == false){
+	//	len = mysprintf((char *)buf, 0, "FAIL: %d :\n", mpu6050.data);
+    //    serialSend(&ser1, buf, len);
+	//}
 
-	
-	
-	uint32_t len = 0;
-	uint8_t data[20] = {0};
-	uint8_t buf[20] = {0};
+
+
+    // ***** Create Fixed time Tasks ***** // 
+
+    TaskHandle blinkTask = createTask(1000); // 1sec = 1 Hz 
+    TaskHandle mpu6050Task = createTask(1); // 2ms = 500 Hz 
+    TaskHandle imuTask = createTask(1); // 50ms = 200 Hz
+    TaskHandle serialTask = createTask(100); // 100ms = 10hz
+    mpu6050Task.enable = false;
+    imuTask.enable = false;
+    uint32_t loopTick;
+    uint32_t imuTickTime = 0;
+
 	for(;;){
-		gpio_toggle(led.port, led.pin);
-		readMPU6050(&imu);
-		len = mysprintf((char *)buf, 3,"%f:%f:%f:%f\n",get_ticks(), (float )get_ticks()/1000, imu.accel.x, imu.accel.y, imu.accel.z);
-		memset(data, 0, 20);
-		serialSend(&ser1, buf,len );
-		delay(100);
-	
+        loopTick = get_ticks();
+        if(CHECK_TASK(mpu6050Task, loopTick)){
+            //readMPU6050(&mpu6050);
+            mpu6050Task.lastTick = loopTick;
+        }
+
+        else if(CHECK_TASK(imuTask, loopTick)){
+            //updateOrientation(&imu, &mpu6050.accel, &mpu6050.gyro);
+            imuTask.lastTick = loopTick;
+        }
+        else if(CHECK_TASK(blinkTask, loopTick)){
+            gpio_toggle(led.port, led.pin);    
+            blinkTask.lastTick = loopTick;
+        }
+        else if(CHECK_TASK(serialTask, loopTick)){
+            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",mpu6050.accel.x, mpu6050.accel.y, mpu6050.accel.z);
+            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",imu.roll, imu.pitch, imu.yaw);
+            len = mysprintf((char *)buf, 3,"%d:%f\n",get_ticks(), (float)(get_ticks()/1000));
+		    serialSend(&ser1, buf,len );
+            serialTask.lastTick = loopTick;
+        }
 
 	}
 

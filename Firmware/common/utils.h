@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include <stdarg.h>
+#include <stdbool.h>
 
 
 // *** // MATH // **** // 
@@ -99,8 +100,10 @@ static int ftoa(char *buf, float val, int precision){
     }
 
     // Convert the whole part to string
+    // This works but should be cleaned up
     if (intPart == 0) {
         buf[i++] = '0'; // pad with 0
+        start = i; 
     } else {
         start = i; // Save the start index of the whole part
         while (intPart > 0) {
@@ -108,6 +111,8 @@ static int ftoa(char *buf, float val, int precision){
             intPart /= 10; //  shift decimal place right
         }
     }
+
+
     // reverse whole part
     int end = i - 1;
     while (start < end) {
@@ -117,7 +122,7 @@ static int ftoa(char *buf, float val, int precision){
         start++;
         end--;
     }
-
+    
     buf[i++] = '.';
     for(int j  = 0; j < precision; j++){
         fractionPart *= 10; // shift decimal place right
@@ -154,8 +159,6 @@ static int itoa(char *buf, int num, int base){
     if (isNegative) {
         buf[i++] = '-';
     }
-
-    
 
     // Reverse the string
     int left = 0;

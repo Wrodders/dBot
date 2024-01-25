@@ -45,6 +45,9 @@ void test_ftoa(void) {
 
     assert(ftoa(buf, -789.01234, 4) == 9);
     assert(strcmp(buf, "-789.0123") == 0);
+    
+    assert(ftoa(buf, -0.01234, 4) == 7);
+    assert(strcmp(buf, "-0.0123") == 0);
 }
 
 void test_itoa(void) {
@@ -69,13 +72,11 @@ void test_mysprintf(void) {
     assert(mysprintf(buf, 3, "Float: %f", 3.14159) == 12);
     assert(strcmp(buf, "Float: 3.141") == 0);
 
-    assert(mysprintf(buf, 4,"%f:%f:%f", 0.12345,0.98765,-1.456789) ==  21);
-    
+    assert(mysprintf(buf, 4,"%f:%f:%f", -0.12345,-0.98765,-1.456789) ==  23);
+    assert(strcmp(buf, "-0.1235:-0.9876:-1.4567")== 0);
 
     assert(mysprintf(buf, 3, "Value: %d, Float: %f, Text: %s", 4,3.14159,"hello" ) == 35);
     assert(strcmp(buf, "Value: 4, Float: 3.141, Text: hello") == 0);
-
-
 }
 
 int main(void) {

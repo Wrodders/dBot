@@ -1,4 +1,4 @@
-#ifndef MPU6060_H
+#ifndef MPU6050_H
 #define MPU6050_H
 
 
@@ -190,6 +190,8 @@ static MPU6050_t initMPU6050(uint32_t port, uint32_t scl, uint32_t sda){
     imu.offset.accel.y = -0.0021066f;
     imu.offset.accel.z = 0.133658f;
 
+    imu.initalized = true;
+
     return imu;
 }
 
@@ -249,5 +251,5 @@ static void getRawAngle(vector_t *accel, float *roll, float *pitch){
 
 
 
-#endif
+#endif // MPU6050_H
 

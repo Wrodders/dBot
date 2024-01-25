@@ -10,7 +10,9 @@
         "mpu6050.h": "c",
         "common.h": "c",
         "comms.h": "c",
-        "motor.h": "c"
+        "motor.h": "c",
+        "serial.h": "c",
+        "madgwick.h": "c"
     },
     "cSpell.words": [
         "acklogalged"
