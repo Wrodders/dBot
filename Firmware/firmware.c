@@ -12,9 +12,9 @@
 
 // Debug UART 
 #define DEBUG_USART		USART1
-#define DEBUG_PORT		GPIOA
-#define DEBUG_RX		GPIO10 // UART1 PB7/8
-#define DEBUG_TX		GPIO9
+#define DEBUG_PORT		GPIOB
+#define DEBUG_RX		GPIO7 
+#define DEBUG_TX		GPIO6
 
 // Bluetooth UART
 #define BT_USART		USART6
@@ -74,14 +74,14 @@ int main(void){
 	serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
 	serialSend(&ser1, (uint8_t *)"Hello World\n", 13);
 
-	//MPU6050_t mpu6050 = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
+	MPU6050_t mpu6050 = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
     IMU imu = {0};
     uint8_t len;
 	uint8_t buf[20] = {0}; // Transmit data buffer
-	//if(mpu6050.initalized == false){
-	//	len = mysprintf((char *)buf, 0, "FAIL: %d :\n", mpu6050.data);
-    //    serialSend(&ser1, buf, len);
-	//}
+	if(mpu6050.initalized == false){
+	    len = mysprintf((char *)buf, 0, "FAIL: %d :\n", mpu6050.data);
+        serialSend(&ser1, buf, len);
+	}
 
 
 
@@ -89,22 +89,23 @@ int main(void){
 
     TaskHandle blinkTask = createTask(1000); // 1sec = 1 Hz 
     TaskHandle mpu6050Task = createTask(1); // 2ms = 500 Hz 
-    TaskHandle imuTask = createTask(1); // 50ms = 200 Hz
+    TaskHandle imuTask = createTask(50); // 50ms = 200 Hz
     TaskHandle serialTask = createTask(100); // 100ms = 10hz
-    mpu6050Task.enable = false;
-    imuTask.enable = false;
+    
+
+
     uint32_t loopTick;
     uint32_t imuTickTime = 0;
 
 	for(;;){
         loopTick = get_ticks();
+
         if(CHECK_TASK(mpu6050Task, loopTick)){
-            //readMPU6050(&mpu6050);
+            readMPU6050(&mpu6050);
             mpu6050Task.lastTick = loopTick;
         }
-
         else if(CHECK_TASK(imuTask, loopTick)){
-            //updateOrientation(&imu, &mpu6050.accel, &mpu6050.gyro);
+            updateOrientation(&imu, &mpu6050.accel, &mpu6050.gyro);
             imuTask.lastTick = loopTick;
         }
         else if(CHECK_TASK(blinkTask, loopTick)){
@@ -113,14 +114,11 @@ int main(void){
         }
         else if(CHECK_TASK(serialTask, loopTick)){
             //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",mpu6050.accel.x, mpu6050.accel.y, mpu6050.accel.z);
-            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",imu.roll, imu.pitch, imu.yaw);
-            len = mysprintf((char *)buf, 3,"%d:%f\n",get_ticks(), (float)(get_ticks()/1000));
-		    serialSend(&ser1, buf,len );
+            len = mysprintf((char *)buf, 3,"%f:%f:%f\n",imu.roll, imu.pitch, imu.yaw);
+            //len = mysprintf((char *)buf, 3,"%d:%f\n",get_ticks(), (float)(get_ticks()/1000));
+		    serialSend(&ser1, buf,len);
             serialTask.lastTick = loopTick;
         }
 
 	}
-
-	
-	
 }

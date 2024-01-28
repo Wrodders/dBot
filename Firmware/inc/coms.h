@@ -71,6 +71,9 @@ over error topic identifiable by command id
 #define FORMAT_SIZE (MAX_DATA_ARGS * 2) + MAX_DATA_ARGS - 1
 
 
+#define DEBUG "AA"
+
+
 
 typedef struct MsgFrame{
     uint8_t size;
@@ -105,36 +108,6 @@ static MsgTopic initTopic(char *name, const char delim, char *format, uint8_t nu
     return tp;
 }
 
-static void activateTopic(MsgTopic *tp){ tp->active = true;}
-
-static void disableTopic(MsgTopic *tp){ tp->active = false;}
-
-static int addTopic(MsgHandler *handler, MsgTopic *tp){
-    if(handler == NULL && tp == NULL){return -1;}
-    if(handler->count >= MAX_TOPICS){return -1;}
-    handler->topics[handler->count++] = tp;
-    // ecode index into letters
-    int base = 26;
-    tp->id[0] = 'A' + (handler->count/base) - 1;
-    tp->id[1] = 'A' + (handler->count % base);
-
-}
-
-static *MsgTopic getTopic(MsgHandler *handler, char *id){
-    int base = 26; // Number of letters in the alphabet
-    int idx = 0;
-    idx += (letters[0] - 'A' + 1) * base;
-    idx += letters[1] - 'A' + 1;
-    
-}
-
-
-
-
-
-
-
-
 
 //****** Transmission Queue ***********************************************************//
 
@@ -151,7 +124,7 @@ static void beginComs(void){
 
 // ****** Public API *****************************************************//
 
-static void publish(const char *buf, uint8_t dataSize, MsgTopic topic){
+static void publish(const char *buf, uint8_t dataSize, MsgTopic *topic){
     //@Breif: Publishes Message over topic to Serial TX Queue
     #define START_IDX = 0,
     #define TOPIC_IDX = 1,
@@ -163,12 +136,12 @@ static void publish(const char *buf, uint8_t dataSize, MsgTopic topic){
     uint8_t payloadSize;
     if (dataSize > MAX_MSG_DATA_SIZE){
         payloadSize = MAX_MSG_DATA_SIZE;
-        topic = DEBUG; // redirect to error handler
+        uCpy(topic->id, DEBUG, 2); // re route to debug topic on error
     }else{
         payloadSize = dataSize;
     }
     packet.buf[idx++] = START_BYTE;
-    packet.buf[idx++] = topic;
+    uCpy(&packet.buf[idx], topic->id, 2);
 
     packet.buf[idx++] = DELIM_BYTE;
     packet.buf[idx++] = payloadSize; 

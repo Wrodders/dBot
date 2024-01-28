@@ -15,7 +15,7 @@ typedef struct IMU{
 #define DT 0.001 // samplegn inteval 50ms
 #define ALPHA 0.58 //
 
-
+// Complementatry filter 
 static void updateOrientation(IMU *imu, vector_t *accel, vector_t *gyro){
     double pitchAcc = atan2(accel->y, sqrt(accel->x * accel->x + accel->z * accel->z));
     double rollAcc = atan2(-accel->x, accel->z);

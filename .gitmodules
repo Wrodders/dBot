@@ -4,3 +4,6 @@
 [submodule "modules/cUtils"]
 	path = modules/cUtils
 	url = https://github.com/Wrodders/cUtils.git
+[submodule "modules/stm32Drivers"]
+	path = modules/stm32Drivers
+	url = https://github.com/Wrodders/stm32Drivers.git

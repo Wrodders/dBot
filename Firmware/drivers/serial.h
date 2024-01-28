@@ -23,8 +23,8 @@ typedef struct Serial{
 }Serial;
 
 // ***** GLOBAL USART RING BUFFERS for ISR *****
-RingBuffer rx1_rb  = {.size = 64};
-RingBuffer tx1_rb =  {.size = 64};
+RingBuffer rx1_rb = {.size = RING_BUFFER_SIZE};
+RingBuffer tx1_rb = {.size = RING_BUFFER_SIZE};
 
 // ************** ISR's ************************** // 
 static RingBuffer *getRingBuffer(uint32_t usart){
@@ -39,14 +39,12 @@ static RingBuffer *getRingBuffer(uint32_t usart){
     return rb;
 }
 
-
-
 static void usartTX_ISR(uint32_t usart){
     //@Brief: Generic ISR Handler for TX USART
     RingBuffer *rb = getRingBuffer(usart);
     volatile uint8_t data = 0;
-    if(ringbuffer_empty(rb) == 0){
-        data = ringbuffer_get(rb); 
+    if(rb_empty(rb) == 0){
+        data = rb_get(rb); 
         USART_DR(usart) = data & USART_DR_MASK; // write byte
     }
     else{
@@ -58,9 +56,9 @@ static void usartRX_ISR(uint32_t usart){
     //@Brief: Generic ISR Handler for RX USART
     RingBuffer *rb = getRingBuffer(usart);
     volatile uint8_t data = 0;
-    if(ringbuffer_full(&rx1_rb) == 0){
+    if(rb_full(&rx1_rb) == 0){
         data = (USART_DR(USART1) & USART_DR_MASK);
-        ringbuffer_put(&rx1_rb, data);
+        rb_put(&rx1_rb, data);
     } // If ring buffer full subsequent data will be discared 
 }
 
@@ -102,6 +100,10 @@ static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t
         default:
             break;
     }
+
+    rb_init(ser.rxBuf, RING_BUFFER_SIZE);
+    rb_init(ser.txBuf, RING_BUFFER_SIZE);
+
     return ser;    
 }
 
@@ -167,8 +169,8 @@ static void serialSend(Serial *ser, uint8_t *data, uint16_t size){
     //@Note: Blocks if ringbuffer full
 
     for(int i =0; i < size; i++){
-        while(ringbuffer_full(ser->txBuf) == 1){}; 
-        ringbuffer_put(ser->txBuf, data[i]);
+        while(rb_full(ser->txBuf) == 1){}; 
+        rb_put(ser->txBuf, data[i]);
     }
     usart_enable_tx_interrupt(ser->perif); // Set up ISR 
 }
@@ -178,8 +180,8 @@ static uint8_t serialReceive(Serial *ser, uint8_t *buf, uint16_t size){
     //@Note: Blocks, Returns number of bytes read
     int i = 0;
     for(; i < size; i++){
-        while(ringbuffer_empty(ser->rxBuf) == 1){};
-        buf[i] = ringbuffer_get(ser->rxBuf);
+        while(rb_empty(ser->rxBuf) == 1){};
+        buf[i] = rb_get(ser->rxBuf);
     }
     return i;
 }
@@ -189,8 +191,8 @@ static uint8_t serialGrab(Serial *ser, uint8_t *buf, uint16_t size){
     //@Note: If less bytes available returns num of bytes read
     int i = 0;
     for(; i < size; i++){
-        if(ringbuffer_empty(ser->rxBuf) == 1){return i;}
-        buf[i] = ringbuffer_get(ser->rxBuf);
+        if(rb_empty(ser->rxBuf) == 1){return i;}
+        buf[i] = rb_get(ser->rxBuf);
     }
     return i;
 

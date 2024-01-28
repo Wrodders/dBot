@@ -12,7 +12,8 @@
         "comms.h": "c",
         "motor.h": "c",
         "serial.h": "c",
-        "madgwick.h": "c"
+        "madgwick.h": "c",
+        "usart.h": "c"
     },
     "cSpell.words": [
         "acklogalged"

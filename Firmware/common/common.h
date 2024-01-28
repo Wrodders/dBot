@@ -7,9 +7,9 @@
 #include <libopencm3/cm3/vector.h>
 #include <libopencm3/cm3/nvic.h>
 
-#include "ringbuffer.h"
-#include "utils.h"
-#include "queue.h"
+#include "../../modules/cutils/ringbuffer.h"
+#include "../../modules/cutils/utils.h"
+#include "../../modules/cutils/queue.h"
 
 
 #ifndef NULL
