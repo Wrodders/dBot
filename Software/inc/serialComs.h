@@ -32,8 +32,6 @@ int scanPorts(const char *portName, struct sp_port **port) {
     return -1;
 }
 
-
-
 int initSerialPort(struct sp_port *port, int baudrate){
     //@Brief: Configures serial port parameters
     //@Returns: -1 on failure;
@@ -50,6 +48,22 @@ int initSerialPort(struct sp_port *port, int baudrate){
     
     return retval;
 }
+
+#define TOPIC_SIZE 2
+#define MAX_TOPICS 10
+#define NAME_SIZE 10
+#define MAX_DATA_ARGS 5
+#define FORMAT_SIZE (MAX_DATA_ARGS * 2) + MAX_DATA_ARGS - 1
+
+typedef struct MsgTopic{
+    char id[TOPIC_SIZE];
+    char name[NAME_SIZE]; 
+    char delim;
+    char fmt[FORMAT_SIZE]; // argument format
+    uint8_t numArgs; 
+    bool active;
+}MsgTopic;
+
 
 
 
