@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/opt/homebrew/lib",
-                "/opt/homebrew/include"
+                "/opt/homebrew/include",
+                "${env.HOME}/opencv/install/**"
                 
             ],
             "defines": [],

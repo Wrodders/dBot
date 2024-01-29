@@ -8,7 +8,8 @@
         "stdio.h": "c",
         "__locale": "c",
         "random": "c",
-        "common.h": "c"
+        "common.h": "c",
+        "iostream": "cpp"
     },
     "cSpell.words": [
         "partiy",

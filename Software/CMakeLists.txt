@@ -12,14 +12,13 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/build/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 #Find Libraries
+set(OpenCV_DIR ~/opencv/install/lib/cmake/opencv4)
 find_library(SERIALPORT_LIBRARY NAMES serialport)
-
-if(NOT SERIALPORT_LIBRARY)
-    message(FATAL_ERROR "libserialport not found")
-endif()
+find_package(OpenCV REQUIRED)
 
 
 
+set(CMAKE_CXX_STANDARD 14)
 
 # Add your source files
 set(SOURCES
@@ -27,18 +26,20 @@ set(SOURCES
 )
 
 # Create the executable
-add_executable(${PROJECT_NAME} ${SOURCES})
 
+#serialReader
+add_executable(serialReader src/serialReader.c)
+target_compile_options(serialReader PRIVATE -Wall -Wextra)
 
-target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+target_include_directories(serialReader PRIVATE lib)
+target_include_directories(serialReader PRIVATE "/opt/homebrew/include")
+target_link_libraries(serialReader PRIVATE "${SERIALPORT_LIBRARY}")
 
-# Optionally, you can organize your source files into folders
-# source_group("src" FILES ${SOURCES})
+#openCV
+add_executable(opencvTest src/opencvTest.cpp)
+target_compile_options(opencvTest PRIVATE -Wall -Wextra)
 
-# Optionally, you can add include directories
-target_include_directories(${PROJECT_NAME} PRIVATE lib)
-
-#Link Libraries
-target_include_directories(${PROJECT_NAME}  PRIVATE "/opt/homebrew/include")
-target_link_libraries(${PROJECT_NAME}  PRIVATE "${SERIALPORT_LIBRARY}")
-
+include_directories(${OpenCV_INCLUDE_DIRS})
+target_link_libraries(opencvTest ${OpenCV_LIBS})
+target_compile_options(opencvTest PRIVATE -Wall -Wextra)
+target_link_libraries(opencvTest ${OpenCV_LIBS})
