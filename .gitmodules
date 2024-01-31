@@ -1,6 +1,8 @@
 [submodule "Tools/ComsTerm"]
 	path = modules/ComsTerm
 	url = https://github.com/Wrodders/ComsTerm
+	branch = main
 [submodule "modules/cUtils"]
 	path = modules/cUtils
-	url = https://github.com/Wrodders/cUtils.git
+	url = https://github.com/Wrodders/cUtils
+	branch = main
