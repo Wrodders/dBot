@@ -17,7 +17,7 @@ Read (RX ISR)   serial_receive()
 
 typedef struct Serial{
     uint32_t perif;
-    RingBuffer *rxBuf;
+    RingBuffer *rxBuf; 
     RingBuffer *txBuf;
     bool recvFlag;
 }Serial;
@@ -25,13 +25,32 @@ typedef struct Serial{
 // ***** GLOBAL USART RING BUFFERS for ISR *****
 RingBuffer rx1_rb = {.size = RING_BUFFER_SIZE};
 RingBuffer tx1_rb = {.size = RING_BUFFER_SIZE};
+RingBuffer rx2_rb = {.size = RING_BUFFER_SIZE};
+RingBuffer tx2_rb = {.size = RING_BUFFER_SIZE};
 
 // ************** ISR's ************************** // 
-static RingBuffer *getRingBuffer(uint32_t usart){
+static RingBuffer *getRB_TX(uint32_t usart){
     RingBuffer *rb;
     switch(usart){ // assign global ring buffers
         case USART1:
             rb = &tx1_rb;
+            break;
+        case USART2:
+            rb = &tx2_rb;
+            break;
+        default:
+            return NULL; // exit 
+    }
+    return rb;
+}
+static RingBuffer *getRB_RX(uint32_t usart){
+    RingBuffer *rb;
+    switch(usart){ // assign global ring buffers
+        case USART1:
+            rb = &rx1_rb;
+            break;
+        case USART2:
+            rb = &rx2_rb;
             break;
         default:
             return NULL; // exit 
@@ -39,9 +58,14 @@ static RingBuffer *getRingBuffer(uint32_t usart){
     return rb;
 }
 
+
 static void usartTX_ISR(uint32_t usart){
     //@Brief: Generic ISR Handler for TX USART
-    RingBuffer *rb = getRingBuffer(usart);
+    //@Description: Gets data available from TX RingBuffer writes to USART Data Registers
+    /*@Note: Disables TX Interrupts once no data is in RingBuffer
+    this is enabeld again by the SerialSend Cmd */
+
+    RingBuffer *rb = getRB_TX(usart);
     volatile uint8_t data = 0;
     if(rb_empty(rb) == 0){
         data = rb_get(rb); 
@@ -54,24 +78,13 @@ static void usartTX_ISR(uint32_t usart){
 
 static void usartRX_ISR(uint32_t usart){
     //@Brief: Generic ISR Handler for RX USART
-    RingBuffer *rb = getRingBuffer(usart);
+    //@Description: Puts Data to RX Ring Buffer if not full
+    //@Note: Discards Data if RB is full 
+    RingBuffer *rb = getRB_RX(usart);
     volatile uint8_t data = 0;
-    if(rb_full(&rx1_rb) == 0){
+    if(rb_full(rb) == 0){
         data = (USART_DR(USART1) & USART_DR_MASK);
-        rb_put(&rx1_rb, data);
-    } // If ring buffer full subsequent data will be discared 
-}
-
-void usart1_isr(void){
-    const bool overrun_occurred = usart_get_flag(USART1, USART_FLAG_ORE) == 1;
-    const bool received_data = usart_get_flag(USART1, USART_FLAG_RXNE) == 1;
-    const bool transmit_empty = usart_get_flag(USART1, USART_FLAG_TXE) == 1;
-
-    if(received_data){
-        usartRX_ISR(USART1);
-    }
-    if(transmit_empty){
-       usartTX_ISR(USART1);
+        rb_put(rb, data);
     }
 }
 
@@ -97,6 +110,10 @@ static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t
             ser.rxBuf = &rx1_rb;
             ser.txBuf = &tx1_rb;
             break;
+
+        case USART2:
+            ser.rxBuf = &rx2_rb;
+            ser.txBuf = &tx2_rb;
         default:
             break;
     }
@@ -168,7 +185,7 @@ static void serialSend(Serial *ser, uint8_t *data, uint16_t size){
     //@Breif: adds data to ring buffer and sets up ISR trasmit
     //@Note: Blocks if ringbuffer full
 
-    for(int i =0; i < size; i++){
+    for(int i =0; i < size - 1 ; i++){
         while(rb_full(ser->txBuf) == 1){}; 
         rb_put(ser->txBuf, data[i]);
     }

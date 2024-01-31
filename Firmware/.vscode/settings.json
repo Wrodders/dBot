@@ -13,7 +13,8 @@
         "motor.h": "c",
         "serial.h": "c",
         "madgwick.h": "c",
-        "usart.h": "c"
+        "usart.h": "c",
+        "ringbuffer.h": "c"
     },
     "cSpell.words": [
         "acklogalged"
