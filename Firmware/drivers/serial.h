@@ -91,7 +91,7 @@ static void usartTX_ISR(uint32_t usart){
     uint8_t data = 0;
     
     if(rb_empty(rb) == 0){
-        rb_get(rb, &data); 
+        rb_get(rb, &data); // only write if there is data in the rb 
         USART_DR(usart) = data & USART_DR_MASK; // write byte
     }
     else{
@@ -105,9 +105,10 @@ static void usartRX_ISR(uint32_t usart){
     //@Note: Discards Data if RB is full 
     RingBuffer * const rb = getRB_RX(usart);
     if(rb == NULL){return;} // ensure appropriate USART is serialInit()
+   
     uint8_t data = 0;
+    data = (USART_DR(usart) & USART_DR_MASK); // read byte
     if(rb_full(rb) == 0){
-        data = (USART_DR(USART1) & USART_DR_MASK); // read byte
         rb_put(rb, data); // add byte to buffer    
     }
 }

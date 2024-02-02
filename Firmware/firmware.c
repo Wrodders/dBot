@@ -44,7 +44,7 @@
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
 
-#define RB_SIZE 32
+#define RB_SIZE 16
 // ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
@@ -160,12 +160,23 @@ int main(void){
                     comsSendMsg(&ser1, ID_CMD_RET, "RET:%d", cmdlist.retVal);
                     comsSendMsg(&ser1, ID_CMD_RET, "OK"); // Send OK to ACK  
                 }else {
-                    comsSendMsg(&ser1, ID_CMD_RET, "ERR"); // Send ERR to ACK  
+                    serialSend(&ser1, rxFrame.buf, rxFrame.size);
+                    comsSendMsg(&ser1, ID_CMD_RET, "ERR\n"); // Send ERR to ACK  
                 }
             }*/
             // Run Telemetry
 
-            comsSendMsg(&ser1, ID_IMU, "A:%f", 3.1415973); // test
+            //comsSendMsg(&ser1, ID_IMU, "A:%f", 3.1415973); // NOT SURE WHY THIS ISNT WOKRING 
+            len = mysprintf((char *)&txFrame.buf[DATA_IDX], 4, "A:%f", 3.1415973 ); // ** NEED TO CHECK BUFFER SIZE
+            if(len > MAX_MSG_DATA_SIZE - 1){ continue;} // msg data overflow
+            uint8_t idx = 0;
+            txFrame.buf[idx++] = SOF_BYTE;
+            txFrame.buf[idx++] = len;
+            txFrame.buf[idx++] = ID_IMU;
+            idx += len; // offset data
+            txFrame.buf[idx++] = EOF_BYTE;
+            txFrame.buf[idx++] = '\0'; // terminate string
+            serialSend(&ser1, txFrame.buf, idx);
 
             //serialSend(&ser1, "HElloWorld\n", 12);
             serialSend(&serBT, (uint8_t *)"Hello BT\n", 10);

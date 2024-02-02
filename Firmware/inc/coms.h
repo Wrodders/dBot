@@ -103,6 +103,12 @@ typedef struct CmdList{
 }CmdList;
 
 
+typedef struct Coms{
+    MsgFrame rxFrame;
+    MsgFrame txFrame;
+    CmdList server; // handles access to commands
+}Coms;
+
 
 // ******* Commander *************************************************************// 
 
@@ -121,12 +127,12 @@ static bool comsGetMsg(Serial *ser, MsgFrame *msg){
     //@Returns true Message Received
     static enum {IDLE, SIZE, ID, DATA, COMPLETE, ERROR} state = IDLE;
     while (rb_empty(&ser->rxRB) == 0){
-        uint8_t dataIdx = 0;
+        uint8_t dataIdx = 3; // start posiotn of data
         uint8_t byte;
         rb_get(&ser->rxRB, &byte); // pop byte
         switch (state){
             case IDLE:
-                if(byte == '<'){state=SIZE;}
+                if(byte == SOF_BYTE){state=SIZE;}
                 msg->size = 0; 
                 break;
             case SIZE:
@@ -139,13 +145,16 @@ static bool comsGetMsg(Serial *ser, MsgFrame *msg){
                 break;
             case DATA:
                 if(dataIdx > msg->size){state = ERROR; break;} // src overflow
-                if(byte == '\n'){state = COMPLETE; break;} // EOF
+                if(byte == SOF_BYTE){state = IDLE; break;} // multiple start bytes detected 
+                if(byte == EOF_BYTE){state = COMPLETE; break;} // EOF
                 msg->buf[dataIdx++] = byte; 
                 break;
             case COMPLETE:
+                USART_DR(USART1) = 'X' & USART_DR_MASK; // write byte
                 state=IDLE; // reload 
                 return true; // exit   
             case ERROR:
+                msg->buf[0] = '\0';
                 state=IDLE;
                 return false; // exit 
         }
