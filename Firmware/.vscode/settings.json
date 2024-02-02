@@ -14,7 +14,8 @@
         "serial.h": "c",
         "madgwick.h": "c",
         "usart.h": "c",
-        "ringbuffer.h": "c"
+        "ringbuffer.h": "c",
+        "queue.h": "c"
     },
     "cSpell.words": [
         "acklogalged"

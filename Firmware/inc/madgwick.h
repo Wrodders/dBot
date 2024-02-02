@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 
-#include "../common/utils.h"
+#include "../common/common.h"
 // ********* Madgwick Filter Functions *****************************************************// 
 typedef struct MadgwickFilter {
   float    beta;

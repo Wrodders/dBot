@@ -4,6 +4,8 @@
 #include "../common/common.h"
 #include "../drivers/serial.h"
 
+
+
 /*
 Communication Protocol:
 Tranmission and reception are handled separately.
@@ -11,21 +13,25 @@ Tranmission and reception are handled separately.
 Tranmission: 
 The Device; on which this firmware is executed, acts as a data publisher.
 Unique Topics are used in a Pub Sub model where another program acts as a Subscriber.
-It is the Subscribers responsibilty to correctly interpret the messages per topic.
+It is the Subscribers responsibilty to correctly interpret the messages per id.
 The Device may only publish over a set list of topics, which can be activated/deactivated.
-gstThe Device may list the format & description of each topic at start up and/or upon request.
+gstThe Device may list the format & description of each id at start up and/or upon request.
 
-Messages are framed as 
-|-----+-----+-------+------+-------+- - - +-------+-------|
-| SOF | LEN | DELIM |TOPIC | DELIM | DATA | DELIM | CKSUM |
-| 1   | 2   | 1     | 2    | 1     | ...   | 1     | 2    |
-|-----+-----+-------+------+-------+- - - +-------+-------|
+Messages are framed inside a packet:
 
-SOF -- Start of Frame (0x3C / < )
+|-------------Packet---------------|
+|-----+-----+-------+- - - +-------+
+| SOF | LEN | ID | DATA | EOF   |
+| 1   | 1   | 1     | ...  | 1     |
+|-----------+-------+- - - +-------+
+      |--------Frame-------|
+
+
+SOF -- Start of Frame 
 LEN -- Size of Data (bytes)
-TOPIC -- Hashed Topic String Identifier 
+ID -- Hashed Topic String Identifier 
 DATA -- LEN bytes of data
-CKSUM -- 2 byte XOR 
+EOF - End of Frame 
 
 Message Frames Have a Max Size
 
@@ -35,6 +41,14 @@ This will be used to encode a message into the frame, and allows the subscriber 
 Subscribers will delimit messages based on receiving the start of frame byte, 
 If a SOF is received before LEN bytes message is aborted and new message begins
 
+Data Received Byte By Byte in USART ISR
+Put into Ringbuffer, serviced by Main through Non-Blocking GetMessage() returns
+MsgFrame Struct used to Handle msgs by TopicIDs 
+
+
+Data Passed to Queue of MessagesPackets
+Queue serviced by Main every 100ms and written to TX ring buffer for transmission via ISR
+
 *************************************************
 Reception
 Activating the Engineering Command program requires the reception of an Engineering Mode byte sequence. 
@@ -43,130 +57,138 @@ Exiting Engineering mode can only be done though reset.
 ID command runs upon entering engineering mode and reports all commands available on device and format as single source of truth. 
 Commands consist of GET/SET/RUN modifiers which act on unique ids. 
 Commands must register their input and response format.
-All Commands have a timeout. Error messages are transmitted back over the Error topic. 
+All Commands have a timeout. Error messages are transmitted back over the Error id. 
 Parameters to be passed to commands may be specified as required or optional with default values
 
-A successful command message will be parsed, executed, its responds over cmdResp topic and its acklogalged over cmdRet topic
+A successful command message will be parsed, executed, its responds over cmdResp id and its acklogalged over cmdRet id
 Error in any part of this process will result in a Failed cmdRet and an accompanying error message 
-over error topic identifiable by command id
+over error id identifiable by command id
 
 */
 
 
-#define START_BYTE '<' // hex 0x3C 
-#define STOP_BYTE  '>' // 
-#define DELIM_BYTE ',' // hex 0x3A
-#define TOPIC_SIZE 2
-#define CKSUM_SIZE 2
+#define SOF_BYTE '<' // hex 0x3C 
+#define EOF_BYTE  '\n' // 
+#define DELIM_BYTE ':' // hex 0x3A
 #define MAX_MSG_DATA_SIZE 64
-#define MSG_OVERHEAD_SIZE  sizeof(START_BYTE) + 2 + 1 + TOPIC_SIZE + 1 + CKSUM_SIZE
+#define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
  
+#define NUM_COMMANDS 10
 
-#define QUEUE_SIZE 3
-
-#define MAX_TOPICS 10
-#define NAME_SIZE 10
-#define MAX_DATA_ARGS 5
-#define FORMAT_SIZE (MAX_DATA_ARGS * 2) + MAX_DATA_ARGS - 1
-
-
-#define DEBUG "AA"
+#define ID_DEBUG 'A' // DEBUG Statements 
+#define ID_CMD_RET 'B' // Return Value of Function
+#define ID_IMU  'C' // PITCH ROLL YAW
+#define ID_ODOM 'D' // Bot Velocity & Angle
 
 
 
 typedef struct MsgFrame{
-    uint8_t size;
-    char buf[MAX_MSG_FRAME_SIZE]; 
+    uint8_t size; // current size of msg buffer
+    uint8_t id; // id 
+    uint8_t buf[MAX_MSG_FRAME_SIZE]; 
 }MsgFrame;
 
+typedef uint8_t (*Service)(MsgFrame *msg);
 
-typedef struct MsgTopic{
-    char id[TOPIC_SIZE];
-    char name[NAME_SIZE]; 
-    char delim;
-    char fmt[FORMAT_SIZE]; // argument format
-    uint8_t numArgs; 
-    bool active;
-}MsgTopic;
+typedef struct Command{
+    uint8_t id; 
+    Service func;
+}Command;
 
-typedef struct MsgHandler{
+typedef struct CmdList{
+    Command cmds[NUM_COMMANDS];
     uint8_t count;
-    MsgTopic *topics[MAX_TOPICS];
-}MsgHandler;
+    uint8_t retVal; // Store last return value of function executed
+}CmdList;
 
-static MsgTopic initTopic(char *name, const char delim, char *format, uint8_t numArgs){
-    MsgTopic tp;
 
-    if(uCpy(tp.name, name, NAME_SIZE) == 0){tp.active = false;}
 
-    if(numArgs > MAX_DATA_ARGS){tp.active = false;}
-    tp.numArgs = numArgs;
-    if(uCpy(tp.fmt, format, FORMAT_SIZE) == 0){tp.active = false;}
-    tp.delim = delim;
-    tp.active = true;
-    return tp;
+// ******* Commander *************************************************************// 
+
+static bool registerCmd(CmdList *cmdList, Service func){
+    //Adds Cmd index by index in list
+    uint8_t *cnt = &cmdList->count;
+    if(cmdList->count == NUM_COMMANDS){return false;}
+    Command *cmd = &cmdList->cmds[*cnt++];
+    cmd->func = func;
+    cmd->id = *cnt++;
+    return true;
 }
 
-
-//****** Transmission Queue ***********************************************************//
-
-QUEUE_DECLARATION(serTXQueue, MsgFrame, QUEUE_SIZE);
-QUEUE_DEFINITION(serTXQueue, MsgFrame);
-
-struct serTXQueue sertxQueue;
-
-static void beginComs(void){
-    serTXQueue_init(&sertxQueue);
-    return;
+static bool comsGetMsg(Serial *ser, MsgFrame *msg){
+    //@Grabs a message from the serial buffer is available
+    //@Returns true Message Received
+    static enum {IDLE, SIZE, ID, DATA, COMPLETE, ERROR} state = IDLE;
+    while (rb_empty(&ser->rxRB) == 0){
+        uint8_t dataIdx = 0;
+        uint8_t byte;
+        rb_get(&ser->rxRB, &byte); // pop byte
+        switch (state){
+            case IDLE:
+                if(byte == '<'){state=SIZE;}
+                msg->size = 0; 
+                break;
+            case SIZE:
+                msg->size = byte; 
+                state = ID;
+                break;
+            case ID:
+                msg->id = byte;
+                state = DATA;
+                break;
+            case DATA:
+                if(dataIdx > msg->size){state = ERROR; break;} // src overflow
+                if(byte == '\n'){state = COMPLETE; break;} // EOF
+                msg->buf[dataIdx++] = byte; 
+                break;
+            case COMPLETE:
+                state=IDLE; // reload 
+                return true; // exit   
+            case ERROR:
+                state=IDLE;
+                return false; // exit 
+        }
+    }
+    return false;
 }
 
+static bool comsCmdExec(CmdList *cmdList, MsgFrame *msg){
+    //@Brief: LooksUp Cmd by ID, validates protocol
+    //@Return: NULL if command not found
 
-// ****** Public API *****************************************************//
-
-static void publish(const char *buf, uint8_t dataSize, MsgTopic *topic){
-    //@Breif: Publishes Message over topic to Serial TX Queue
-    #define START_IDX = 0,
-    #define TOPIC_IDX = 1,
-    #define SIZE_IDX = 3, // skip delim
-    #define DATA_IDX = 5, //skip delim
+    if(msg->id > cmdList->count){return false;} //
     
-    MsgFrame packet;
-    uint8_t idx = 0;
-    uint8_t payloadSize;
-    if (dataSize > MAX_MSG_DATA_SIZE){
-        payloadSize = MAX_MSG_DATA_SIZE;
-        uCpy(topic->id, DEBUG, 2); // re route to debug topic on error
-    }else{
-        payloadSize = dataSize;
-    }
-    packet.buf[idx++] = START_BYTE;
-    uCpy(&packet.buf[idx], topic->id, 2);
-
-    packet.buf[idx++] = DELIM_BYTE;
-    packet.buf[idx++] = payloadSize; 
-    packet.buf[idx++] = DELIM_BYTE;
-    for(int i = 0; i < payloadSize; i++){
-        packet.buf[idx++] = buf[i];
-    }
-    packet.buf[idx++] = STOP_BYTE; 
-
-    packet.size = idx;
-
-    serTXQueue_enqueue(&sertxQueue,&packet);
-    return;
-}
-
-static bool sendPckt(Serial *ser){
-    //@Breif: Pulls message from queue and sends to UART buffer
-    MsgFrame pckt;
-    enum dequeue_result res = serTXQueue_dequeue(&sertxQueue,&pckt);
-    if(res == DEQUEUE_RESULT_EMPTY){
-        return false;
-    }
-    serialSend(ser, (uint8_t *)pckt.buf, pckt.size);
+    Command *cmd = &cmdList->cmds[msg->id];
+    cmdList->retVal = cmd->func(msg);
     return true;
 }
 
 
-#endif // COMMS_H
+//****** Transmission Queue ***********************************************************//
+static bool comsSendMsg(Serial *ser, char id, char *format, ...){
+    //@Breif: Publishes Message over id to Serial TX Queue
+    #define START_IDX  0
+    #define LEN_IDX 1
+    #define TOPIC_IDX  2
+    #define DATA_IDX  3
+
+    
+    MsgFrame msg;
+    va_list args;
+    va_start(args, format);
+    int len = mysprintf((char *)&msg.buf[DATA_IDX], 2, format, args); // ** NEED TO CHECK BUFFER SIZE
+    va_end(args);
+    if(len > MAX_MSG_DATA_SIZE - 1){ return false;} // msg data overflow
+    uint8_t idx = 0;
+    msg.buf[idx++] = SOF_BYTE;
+    msg.buf[idx++] = len;
+    msg.buf[idx++] = id;
+    idx += len; // offset data
+    msg.buf[idx++] = EOF_BYTE;
+    serialSend(ser, msg.buf, idx);
+    return true;
+}
+
+
+#endif // COMS_H

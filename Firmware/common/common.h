@@ -1,6 +1,6 @@
 #ifndef COMMON_H
 #define COMMON_H
-
+// ********* REGISTER DEFINITIONS ************************** //
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/cm3/systick.h>
@@ -11,16 +11,21 @@
 #include "../../modules/cutils/utils.h"
 #include "../../modules/cutils/queue.h"
 
-
 #ifndef NULL
 #define NULL ((void *)0)
 #endif
 
+// ******************** MACROS **************************** //
+
+#define ARR_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+
+
+//  ********* SYS Clock ***********************************//
+
 #define TICK			1000     // 1ms
 #define CPU_FREQ		84000000 // 84Mhz
 
-
-//  ********* SYS Clock *********************************//
 volatile uint32_t _millis = 0;
 void sys_tick_handler(void){
 	_millis++;
@@ -39,7 +44,7 @@ static void delay(uint32_t milleseconds) {
 }
 
 
-// ************* GPIO ************ //
+// ************* GPIO ************************************ //
 typedef struct  GPIO {
 	uint32_t pin;
 	uint32_t port;
@@ -54,9 +59,7 @@ static GPIO initGPIO(uint32_t pin, uint32_t port, uint32_t mode, uint32_t pupd) 
 	return p;
 }
 
-
-
-// ********* TASKS ************** //
+// ********* TASKS ************************************** //
 
 #define CHECK_TASK(TASK, LOOPTICK) 	((LOOPTICK - TASK.lastTick >= TASK.rate) && (TASK.enable))
 
@@ -84,7 +87,13 @@ static void enableTask(TaskHandle *t){
 	return;
 }
 
+//****************** ERROR HANDLER ***************// 
 
+typedef enum Error_t{
+	ERR_OK = 0,
+	ERR_OVERFLOW,
+	
+}Error_t;
 
 
 

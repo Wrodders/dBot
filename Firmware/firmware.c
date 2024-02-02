@@ -3,6 +3,8 @@
 #include "common/common.h"
 #include "drivers/serial.h"
 #include "inc/imu.h"
+#include "inc/coms.h"
+#include "inc/services.h"
 
 
 
@@ -40,33 +42,17 @@
 #define PWMBCH4_PIN		GPIO3
 
 
-// ******** ISRs ***********************************************************//
+// ********** GLOBAL STATIC BUFFERS *************************************** // 
 
-void usart1_isr(void){
-    const bool overrun_occurred = usart_get_flag(USART1, USART_FLAG_ORE) == 1;
-    const bool received_data = usart_get_flag(USART1, USART_FLAG_RXNE) == 1;
-    const bool transmit_empty = usart_get_flag(USART1, USART_FLAG_TXE) == 1;
+#define RB_SIZE 32
+// ACCESS THROUGH RING BUFFER 
+uint8_t rx1_buf_[RB_SIZE] = {0};
+uint8_t tx1_buf_[RB_SIZE] = {0};
+uint8_t rx2_buf_[RB_SIZE] = {0};
+uint8_t tx2_buf_[RB_SIZE] = {0};
+//uint8_t _rx6_buf[16] = {0};
+//uint8_t _tx6_Buf[16] = {0};
 
-    if(received_data){
-        usartRX_ISR(USART1);
-    }
-    if(transmit_empty){
-       usartTX_ISR(USART1);
-    }
-}
-
-void usart2_isr(void){
-    const bool overrun_occurred = usart_get_flag(USART2, USART_FLAG_ORE) == 1;
-    const bool received_data = usart_get_flag(USART2, USART_FLAG_RXNE) == 1;
-    const bool transmit_empty = usart_get_flag(USART2, USART_FLAG_TXE) == 1;
-
-    if(received_data){
-        usartRX_ISR(USART2);
-    }
-    if(transmit_empty){
-       usartTX_ISR(USART2);
-    }
-}
 
 // ******* Clock Set Up ****************************************************** //
 static void clock_setup(void){
@@ -92,6 +78,13 @@ static void systick_setup(void){
 	return;
 }
 
+// ******* Service Funcs ***************************************************** //
+
+static uint8_t serv_id(MsgFrame *msg){
+    return 9; // test
+}
+
+
 
 int main(void){
 
@@ -102,23 +95,33 @@ int main(void){
 
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 	
-    Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
-	serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
+    Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ, 
+                            rx1_buf_, ARR_SIZE(rx1_buf_), 
+                            tx1_buf_, ARR_SIZE(tx1_buf_));
+	serialLinkRB(&ser1);
+    serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
 	serialSend(&ser1, (uint8_t *)"Hello World\n", 13);
 
-    Serial serBT = serialInit(USART2, BT_PORT, BT_RX, BT_TX, GPIO_AF7, NVIC_USART2_IRQ);
+    Serial serBT = serialInit(USART2, BT_PORT, BT_RX, BT_TX, GPIO_AF7, NVIC_USART2_IRQ,
+                            rx2_buf_, ARR_SIZE(rx2_buf_), 
+                            tx2_buf_, ARR_SIZE(tx2_buf_));
+    serialLinkRB(&serBT);
     serialConfig(&serBT, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
     serialSend(&serBT, (uint8_t *)"Hello BT\n", 10);
 
+
+    MsgFrame rxFrame = {0}; // Buffer  * THIS SHOULD REALLY BE INSIDE A COMS STRUCT/ class 
+    MsgFrame txFrame = {0};
+    CmdList cmdlist = {.count = 0}; // Commander    
+    registerCmd(&cmdlist, serv_id);
+
 	MPU6050_t mpu6050; // = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
     IMU imu = {0};
-    uint8_t len;
-	uint8_t buf[20] = {0}; // Transmit data buffer
+
 	//if(mpu6050.initalized == false){
 	//    len = mysprintf((char *)buf, 0, "FAIL: %d :\n", mpu6050.data);
     //    serialSend(&ser1, buf, len);
 	//}
-
 
 
     // ***** Create Fixed time Tasks ***** // 
@@ -129,6 +132,7 @@ int main(void){
     TaskHandle serialTask = createTask(100); // 100ms = 10hz
     imuTask.enable =false;
     mpu6050Task.enable=false;
+    uint8_t len = 0;
     uint32_t loopTick;
     uint32_t imuTickTime = 0;
     uint32_t idleCount =0;
@@ -149,10 +153,21 @@ int main(void){
             blinkTask.lastTick = loopTick;
         }
         if(CHECK_TASK(serialTask, loopTick)){
-            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",mpu6050.accel.x, mpu6050.accel.y, mpu6050.accel.z);
-            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",imu.roll, imu.pitch, imu.yaw);
-            len = mysprintf((char *)buf, 3,"%d:%f\n",get_ticks(), (float)(get_ticks()/1000));
-		    serialSend(&ser1, buf,len);
+            MsgFrame msgframe;
+            /*if(comsGetMsg(&ser1, &rxFrame) == true){
+                // Execute Engineering Controlls Messages
+                if(comsCmdExec(&cmdlist, &rxFrame)  == true){ // lookup & exec CMD
+                    comsSendMsg(&ser1, ID_CMD_RET, "RET:%d", cmdlist.retVal);
+                    comsSendMsg(&ser1, ID_CMD_RET, "OK"); // Send OK to ACK  
+                }else {
+                    comsSendMsg(&ser1, ID_CMD_RET, "ERR"); // Send ERR to ACK  
+                }
+            }*/
+            // Run Telemetry
+
+            comsSendMsg(&ser1, ID_IMU, "A:%f", 3.1415973); // test
+
+            //serialSend(&ser1, "HElloWorld\n", 12);
             serialSend(&serBT, (uint8_t *)"Hello BT\n", 10);
             serialTask.lastTick = loopTick;
         }
