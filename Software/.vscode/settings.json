@@ -9,7 +9,8 @@
         "__locale": "c",
         "random": "c",
         "common.h": "c",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "serialcoms.h": "c"
     },
     "cSpell.words": [
         "partiy",

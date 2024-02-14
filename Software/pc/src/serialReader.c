@@ -1,5 +1,5 @@
-#include "../common/common.h"
-#include "../inc/serialComs.h"
+#include "../../common/common.h"
+#include "../../common/serialComs.h"
 
 
 void printUsage() {

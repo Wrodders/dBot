@@ -3,10 +3,17 @@
 This code is designed to be used as simulation for eventual running on the raspberry pi zero W. it Interfaces with Devices via AT commands and sends telemetry data over the network to another client (PC). the PC can also send RPC commands to the pi. 
 
 
-The same code base is used on the PC software and on the PI to avoidl compatibility issues. 
+The same code base is used on the PC software and on the PI to avoid compatibility issues. 
+
+## Build
+
+Cmake script builds all,common,pc,raspberry projects, specified by name and dependencies updates. Build files locate din build, executables located in $PROJECT/bin/
 
 ## Raspberry
-All files to be deployed to pi. 
+Code That is run on PI Zero W. Gets cross compiled with shared libraries. piUpdate.sh transfers binaries in raspberry/bin/ and scripts in raspberry/scripts.
+
+## PC
+Code that runs on the PC. Compiled executables located in pc/bin/.
 
 
 # Code Architecture
