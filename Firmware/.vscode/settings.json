@@ -15,10 +15,12 @@
         "madgwick.h": "c",
         "usart.h": "c",
         "ringbuffer.h": "c",
-        "queue.h": "c"
+        "queue.h": "c",
+        "imu.h": "c"
     },
     "cSpell.words": [
-        "acklogalged"
+        "acklogalged",
+        "msgframe"
     ],
     "editor.detectIndentation": false
 }

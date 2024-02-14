@@ -6,9 +6,6 @@
 #include "inc/coms.h"
 #include "inc/services.h"
 
-
-
-
 #define LED_PORT 		GPIOC
 #define LED_PIN			GPIO13
 
@@ -50,8 +47,7 @@ uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
 uint8_t rx2_buf_[RB_SIZE] = {0};
 uint8_t tx2_buf_[RB_SIZE] = {0};
-//uint8_t _rx6_buf[16] = {0};
-//uint8_t _tx6_Buf[16] = {0};
+
 
 
 // ******* Clock Set Up ****************************************************** //
@@ -63,36 +59,28 @@ static void clock_setup(void){
 	rcc_periph_clock_enable(RCC_GPIOB);
 	rcc_periph_clock_enable(RCC_GPIOC);
 
-
 	rcc_periph_clock_enable(RCC_USART1);
     rcc_periph_clock_enable(RCC_USART2);
 
-	rcc_periph_clock_enable(RCC_I2C1);
+	rcc_periph_clock_enable(RCC_I2C1); // MPU6050
+    rcc_periph_clock_enable(RCC_TIM3); // Encoder
+
 	return;
 }
 
 static void systick_setup(void){
-	systick_set_frequency(TICK, CPU_FREQ); // 1 ms interupt	
+	systick_set_frequency(TICK, CPU_FREQ); // 1 ms interrupt	
     systick_interrupt_enable();
 	systick_counter_enable();
 	return;
 }
-
-// ******* Service Funcs ***************************************************** //
-
-static uint8_t serv_id(MsgFrame *msg){
-    return 9; // test
-}
-
-
 
 int main(void){
 
 	// ***** SETUP ********** //
 	clock_setup(); // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup(); // 1ms Tick
-
-
+    
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 	
     Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ, 
@@ -109,13 +97,12 @@ int main(void){
     serialConfig(&serBT, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
     serialSend(&serBT, (uint8_t *)"Hello BT\n", 10);
 
-
     MsgFrame rxFrame = {0}; // Buffer  * THIS SHOULD REALLY BE INSIDE A COMS STRUCT/ class 
     MsgFrame txFrame = {0};
-    CmdList cmdlist = {.count = 0}; // Commander    
-    registerCmd(&cmdlist, serv_id);
+
 
 	MPU6050_t mpu6050; // = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
+    CompFilt compFilt = {.a = 0.8, .dt = 50};
     IMU imu = {0};
 
 	//if(mpu6050.initalized == false){
@@ -123,8 +110,8 @@ int main(void){
     //    serialSend(&ser1, buf, len);
 	//}
 
-
     // ***** Create Fixed time Tasks ***** // 
+    enum STATE{INIT = 0, CALIB, AUTO, REMOTE} state = INIT;
 
     TaskHandle blinkTask = createTask(1000); // 1sec = 1 Hz 
     TaskHandle mpu6050Task = createTask(1); // 2ms = 500 Hz 
@@ -133,57 +120,39 @@ int main(void){
     imuTask.enable =false;
     mpu6050Task.enable=false;
     uint8_t len = 0;
+
     uint32_t loopTick;
-    uint32_t imuTickTime = 0;
-    uint32_t idleCount =0;
-
 	for(;;){
-        loopTick = get_ticks();
 
-        if(CHECK_TASK(mpu6050Task, loopTick)){
-            readMPU6050(&mpu6050);
-            mpu6050Task.lastTick = loopTick;
-        }
-        if(CHECK_TASK(imuTask, loopTick)){
-            updateOrientation(&imu, &mpu6050.accel, &mpu6050.gyro);
-            imuTask.lastTick = loopTick;
-        }
-        if(CHECK_TASK(blinkTask, loopTick)){
-            gpio_toggle(led.port, led.pin);    
-            blinkTask.lastTick = loopTick;
-        }
-        if(CHECK_TASK(serialTask, loopTick)){
-            MsgFrame msgframe;
-            /*if(comsGetMsg(&ser1, &rxFrame) == true){
-                // Execute Engineering Controlls Messages
-                if(comsCmdExec(&cmdlist, &rxFrame)  == true){ // lookup & exec CMD
-                    comsSendMsg(&ser1, ID_CMD_RET, "RET:%d", cmdlist.retVal);
-                    comsSendMsg(&ser1, ID_CMD_RET, "OK"); // Send OK to ACK  
-                }else {
-                    serialSend(&ser1, rxFrame.buf, rxFrame.size);
-                    comsSendMsg(&ser1, ID_CMD_RET, "ERR\n"); // Send ERR to ACK  
+        switch (state){
+            case INIT:
+                break;
+            case CALIB:
+                break;
+            case AUTO:
+                loopTick = get_ticks();
+                if(CHECK_TASK(blinkTask, loopTick)){
+                    gpio_toggle(led.port, led.pin);    
+                    blinkTask.lastTick = loopTick;
                 }
-            }*/
-            // Run Telemetry
-
-            //comsSendMsg(&ser1, ID_IMU, "A:%f", 3.1415973); // NOT SURE WHY THIS ISNT WOKRING 
-            len = mysprintf((char *)&txFrame.buf[DATA_IDX], 4, "A:%f", 3.1415973 ); // ** NEED TO CHECK BUFFER SIZE
-            if(len > MAX_MSG_DATA_SIZE - 1){ continue;} // msg data overflow
-            uint8_t idx = 0;
-            txFrame.buf[idx++] = SOF_BYTE;
-            txFrame.buf[idx++] = len;
-            txFrame.buf[idx++] = ID_IMU;
-            idx += len; // offset data
-            txFrame.buf[idx++] = EOF_BYTE;
-            txFrame.buf[idx++] = '\0'; // terminate string
-            serialSend(&ser1, txFrame.buf, idx);
-
-            //serialSend(&ser1, "HElloWorld\n", 12);
-            serialSend(&serBT, (uint8_t *)"Hello BT\n", 10);
-            serialTask.lastTick = loopTick;
-        }
-        else{
-            idleCount++;
+                if(CHECK_TASK(serialTask, loopTick)){
+                    MsgFrame msgframe;
+                    // Run Telemetry
+                    comsSendMsg(&ser1, ID_IMU, "A:%f", 3.1415973); 
+                }
+                if(CHECK_TASK(imuTask, loopTick)){
+                    filterComplementary(&compFilt, &imu, &mpu6050.accel, &mpu6050.gyro);
+                    imuTask.lastTick = loopTick;
+                }
+                if(CHECK_TASK(mpu6050Task, loopTick)){
+                    readMPU6050(&mpu6050);
+                    mpu6050Task.lastTick = loopTick;
+                }
+                break;
+            case REMOTE:
+                break;
+            default:
+                break;
         }
 	}
 }

@@ -2,19 +2,11 @@
 #define DCMOTOR_H
 
 
-/*************************
- * DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
- * Supports:
- * Voltage Control of Speed and direction
- * Break & Stop & Coast
- * Acceleration Soft Start/Stop
- * NOTE: TIMER PERIF RCC Must be initialized previously. 
- * 
- * Closed Loop Control
- * Velocity
- * Position
- * Torque
- * 
+/************************** 
+DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
+NOTE: TIMER PERIF RCC Must be initialized previously. 
+Motors Bind To Encoders. 
+All velocities are relative to the motors frame. 
 **************************/
 
 #include "../common/common.h"
@@ -45,20 +37,15 @@ typedef struct Motor {
     float pos; // shaft position
 }Motor;
 
-static void bindEncoder(Encoder *e, Motor *m){
-    m->enc = e;
-    e->gRatio = &m->gR;
-}
-
-static Motor initDCMotor(uint32_t timPerif, enum tim_oc_id timCH_A,uint32_t pwmA, enum tim_oc_id timCH_B, uint32_t pwmB, uint32_t pwmPort, uint32_t enPin, uint32_t enPort){
-    //@Breif: Inits Motor PWM
+static Motor motorInit(uint32_t timPerif, enum tim_oc_id timCH_A,uint32_t pwmA, enum tim_oc_id timCH_B, uint32_t pwmB, uint32_t pwmPort, uint32_t enPin, uint32_t enPort){
+    //@Brief: Inits Motor PWM
     Motor m;
     m.drv.timPerif = timPerif;
     m.drv.timCH_A = timCH_A;
     m.drv.timCH_B = timCH_B;
     m.drv.pwmA.pin = pwmA;
     m.drv.pwmA.port = pwmPort;
-    m.drv.pwmB.pin =pwmB;
+    m.drv.pwmB.pin = pwmB;
     m.drv.pwmB.port = pwmPort;
     m.drv.en.pin = enPin;
     m.drv.en.port = enPort;
@@ -71,8 +58,9 @@ static Motor initDCMotor(uint32_t timPerif, enum tim_oc_id timCH_A,uint32_t pwmA
     return m;
 }
 
-static void configMotor(Motor *m, float vBat, float vPSU, float vLimit, float vMin, float gearRatio, bool flipDir){
-    //@Breif: Configs Motor parameters
+static void motorConfig(Motor *m, Encoder *enc, float vBat, float vPSU, float vLimit, float vMin, float gearRatio, bool flipDir){
+    //@Brief: Configs Motor parameters
+    m->enc = enc;
     m->drv.vBat =  vBat;
     m->drv.vPSU = vPSU;
     m->drv.vLimit = vLimit < vPSU ? vLimit : vPSU ; // vLimit must be below or == vPSU
@@ -84,14 +72,14 @@ static void configMotor(Motor *m, float vBat, float vPSU, float vLimit, float vM
 
 
 static void enableDriver(Driver *drv){
-    //@Breif: Starts Motor Driver PWM
+    //@Brief: Starts Motor Driver PWM
     pwm_start_timer(drv->timPerif);
     timer_enable_break_main_output(drv->timPerif); // for advanced timers only
     return;
 }
 
 static void setMotorVoltage(Motor *motor, float v){
-    //@Breif: Sets PWM Duty Cycle as voltage vector
+    //@Brief: Sets PWM Duty Cycle as voltage vector
     // Assumes 
     // PWM A High == Forwards
     // PWM B High == Backwards 
@@ -127,14 +115,14 @@ static void setMotorVoltage(Motor *motor, float v){
 }
 
 static void stopMotor(Motor *motor){ 
-    //@Breif: Sets H Brige Inputs High
+    //@Brief: Sets H Brige Inputs High
     pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_A, 1);
     pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_B, 1);
     return;
 }
 
 static void breakMotor(Motor *motor){
-    //@Breif: Sets H Bridge Inputs Low
+    //@Brief: Sets H Bridge Inputs Low
     pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_A, 0);
     pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_B, 0);
     return;

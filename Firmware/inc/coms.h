@@ -175,29 +175,19 @@ static bool comsCmdExec(CmdList *cmdList, MsgFrame *msg){
 
 
 //****** Transmission Queue ***********************************************************//
-static bool comsSendMsg(Serial *ser, char id, char *format, ...){
-    //@Breif: Publishes Message over id to Serial TX Queue
-    #define START_IDX  0
-    #define LEN_IDX 1
-    #define TOPIC_IDX  2
-    #define DATA_IDX  3
 
-    
-    MsgFrame msg;
-    va_list args;
-    va_start(args, format);
-    int len = mysprintf((char *)&msg.buf[DATA_IDX], 2, format, args); // ** NEED TO CHECK BUFFER SIZE
-    va_end(args);
-    if(len > MAX_MSG_DATA_SIZE - 1){ return false;} // msg data overflow
-    uint8_t idx = 0;
-    msg.buf[idx++] = SOF_BYTE;
-    msg.buf[idx++] = len;
-    msg.buf[idx++] = id;
-    idx += len; // offset data
-    msg.buf[idx++] = EOF_BYTE;
-    serialSend(ser, msg.buf, idx);
-    return true;
-}
-
+#define comsSendMsg(SER, ID, FORMAT, ... )                                  \
+const uint8_t DATA_IDX = 3;                                                 \
+MsgFrame MSG;                                                               \
+int LEN = mysprintf((char *)&MSG.buf[DATA_IDX], 2, FORMAT, __VA_ARGS__ );   \
+if(LEN <= (MAX_MSG_DATA_SIZE - 1)){                                         \
+uint8_t IDX = 0;                                                            \
+MSG.buf[IDX++] = SOF_BYTE;                                                  \
+MSG.buf[IDX++] = LEN;                                                       \
+MSG.buf[IDX++] = ID;                                                        \
+IDX += LEN;                                                                 \
+MSG.buf[IDX++] = EOF_BYTE;                                                  \
+serialSend(SER, MSG.buf, IDX);                                              \
+}                                                                           
 
 #endif // COMS_H

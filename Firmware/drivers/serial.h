@@ -117,30 +117,18 @@ void usart1_isr(void){
     const bool overrun_occurred = usart_get_flag(USART1, USART_FLAG_ORE) == 1;
     const bool received_data = usart_get_flag(USART1, USART_FLAG_RXNE) == 1;
     const bool transmit_empty = usart_get_flag(USART1, USART_FLAG_TXE) == 1;
-    
 
-    if(received_data){
-
-        usartRX_ISR(USART1);
-    }
-    if(transmit_empty){
-        
-        usartTX_ISR(USART1);
-    }
+    if(received_data){usartRX_ISR(USART1);}
+    if(transmit_empty){usartTX_ISR(USART1);}
 }
 
 void usart2_isr(void){
     const bool overrun_occurred = usart_get_flag(USART2, USART_FLAG_ORE) == 1;
     const bool received_data = usart_get_flag(USART2, USART_FLAG_RXNE) == 1;
     const bool transmit_empty = usart_get_flag(USART2, USART_FLAG_TXE) == 1;
-    
 
-    if(received_data){
-        usartRX_ISR(USART2);
-    }
-    if(transmit_empty){
-       usartTX_ISR(USART2);
-    }
+    if(received_data){usartRX_ISR(USART2);}
+    if(transmit_empty){usartTX_ISR(USART2);}
 }
 
 
@@ -207,7 +195,7 @@ static void serialWrite(Serial *ser, uint8_t *data, uint16_t size){
     //@Brief: Writes Bytes to USART Trasmit Data Register 
     //@Note: Blocking, waits on transmit complete
     for(int i =0; i<size; i++){
-        while((USART_SR(ser->perif) & USART_SR_TXE) == 0){}; // wait for shift registe to be empty
+        while((USART_SR(ser->perif) & USART_SR_TXE) == 0){}; // wait for shift register to be empty
         USART_DR(ser->perif) = data[i] & USART_DR_MASK; // write byte
     }
 }
@@ -216,7 +204,7 @@ static void serialRead(Serial *ser, uint8_t *buf, uint16_t size){
     //@Brief: Reads from USART Receive Data Register
     //@Note: Blocking, waits on data available
     for(int i =0; i< size; i++){
-        while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; // wait for data to be avalibal in receive shift resgter
+        while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; // wait for data to be available in receive shift register
         buf[i] = (USART_DR(ser->perif) & USART_DR_MASK);
     }
 }
