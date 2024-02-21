@@ -1,4 +1,4 @@
-[submodule "Tools/ComsTerm"]
+[submodule "modules/ComsTerm"]
 	path = modules/ComsTerm
 	url = https://github.com/Wrodders/ComsTerm
 	branch = main
