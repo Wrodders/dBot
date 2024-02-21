@@ -3,7 +3,7 @@
 # Function to build PC project
 build_pc() {
     echo "Building PC project..."
-    cd PC || exit 1
+    cd pc || exit 1
     mkdir -p build
     cd build || exit 1
     cmake ..
@@ -30,10 +30,10 @@ build_all() {
 
 # Main script
 case "$1" in
-    "PC")
+    "pc")
         build_pc
         ;;
-    "PI")
+    "pi")
         build_pi
         ;;
     "ALL")
