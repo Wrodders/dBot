@@ -25,14 +25,18 @@ typedef struct Encoder {
 static Encoder encoderInit(uint32_t timPerif, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint16_t cpr ){
     //@Brief: Sets up timer in encoder mode  
     Encoder e = {0};
-    e.chA = initGPIO(pinA, portA, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
-    e.chB = initGPIO(pinB, portB, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
+    // set up gpio at timer output 
+    gpio_mode_setup(portA, GPIO_MODE_AF, GPIO_PUPD_PULLUP, pinA | pinB); 
+    gpio_set_af(portA, GPIO_AF2, pinA | pinB );
+
+   
     e.timPerif = timPerif;
-    timer_set_period(e.timPerif, cpr - 1);
+    timer_set_period(e.timPerif, cpr);
     timer_slave_set_mode(e.timPerif, TIM_MODE_ENC);
     timer_ic_set_input(e.timPerif,  TIM_IC1, TIM_IC_IN_TI1);
     timer_ic_set_input(e.timPerif,  TIM_IC2, TIM_IC_IN_TI2);
     timer_enable_counter(e.timPerif);
+    TIM_CNT(e.timPerif) = 0x0000; // reset counter
 
     return e;
 }

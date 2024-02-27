@@ -29,18 +29,28 @@
 
 // DRV8833 2-CH PWM DC Motor Controller 
 
-#define M_L_TIM 	TIM2    // Left Motor PWM Timer 
-#define M_L_PORT	GPIOA   // Left Motor PWM Port
-#define M_L_CH1		GPIO0   // Left Motor PWM CH1 Pin
-#define M_L_CH2		GPIO1   // Left Motor PWM CH2 Pin
+#define M_L_TIM 	    TIM2    // Left Motor PWM Timer 
+#define M_L_PORT	    GPIOA   // Left Motor PWM Port
+#define M_L_CH1		    GPIO0   // Left Motor PWM CH1 Pin
+#define M_L_CH2		    GPIO1   // Left Motor PWM CH2 Pin
 
-#define M_R_TIM		TIM2    // Right Motor PWM Timer 
-#define M_R_PORT	GPIOA   // Right Motor PWM Port
-#define M_R_CH1		GPIO2   // Right Motor PWM CH1 Pin
-#define M_R_CH2		GPIO3   // Right Motor PWM CH2 Pin
+#define M_R_TIM		    TIM2    // Right Motor PWM Timer 
+#define M_R_PORT	    GPIOA   // Right Motor PWM Port
+#define M_R_CH1		    GPIO2   // Right Motor PWM CH1 Pin
+#define M_R_CH2		    GPIO3   // Right Motor PWM CH2 Pin
 
-#define DRIVER_EN_PIN   GPIO5   // DRV8833 Enable PIN
-#define DRIVER_EN_PORT  GPIOA   // DRV8833 Enable PORT
+#define DRV_EN_PIN      GPIO5   // DRV8833 Enable PIN
+#define DRV_EN_PORT     GPIOA   // DRV8833 Enable PORT
+
+#define ENC_CPR         12      
+#define ENC_TIM         TIM3
+#define ENC_L_PORT      GPIOB
+#define ENC_L_A         GPIO4   // TIM3 CH1
+#define ENC_L_B         GPIO5   // TIM3 CH2
+
+#define ENC_R_PORT      GPIOB
+#define ENC_R_A         GPIO0   // TIM3 CH3
+#define ENC_R_B         GPIO1   // TIM3 CH4
 
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
@@ -102,6 +112,11 @@ int main(void){
 
     IMU imu = imuInit(0.5f, 0.01f);
 
+
+    // Motor 
+
+    Encoder enc = encoderInit(ENC_TIM, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT,ENC_CPR*20);
+
     enum STATE{
         T_SCHEDULE = 0, // ** Run Round Robin Scheduler  ** //
         T_POST,         // ** PowerOnSelfTest ** //
@@ -130,15 +145,17 @@ int main(void){
 
         if(CHECK_TASK(comsTask, loopTick)){
             
-            len = mysprintf(buf, 4, "%f:%f:%f:%f\n", mpu6050.accel.x,imu.flitAccel.x, mpu6050.gyro.y,imu.filtGyro.y );
+            //len = mysprintf(buf, 4, "%f:%f:%f:%f\n", mpu6050.accel.x,imu.flitAccel.x, mpu6050.gyro.y,imu.filtGyro.y );
+            len = mysprintf(buf, 4, "%d\n", encoderRead(&enc));
             serialSend(&ser1, buf, len);
             comsTask.lastTick = loopTick;
         }
 
         if(CHECK_TASK(llCtrlTask, loopTick)){
             // Get Pitch Angle
+
             mpu6050Read(&mpu6050);
-            imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurmetns
+            imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurements
             llCtrlTask.lastTick = loopTick;
         }
 	}
