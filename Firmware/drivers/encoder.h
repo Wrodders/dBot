@@ -18,16 +18,13 @@ typedef struct Encoder {
     GPIO chB;
     uint32_t timPerif;
     uint32_t cpr; // counts per revolution
-    uint32_t count; // encoder count
-
-    uint32_t rate;
-    uint32_t pos; // angle position x
-    uint32_t vel; // angular velocity dx  
+    
+    uint32_t lastCount; // encoder count
 }Encoder;
 
 static Encoder encoderInit(uint32_t timPerif, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint16_t cpr ){
     //@Brief: Sets up timer in encoder mode  
-    Encoder e = {0}
+    Encoder e = {0};
     e.chA = initGPIO(pinA, portA, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
     e.chB = initGPIO(pinB, portB, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP);
     e.timPerif = timPerif;
@@ -40,35 +37,11 @@ static Encoder encoderInit(uint32_t timPerif, uint32_t pinA, uint32_t portA, uin
     return e;
 }
 
-static uint32_t encoderRead(Encoder *enc){
+static inline uint32_t encoderRead(Encoder *enc){
     return timer_get_counter(enc->timPerif);
 }
 
-static bool encCountDown(Encoder *enc){
-    uint32_t tim = enc->timPerif; 
 
-}
 
-static void encoderUpdate(Encoder *enc){
 
-    uint32_t lastCount = enc->count;
-    uint32_t tmpCount = encoderRead(enc);
-
-    if(tmpCount == lastCount){enc->vel = 0;}
-    else if ( tmpCount > lastCount){
-        if(encCountDown(enc)){ // overflown 
-            enc->vel = -lastCount - TIM_ARR(enc->timPerif) - tmpCount;
-        }else{
-            enc->vel = tmpCount - lastCount;
-        }
-    }
-    else {
-        if(encCountDown(enc)){ // overflown 
-            enc->vel = tmpCount - lastCount;
-        }else{
-            enc->vel = tmpCount + TIM_ARR(enc->timPerif) - lastCount;
-        }
-    }
-    enc->pos += enc->vel;
-}
 #endif // ENCODER_H

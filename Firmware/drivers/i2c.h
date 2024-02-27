@@ -4,12 +4,12 @@
 #include "../common/common.h"
 #include <libopencm3/stm32/i2c.h>
 
-static void _i2c_reset(uint32_t i2cPerif){
+static void i2cReset(uint32_t i2cPerif){
     I2C_CR1(i2cPerif) |= I2C_CR1_SWRST;
     I2C_CR1(i2cPerif) &= ~I2C_CR1_SWRST;
 }
 
-static uint32_t i2c_setup(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin, uint32_t sdaPin){
+static uint32_t i2cInit(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin, uint32_t sdaPin){
     //@Breif: Configures I2C Peripheral on GPIO pins
     //@Note: Requieres Clocks to be enabeld for GPIO's & I2C
     // ENUSRE PUPD_PULLUP IS ENABLED !!!!!!
@@ -18,7 +18,7 @@ static uint32_t i2c_setup(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin,
     gpio_set_af(gpioPort, GPIO_AF4, sclPin | sdaPin);
 
     i2c_peripheral_disable(i2cPerif);
-    _i2c_reset(i2cPerif);
+    i2cReset(i2cPerif);
 
     i2c_set_clock_frequency(i2cPerif, 42); // Set the Peripheral Clock Freq
     i2c_set_fast_mode(i2cPerif); // 400Khz
@@ -31,7 +31,7 @@ static uint32_t i2c_setup(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin,
 }
 
 
-static uint16_t i2c_read_seq(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t *data, uint16_t len) {
+static uint16_t i2cReadSeq(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t *data, uint16_t len) {
     //@Breif: Reads array of bytes from I2C Device
     //@Note: Assumes Device has Auto Increment Registers
 
@@ -84,7 +84,7 @@ static uint16_t i2c_read_seq(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t *
 }
 
 
-static uint8_t _i2c_read_reg(uint32_t i2c, uint16_t addr, uint8_t reg) {
+static uint8_t i2cReadReg(uint32_t i2c, uint16_t addr, uint8_t reg) {
     //@Breif: Reads one Byte from a I2C Device Register
     uint8_t data = 0;
 
@@ -128,7 +128,7 @@ static uint8_t _i2c_read_reg(uint32_t i2c, uint16_t addr, uint8_t reg) {
 }
 
 
-static void _i2c_write_reg(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t data) {
+static void i2cWriteReg(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t data) {
     //@Breif: write Byte to I2C Device Register
 
     i2c_enable_ack(i2c);

@@ -18,17 +18,11 @@ ISR     - Reads/Writes data byte by byte into allocated RingBuffer, new data ign
         - serialGrab() non-blocking reads n bytes from ringbuffer, if empty returns num bytes read
 **************************************/
 
-
-
 typedef struct Serial{
     uint32_t perif;
     RingBuffer rxRB; 
     RingBuffer txRB;
 }Serial;
-
-
-
-
 
 // ************** ISR's ************************** // 
 // Code below is executed from ISRs
@@ -39,24 +33,24 @@ typedef struct Serial{
 * This way users can simply access the buffer through serial->rb
 * The application will access the correct buffer through the global pointer
 ---------------------------------------------------*/
-RingBuffer *rx1_rb = NULL;
-RingBuffer *tx1_rb = NULL;
-RingBuffer *rx2_rb = NULL;
-RingBuffer *tx2_rb = NULL;
-RingBuffer *rx6_rb = NULL;
-RingBuffer *tx6_rb = NULL;
+RingBuffer *rx1_rb_ = NULL;
+RingBuffer *tx1_rb_ = NULL;
+RingBuffer *rx2_rb_ = NULL;
+RingBuffer *tx2_rb_ = NULL;
+RingBuffer *rx6_rb_ = NULL;
+RingBuffer *tx6_rb_ = NULL;
 
 static RingBuffer *getRB_TX(uint32_t usart){
     RingBuffer *rb;
     switch(usart){ // assign global ring buffers
         case USART1:
-            rb = tx1_rb;
+            rb = tx1_rb_;
             break;
         case USART2:
-            rb = tx2_rb;
+            rb = tx2_rb_;
             break;
         case USART6:
-            rb = tx6_rb;
+            rb = tx6_rb_;
             break;
         default:
             return NULL; // exit 
@@ -67,13 +61,13 @@ static RingBuffer *getRB_RX(uint32_t usart){
     RingBuffer *rb;
     switch(usart){ // assign global ring buffers
         case USART1:
-            rb = rx1_rb;
+            rb = rx1_rb_;
             break;
         case USART2:
-            rb = rx2_rb;
+            rb = rx2_rb_;
             break;
         case USART6:
-            rb = rx6_rb;
+            rb = rx6_rb_;
             break;
         default:
             return NULL; // exit 
@@ -155,26 +149,7 @@ static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t
     return ser;    
 }
 
-static void serialLinkRB(Serial *ser){
-    //@Brief: Maps the global ringbuffer pointers to a Serial's ringbuffer
-    //@Note: ISR's access the ring buffer based on which USART peripheral is used. 
-    switch (ser->perif){ // assign global ring buffer pointers
-        case USART1:
-            rx1_rb = &(ser->rxRB);
-            tx1_rb = &(ser->txRB);
-            break;
-        case USART2:
-            rx2_rb = &(ser->rxRB);
-            tx2_rb = &(ser->txRB);
-            break;
-        case USART6:
-            rx6_rb = &(ser->rxRB);
-            tx6_rb = &(ser->txRB);
-            break;
-        default:
-            break;
-    }   
-}
+
 static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t stopBits, uint32_t parity, uint32_t flowcontroll ){
     //@Breif: Configures USART Parameters
 
@@ -185,8 +160,29 @@ static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t s
     usart_set_stopbits(usart, stopBits);
     usart_set_parity(usart, parity);
     usart_set_flow_control(usart, flowcontroll);
+
+    //Maps the global ringbuffer pointers to a Serial's ringbuffer
+    //ISR's access the ring buffer based on which USART peripheral is used. 
+    switch (ser->perif){ // assign global ring buffer pointers
+        case USART1:
+            rx1_rb_ = &(ser->rxRB);
+            tx1_rb_ = &(ser->txRB);
+            break;
+        case USART2:
+            rx2_rb_ = &(ser->rxRB);
+            tx2_rb_ = &(ser->txRB);
+            break;
+        case USART6:
+            rx6_rb_ = &(ser->rxRB);
+            tx6_rb_ = &(ser->txRB);
+            break;
+        default:
+            break;
+    }   
+
     usart_enable(usart);
 }
+
 
 // *********** POLLING *************************** //
 //@Note: This doesent fully work when the ISR is enabled ???? gives some wired values on read
@@ -233,10 +229,10 @@ static bool serialAvailable(Serial *ser){
 // *********** ISR DRIVEN *********************** //
 
 static void serialSend(Serial *ser, uint8_t *data, uint16_t size){
-    //@Breif: adds data to ring buffer and sets up ISR trasmit
+    //@Brief: adds data to ring buffer and sets up ISR transmit
     //@Note: Blocks if ringbuffer full
 
-    for(int i =0; i < size - 1 ; i++){
+    for(int i =0; i < size; i++){
         while(rb_full(&ser->txRB) == 1){}; // block while full
         rb_put(&ser->txRB, data[i]);
     }

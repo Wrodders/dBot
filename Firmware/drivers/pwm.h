@@ -5,7 +5,7 @@
 #include <libopencm3/stm32/timer.h>
 
 
-static void pwm_config_timer(uint32_t timPerif, uint16_t prescaler, uint32_t freq){
+static void pwmInit(uint32_t timPerif, uint16_t prescaler, uint32_t freq){
     //@Breif: Initializes a Timer Perfieral for PWM mode
     
     timer_set_mode(timPerif,TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,TIM_CR1_DIR_UP);
@@ -17,7 +17,7 @@ static void pwm_config_timer(uint32_t timPerif, uint16_t prescaler, uint32_t fre
     return;
 }
 
-static void pwm_init_output_channel(uint32_t timPerif,enum tim_oc_id timCH, uint32_t gpioPort, uint32_t gpioPin, uint32_t gpioAF){
+static void pwmConfig(uint32_t timPerif,enum tim_oc_id timCH, uint32_t gpioPort, uint32_t gpioPin, uint32_t gpioAF){
     //@Breif: Set Up GPIO and Output Compare for PWM
     timer_disable_oc_output(timPerif, timCH );
     timer_set_oc_mode(timPerif, timCH, TIM_OCM_PWM1); // Output Compare PWM Mode 1
@@ -30,7 +30,7 @@ static void pwm_init_output_channel(uint32_t timPerif,enum tim_oc_id timCH, uint
     return;
 }
 
-static void pwm_set_dutyCycle(uint32_t timPerif, enum tim_oc_id timCH, float dutyCycle){
+static void pwmSetDuty(uint32_t timPerif, enum tim_oc_id timCH, float dutyCycle){
     //@Breif: Sets Duty Cycle of PWM Output Chanel
     //The duty cycle value is a percentage of the reload register value (ARR)
     const float newCCR = (float)(TIM_ARR(timPerif) * dutyCycle);
@@ -38,7 +38,7 @@ static void pwm_set_dutyCycle(uint32_t timPerif, enum tim_oc_id timCH, float dut
     return;
 }
 
-static void pwm_start_timer(uint32_t timPerif){
+static void pwmStart(uint32_t timPerif){
     //@Breif: Start PWM Generation
     timer_generate_event(TIM1, TIM_EGR_UG);
     timer_enable_break_main_output(timPerif); // for advanced timers only
