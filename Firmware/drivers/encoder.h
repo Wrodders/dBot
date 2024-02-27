@@ -31,7 +31,7 @@ static Encoder encoderInit(uint32_t timPerif, uint32_t pinA, uint32_t portA, uin
 
    
     e.timPerif = timPerif;
-    timer_set_period(e.timPerif, cpr);
+    timer_set_period(e.timPerif, 0xffffffff);
     timer_slave_set_mode(e.timPerif, TIM_MODE_ENC);
     timer_ic_set_input(e.timPerif,  TIM_IC1, TIM_IC_IN_TI1);
     timer_ic_set_input(e.timPerif,  TIM_IC2, TIM_IC_IN_TI2);

@@ -43,11 +43,12 @@ static Motor motorInit(uint32_t timPerif,  uint32_t pwmPort, enum tim_oc_id timC
     m.drv.pwmA.port = pwmPort;
     m.drv.pwmB.pin = pwmB;
     m.drv.pwmB.port = pwmPort;
-    m.drv.en.pin = enPin;
-    m.drv.en.port = enPort;
 
+
+    m.drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
+    gpio_clear(m.drv.en.port, m.drv.en.pin); // set off
     // Initialize Timer PWM
-    pwmInit(m.drv.timPerif,84,1); // set freq to 1Hz period to 25000 ARR reg
+    pwmInit(m.drv.timPerif,84,25000); // set freq to 1Hz period to 25000 ARR reg
 	pwmConfig(m.drv.timPerif, m.drv.timCH_A, m.drv.pwmA.port, m.drv.pwmA.pin, GPIO_AF1); 
 	pwmConfig(m.drv.timPerif, m.drv.timCH_B, m.drv.pwmB.port, m.drv.pwmB.pin, GPIO_AF1); 
    
@@ -67,8 +68,10 @@ static void motorConfig(Motor *m, Encoder *enc,float vPSU, float vLimit, float v
 
 static void driverEnable(Driver *drv){
     //@Brief: Starts Motor Driver PWM
+    
     pwmStart(drv->timPerif);
     timer_enable_break_main_output(drv->timPerif); // for advanced timers only
+    gpio_set(drv->en.port, drv->en.pin); // enable driver
     return;
 }
 
@@ -82,19 +85,15 @@ static void motorSetVoltage(Motor *motor, float v){
     // Forward Spin(1) & motor flipped(1) -> PWM B
     bool dir;
     float vAbs =  _fabs(v);
-    if(vAbs < motor->drv.vMin){
-       v = 0;
-    }
-    if(v >= 0.0f){ 
-        dir = 1;
-    }
+    if(vAbs < motor->drv.vMin){v = 0;} // limit minium voltage
+    if(v >= 0.0f){ dir = 1;}
     else{
         dir = 0; 
         v = -v;
     }
 
-    v = _clamp(v, 0.0f, motor->drv.vLimit);
-    v = _clamp(v/motor->drv.vPSU, 0.0f, 1.0f);
+    v = _clamp(v, 0.0f, motor->drv.vLimit); // clamp to 
+    v = _clamp(v/motor->drv.vPSU, 0.0f, 1.0f); // make %
     
     if(dir == motor->flipDir){
         // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
@@ -123,13 +122,6 @@ static void motorBreak(Motor *motor){
     return;
 }
 
-static void motorSetVelocity(Motor *motor, float vel){
-    //@Brief: Sets Motors Speed Control Reference
-    //@Description: DC Motor Transfer Function Z Transform 
-
-    return;
-
-}
 
 
 #endif // DCMOTOR_H

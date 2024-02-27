@@ -39,7 +39,7 @@
 #define M_R_CH1		    GPIO2   // Right Motor PWM CH1 Pin
 #define M_R_CH2		    GPIO3   // Right Motor PWM CH2 Pin
 
-#define DRV_EN_PIN      GPIO5   // DRV8833 Enable PIN
+#define DRV_EN_PIN      GPIO4   // DRV8833 Enable PIN
 #define DRV_EN_PORT     GPIOA   // DRV8833 Enable PORT
 
 #define ENC_CPR         12      
@@ -74,7 +74,8 @@ static void clock_setup(void){
     rcc_periph_clock_enable(RCC_USART2);
 
 	rcc_periph_clock_enable(RCC_I2C1); // MPU6050
-    rcc_periph_clock_enable(RCC_TIM3); // Encoder
+     rcc_periph_clock_enable(RCC_TIM2); // Motor PWM
+    rcc_periph_clock_enable(RCC_TIM3); // Encoder Quducore Input capture
 
 	return;
 }
@@ -114,8 +115,13 @@ int main(void){
 
 
     // Motor 
+    
+    Encoder encL = encoderInit(ENC_TIM, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT,ENC_CPR*20);
+    Motor motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_CH1, TIM_OC2, M_L_CH2, DRV_EN_PIN, DRV_EN_PORT);
+    motorConfig(&motorL, &encL, 12.0f, 9.0f, 0.3f,false);
+    driverEnable(&motorL.drv); // enable DRV8833 & pwm
+    motorSetVoltage(&motorL, 8);
 
-    Encoder enc = encoderInit(ENC_TIM, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT,ENC_CPR*20);
 
     enum STATE{
         T_SCHEDULE = 0, // ** Run Round Robin Scheduler  ** //
@@ -146,14 +152,13 @@ int main(void){
         if(CHECK_TASK(comsTask, loopTick)){
             
             //len = mysprintf(buf, 4, "%f:%f:%f:%f\n", mpu6050.accel.x,imu.flitAccel.x, mpu6050.gyro.y,imu.filtGyro.y );
-            len = mysprintf(buf, 4, "%d\n", encoderRead(&enc));
+            len = mysprintf(buf, 4, "%d:%d\n", encoderRead(&encL), timer_get_counter(M_L_TIM));
             serialSend(&ser1, buf, len);
             comsTask.lastTick = loopTick;
         }
 
         if(CHECK_TASK(llCtrlTask, loopTick)){
             // Get Pitch Angle
-
             mpu6050Read(&mpu6050);
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurements
             llCtrlTask.lastTick = loopTick;
