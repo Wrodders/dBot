@@ -16,10 +16,13 @@
         "usart.h": "c",
         "ringbuffer.h": "c",
         "queue.h": "c",
-        "imu.h": "c"
+        "imu.h": "c",
+        "encoder.h": "c"
     },
     "cSpell.words": [
         "acklogalged",
+        "Calib",
+        "DDMR",
         "msgframe"
     ],
     "editor.detectIndentation": false

@@ -14,7 +14,6 @@ All velocities are relative to the motors frame.
 #include "../drivers/encoder.h"
 
 
-
 typedef struct Driver{
     uint32_t timPerif;
     enum tim_oc_id timCH_A;
@@ -22,7 +21,6 @@ typedef struct Driver{
     GPIO pwmA;
     GPIO pwmB;
     GPIO en;
-    float  vBat; // Battery voltage
     float vPSU;
     float vLimit;
     float vMin; 
@@ -32,12 +30,10 @@ typedef struct Motor {
     Driver drv;
     Encoder *enc; 
     bool flipDir; 
-    float gR; // gear ratio
-    float speed; // shaft speed
-    float pos; // shaft position
+    float angularSpeed; // angular speed rad/s
 }Motor;
 
-static Motor motorInit(uint32_t timPerif, enum tim_oc_id timCH_A,uint32_t pwmA, enum tim_oc_id timCH_B, uint32_t pwmB, uint32_t pwmPort, uint32_t enPin, uint32_t enPort){
+static Motor motorInit(uint32_t timPerif,  uint32_t pwmPort, enum tim_oc_id timCH_A, uint32_t pwmA, enum tim_oc_id timCH_B, uint32_t pwmB,  uint32_t enPin, uint32_t enPort){
     //@Brief: Inits Motor PWM
     Motor m;
     m.drv.timPerif = timPerif;
@@ -51,34 +47,33 @@ static Motor motorInit(uint32_t timPerif, enum tim_oc_id timCH_A,uint32_t pwmA, 
     m.drv.en.port = enPort;
 
     // Initialize Timer PWM
-    pwm_config_timer(m.drv.timPerif,84,1); // set freq to 1Hz period to 25000 ARR reg
-	pwm_init_output_channel(m.drv.timPerif, m.drv.timCH_A, m.drv.pwmA.port, m.drv.pwmA.pin, GPIO_AF1); 
-	pwm_init_output_channel(m.drv.timPerif, m.drv.timCH_B, m.drv.pwmB.port, m.drv.pwmB.pin, GPIO_AF1); 
+    pwmInit(m.drv.timPerif,84,1); // set freq to 1Hz period to 25000 ARR reg
+	pwmConfig(m.drv.timPerif, m.drv.timCH_A, m.drv.pwmA.port, m.drv.pwmA.pin, GPIO_AF1); 
+	pwmConfig(m.drv.timPerif, m.drv.timCH_B, m.drv.pwmB.port, m.drv.pwmB.pin, GPIO_AF1); 
    
     return m;
 }
 
-static void motorConfig(Motor *m, Encoder *enc, float vBat, float vPSU, float vLimit, float vMin, float gearRatio, bool flipDir){
+static void motorConfig(Motor *m, Encoder *enc,float vPSU, float vLimit, float vMin, bool flipDir){
     //@Brief: Configs Motor parameters
     m->enc = enc;
-    m->drv.vBat =  vBat;
     m->drv.vPSU = vPSU;
     m->drv.vLimit = vLimit < vPSU ? vLimit : vPSU ; // vLimit must be below or == vPSU
     m->drv.vMin = vMin;
-    m->gR = gearRatio;
     m->flipDir = flipDir;
     return; 
 }
 
 
-static void enableDriver(Driver *drv){
+static void driverEnable(Driver *drv){
     //@Brief: Starts Motor Driver PWM
-    pwm_start_timer(drv->timPerif);
+    pwmStart(drv->timPerif);
     timer_enable_break_main_output(drv->timPerif); // for advanced timers only
     return;
 }
 
-static void setMotorVoltage(Motor *motor, float v){
+
+static void motorSetVoltage(Motor *motor, float v){
     //@Brief: Sets PWM Duty Cycle as voltage vector
     // Assumes 
     // PWM A High == Forwards
@@ -103,29 +98,37 @@ static void setMotorVoltage(Motor *motor, float v){
     
     if(dir == motor->flipDir){
         // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
-        pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_A, 0); // drive low
-        pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_B, v); 
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0); // drive low
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, v); 
     }
     else{
         // Fwds = (1) flipped = (0) ||  BCK = (0) Flipped = (1) -> PWM A
-        pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_A, v);
-        pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_B, 0); 
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, v);
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0); 
     }
     return;
 }
 
-static void stopMotor(Motor *motor){ 
+static void motorStop(Motor *motor){ 
     //@Brief: Sets H Brige Inputs High
-    pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_A, 1);
-    pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_B, 1);
+    pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 1);
+    pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 1);
     return;
 }
 
-static void breakMotor(Motor *motor){
+static void motorBreak(Motor *motor){
     //@Brief: Sets H Bridge Inputs Low
-    pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_A, 0);
-    pwm_set_dutyCycle(motor->drv.timPerif, motor->drv.timCH_B, 0);
+    pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0);
+    pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0);
     return;
+}
+
+static void motorSetVelocity(Motor *motor, float vel){
+    //@Brief: Sets Motors Speed Control Reference
+    //@Description: DC Motor Transfer Function Z Transform 
+
+    return;
+
 }
 
 

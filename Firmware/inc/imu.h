@@ -2,15 +2,59 @@
 #define IMU_H
 
 
-#include "../sensors/MPU6050.h"
+#include "MPU6050.h"
 
-
+#define RAD_TO_DEG 57.295779513082320876798154814105
 
 typedef struct IMU{
     float roll;
     float pitch;
     float yaw;
+
+    vector_t flitAccel;
+    vector_t filtGyro;
+    float aAccel;
+    float aGyro;
 }IMU; 
+
+
+static IMU imuInit(float aAccel, float aGyro){
+    IMU imu = {0};
+    imu.aAccel = aAccel;
+    imu.aGyro = aGyro;
+    return imu;
+}
+
+static void imuLPF(IMU *imu, vector_t *accel, vector_t *gyro){
+    // first order IIR filter
+
+    imu->flitAccel.x = (imu->aAccel * imu->flitAccel.x) + (1.0f - imu->aAccel) * accel->x;
+    imu->flitAccel.y = (imu->aAccel * imu->flitAccel.y) + (1.0f - imu->aAccel) * accel->y;
+    imu->flitAccel.z = (imu->aAccel * imu->flitAccel.z) + (1.0f - imu->aAccel) * accel->z;
+
+    imu->filtGyro.x = (imu->aGyro * imu->filtGyro.x) + (1.0f - imu->aGyro) * gyro->x;
+    imu->filtGyro.y = (imu->aGyro * imu->filtGyro.y) + (1.0f - imu->aGyro) * gyro->y;
+    imu->filtGyro.z = (imu->aGyro * imu->filtGyro.z) + (1.0f - imu->aGyro) * gyro->z;
+}
+
+
+static void imuRawEuler(vector_t *accel, float *roll, float *pitch){
+
+    // roll (x-axis rotation)
+    float ax2 = accel->x * accel->x;
+    float ay2 = accel->y * accel->y;
+    float az2 = accel->z * accel->z;
+
+
+    *roll = atanf(accel->y * invSqrt(ax2 + az2));
+    // pitch (y-axis rotation)
+    *pitch = atan(accel->x * invSqrt(ay2 + az2));
+    return;
+}
+
+// Kalman filter 
+
+
 
 
 
@@ -21,7 +65,7 @@ typedef struct CompFilt{
     float a;
 }CompFilt;
 
-static void filterComplementary(CompFilt * filt, IMU *imu, vector_t *accel, vector_t *gyro){
+static void compFiltUpdate(CompFilt * filt, IMU *imu, vector_t *accel, vector_t *gyro){
 
     double pitchAcc = atan2(accel->y, sqrt((accel->x * accel->x) + (accel->z * accel->z))); //  angle between horizontal plane and accel vector
     double rollAcc = atan2(-accel->x, accel->z);
@@ -48,7 +92,7 @@ typedef struct MadgwickFilter {
   uint32_t counter;
 }MadgwickFilter;
 
-static bool configMadgwickFilter(MadgwickFilter *filter, float freq, float beta){
+static bool madgwickConfig(MadgwickFilter *filter, float freq, float beta){
     if (!filter) {
     return false;
   }
@@ -58,7 +102,7 @@ static bool configMadgwickFilter(MadgwickFilter *filter, float freq, float beta)
   return true;
 }
 
-static bool resetMadgwickFilter(MadgwickFilter *filter){
+static bool madgwickReset(MadgwickFilter *filter){
      if (!filter) {
     return false;
   }
@@ -71,15 +115,15 @@ static bool resetMadgwickFilter(MadgwickFilter *filter){
 }
 
 
-static MadgwickFilter initMadgwickfilter(void) {
+static MadgwickFilter madgwickInit(void) {
     MadgwickFilter filter;
-    configMadgwickFilter(&filter, 500.0f, 0.1f);
-    resetMadgwickFilter(&filter);
+    madgwickConfig(&filter, 500.0f, 0.1f);
+    madgwickReset(&filter);
     return filter;
 }
 
 
-static bool updateMadgwickFilter(MadgwickFilter *filter, float gx, float gy, float gz, float ax, float ay, float az){
+static bool madgwickFiltUpdate(MadgwickFilter *filter, float gx, float gy, float gz, float ax, float ay, float az){
     float recipNorm;
     float s0, s1, s2, s3;
     float qDot1, qDot2, qDot3, qDot4;
@@ -152,7 +196,7 @@ static bool updateMadgwickFilter(MadgwickFilter *filter, float gx, float gy, flo
 
 }
 
-static bool computeEulerAngles(MadgwickFilter *filter, IMU *imu){
+static bool madgwickGetEuler(IMU *imu, MadgwickFilter *filter){
     if (!filter) {return false;}
     // Calc Angles
     imu->roll = asinf(-2.0f * (filter->q1 * filter->q3 - filter->q0 * filter->q2));

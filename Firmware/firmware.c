@@ -4,7 +4,7 @@
 #include "drivers/serial.h"
 #include "inc/imu.h"
 #include "inc/coms.h"
-#include "inc/services.h"
+#include "inc/motor.h"
 
 #define LED_PORT 		GPIOC
 #define LED_PIN			GPIO13
@@ -14,7 +14,6 @@
 #define DEBUG_PORT		GPIOB
 #define DEBUG_RX		GPIO7 
 #define DEBUG_TX		GPIO6
-
 
 
 // Bluetooth UART
@@ -29,26 +28,28 @@
 #define I2C_SCL			GPIO8
 
 // DRV8833 2-CH PWM DC Motor Controller 
-#define PWMA_TIM 		TIM2
-#define PWMA_PORT		GPIOA
-#define PWMACH1_PIN		GPIO0
-#define PWMACH2_PIN		GPIO1
-#define PWMB_TIM		TIM2
-#define PWMB_PORT		GPIOA
-#define PWMBCH3_PIN		GPIO2
-#define PWMBCH4_PIN		GPIO3
+
+#define M_L_TIM 	TIM2    // Left Motor PWM Timer 
+#define M_L_PORT	GPIOA   // Left Motor PWM Port
+#define M_L_CH1		GPIO0   // Left Motor PWM CH1 Pin
+#define M_L_CH2		GPIO1   // Left Motor PWM CH2 Pin
+
+#define M_R_TIM		TIM2    // Right Motor PWM Timer 
+#define M_R_PORT	GPIOA   // Right Motor PWM Port
+#define M_R_CH1		GPIO2   // Right Motor PWM CH1 Pin
+#define M_R_CH2		GPIO3   // Right Motor PWM CH2 Pin
+
+#define DRIVER_EN_PIN   GPIO5   // DRV8833 Enable PIN
+#define DRIVER_EN_PORT  GPIOA   // DRV8833 Enable PORT
 
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
-
-#define RB_SIZE 16
+#define RB_SIZE 64
 // ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
 uint8_t rx2_buf_[RB_SIZE] = {0};
 uint8_t tx2_buf_[RB_SIZE] = {0};
-
-
 
 // ******* Clock Set Up ****************************************************** //
 static void clock_setup(void){
@@ -77,82 +78,69 @@ static void systick_setup(void){
 
 int main(void){
 
-	// ***** SETUP ********** //
+	// ***** HARDWARE SETUP ********** //
 	clock_setup(); // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup(); // 1ms Tick
     
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 	
-    Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ, 
+    Serial ser1 = serialInit(DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ,
                             rx1_buf_, ARR_SIZE(rx1_buf_), 
                             tx1_buf_, ARR_SIZE(tx1_buf_));
-	serialLinkRB(&ser1);
     serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-	serialSend(&ser1, (uint8_t *)"Hello World\n", 13);
-
-    Serial serBT = serialInit(USART2, BT_PORT, BT_RX, BT_TX, GPIO_AF7, NVIC_USART2_IRQ,
-                            rx2_buf_, ARR_SIZE(rx2_buf_), 
-                            tx2_buf_, ARR_SIZE(tx2_buf_));
-    serialLinkRB(&serBT);
-    serialConfig(&serBT, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-    serialSend(&serBT, (uint8_t *)"Hello BT\n", 10);
-
-    MsgFrame rxFrame = {0}; // Buffer  * THIS SHOULD REALLY BE INSIDE A COMS STRUCT/ class 
+    // Coms Messages
+    MsgFrame rxFrame = {0}; 
     MsgFrame txFrame = {0};
 
+    // IMU
+	MPU6050 mpu6050 = mpu6050Init(I2C_PORT, I2C_SCL, I2C_SDA);
+    if(mpu6050.initalized == false){
+        serialWrite(&ser1, "MPU605 FAIL\n", 13);
+    }else{
+        serialWrite(&ser1, "MPU6050 SUCCESS\n", 17);
+    }
 
-	MPU6050_t mpu6050; // = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
-    CompFilt compFilt = {.a = 0.8, .dt = 50};
-    IMU imu = {0};
+    IMU imu = imuInit(0.5f, 0.01f);
 
-	//if(mpu6050.initalized == false){
-	//    len = mysprintf((char *)buf, 0, "FAIL: %d :\n", mpu6050.data);
-    //    serialSend(&ser1, buf, len);
-	//}
+    enum STATE{
+        T_SCHEDULE = 0, // ** Run Round Robin Scheduler  ** //
+        T_POST,         // ** PowerOnSelfTest ** //
+        T_CALIB,        // ** Calibrate Robot ** //
+        T_BLINK,        // ** Debug WatchDog ** //
+        T_COMS,         // ** Execute Cmds & Send Messages ** // 
+        T_RESET,       // ** Reset System Cleanup ** //
+        T_LL_CTRL, // ** DC MOTOR PI Controller @1kHz  ** //
+    }state = T_POST;
 
-    // ***** Create Fixed time Tasks ***** // 
-    enum STATE{INIT = 0, CALIB, AUTO, REMOTE} state = INIT;
-
-    TaskHandle blinkTask = createTask(1000); // 1sec = 1 Hz 
-    TaskHandle mpu6050Task = createTask(1); // 2ms = 500 Hz 
-    TaskHandle imuTask = createTask(50); // 50ms = 200 Hz
-    TaskHandle serialTask = createTask(100); // 100ms = 10hz
-    imuTask.enable =false;
-    mpu6050Task.enable=false;
+    // ***** Application Tasks ***** // 
+    TaskHandle blinkTask = createTask(500); // 500ms = 2Hz
+    TaskHandle comsTask = createTask(100); // 100ms = 10hz
+    TaskHandle llCtrlTask = createTask(50); // 50ms = 200Hz
+    uint8_t buf[40];
     uint8_t len = 0;
-
+    float filtAccelxX;
     uint32_t loopTick;
 	for(;;){
+        loopTick = get_ticks();
 
-        switch (state){
-            case INIT:
-                break;
-            case CALIB:
-                break;
-            case AUTO:
-                loopTick = get_ticks();
-                if(CHECK_TASK(blinkTask, loopTick)){
-                    gpio_toggle(led.port, led.pin);    
-                    blinkTask.lastTick = loopTick;
-                }
-                if(CHECK_TASK(serialTask, loopTick)){
-                    MsgFrame msgframe;
-                    // Run Telemetry
-                    comsSendMsg(&ser1, ID_IMU, "A:%f", 3.1415973); 
-                }
-                if(CHECK_TASK(imuTask, loopTick)){
-                    filterComplementary(&compFilt, &imu, &mpu6050.accel, &mpu6050.gyro);
-                    imuTask.lastTick = loopTick;
-                }
-                if(CHECK_TASK(mpu6050Task, loopTick)){
-                    readMPU6050(&mpu6050);
-                    mpu6050Task.lastTick = loopTick;
-                }
-                break;
-            case REMOTE:
-                break;
-            default:
-                break;
+        if(CHECK_TASK(blinkTask, loopTick)){
+            gpio_toggle(led.port, led.pin);
+            blinkTask.lastTick = loopTick;
+        }
+
+        if(CHECK_TASK(comsTask, loopTick)){
+            
+            len = mysprintf(buf, 4, "%f:%f:%f:%f\n", mpu6050.accel.x,imu.flitAccel.x, mpu6050.gyro.y,imu.filtGyro.y );
+            serialSend(&ser1, buf, len);
+            comsTask.lastTick = loopTick;
+        }
+
+        if(CHECK_TASK(llCtrlTask, loopTick)){
+            // Get Pitch Angle
+            mpu6050Read(&mpu6050);
+            imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurmetns
+            llCtrlTask.lastTick = loopTick;
         }
 	}
+
 }
