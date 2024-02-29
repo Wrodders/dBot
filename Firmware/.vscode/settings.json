@@ -17,7 +17,8 @@
         "ringbuffer.h": "c",
         "queue.h": "c",
         "imu.h": "c",
-        "encoder.h": "c"
+        "encoder.h": "c",
+        "utils.h": "c"
     },
     "cSpell.words": [
         "acklogalged",

@@ -7,13 +7,14 @@
 #define RAD_TO_DEG 57.295779513082320876798154814105
 
 typedef struct IMU{
+    // Estimated Euler Angles
     float roll;
     float pitch;
     float yaw;
 
-    vector_t flitAccel;
+    vector_t flitAccel; // Low Pass IIR Filter 
     vector_t filtGyro;
-    float aAccel;
+    float aAccel; // Filter alpha
     float aGyro;
 }IMU; 
 
@@ -52,7 +53,7 @@ static void imuRawEuler(vector_t *accel, float *roll, float *pitch){
     return;
 }
 
-// Kalman filter 
+
 
 
 

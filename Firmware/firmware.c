@@ -42,7 +42,6 @@
 #define DRV_EN_PIN      GPIO4   // DRV8833 Enable PIN
 #define DRV_EN_PORT     GPIOA   // DRV8833 Enable PORT
 
-#define ENC_CPR         12      
 #define ENC_TIM         TIM3
 #define ENC_L_PORT      GPIOB
 #define ENC_L_A         GPIO4   // TIM3 CH1
@@ -53,13 +52,27 @@
 #define ENC_R_B         GPIO1   // TIM3 CH4
 
 
+
+// Task Execution Rates
+
+#define T_COMS_RATE 100          // 10Hz
+#define T_LL_CTRL_RATE 50       // 20Hz
+#define T_BLINK_RATE 500       // 2Hz
+
+// freq/(cpr*gr) 
+
+#define ENC_CPR 12.00f
+#define GEAR_RATIO 20.00f
+#define EDGE_NUM 4.00f
+const float MOTOR_CPR = ENC_CPR * GEAR_RATIO * EDGE_NUM;
+const float TICKS_TO_RPS  = (float)(1/ MOTOR_CPR) * (1/(T_LL_CTRL_RATE * 0.001));
+
+
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
 #define RB_SIZE 64
 // ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
-uint8_t rx2_buf_[RB_SIZE] = {0};
-uint8_t tx2_buf_[RB_SIZE] = {0};
 
 // ******* Clock Set Up ****************************************************** //
 static void clock_setup(void){
@@ -106,9 +119,9 @@ int main(void){
     // IMU
 	MPU6050 mpu6050 = mpu6050Init(I2C_PORT, I2C_SCL, I2C_SDA);
     if(mpu6050.initalized == false){
-        serialWrite(&ser1, "MPU605 FAIL\n", 13);
+        serialWrite(&ser1, (uint8_t *)"MPU605 FAIL\n", 13);
     }else{
-        serialWrite(&ser1, "MPU6050 SUCCESS\n", 17);
+        serialWrite(&ser1, (uint8_t *)"MPU6050 SUCCESS\n", 17);
     }
 
     IMU imu = imuInit(0.5f, 0.01f);
@@ -116,31 +129,24 @@ int main(void){
 
     // Motor 
     
-    Encoder encL = encoderInit(ENC_TIM, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT,ENC_CPR*20);
+    Encoder encL = encoderInit(ENC_TIM, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT,UINT16_MAX); 
     Motor motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_CH1, TIM_OC2, M_L_CH2, DRV_EN_PIN, DRV_EN_PORT);
     motorConfig(&motorL, &encL, 12.0f, 9.0f, 0.3f,false);
     driverEnable(&motorL.drv); // enable DRV8833 & pwm
-    motorSetVoltage(&motorL, 8);
+    motorSetVoltage(&motorL, -8);
 
-
-    enum STATE{
-        T_SCHEDULE = 0, // ** Run Round Robin Scheduler  ** //
-        T_POST,         // ** PowerOnSelfTest ** //
-        T_CALIB,        // ** Calibrate Robot ** //
-        T_BLINK,        // ** Debug WatchDog ** //
-        T_COMS,         // ** Execute Cmds & Send Messages ** // 
-        T_RESET,       // ** Reset System Cleanup ** //
-        T_LL_CTRL, // ** DC MOTOR PI Controller @1kHz  ** //
-    }state = T_POST;
 
     // ***** Application Tasks ***** // 
-    TaskHandle blinkTask = createTask(500); // 500ms = 2Hz
-    TaskHandle comsTask = createTask(100); // 100ms = 10hz
-    TaskHandle llCtrlTask = createTask(50); // 50ms = 200Hz
-    uint8_t buf[40];
-    uint8_t len = 0;
-    float filtAccelxX;
-    uint32_t loopTick;
+    TaskHandle blinkTask = createTask(T_BLINK_RATE); // 500ms = 2Hz
+    TaskHandle comsTask = createTask(T_COMS_RATE); // 100ms = 10hz
+    TaskHandle llCtrlTask = createTask(T_LL_CTRL_RATE); // 50ms = 200Hz
+    uint8_t buf[40]; // tx coms buffer
+    uint8_t len = 0; // msg len
+    uint16_t mCount = 0;
+    bool dir = 1;
+    float mSpeed = 0; // rps
+    uint16_t dCount = 0;
+    uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
 
@@ -152,7 +158,7 @@ int main(void){
         if(CHECK_TASK(comsTask, loopTick)){
             
             //len = mysprintf(buf, 4, "%f:%f:%f:%f\n", mpu6050.accel.x,imu.flitAccel.x, mpu6050.gyro.y,imu.filtGyro.y );
-            len = mysprintf(buf, 4, "%d:%d\n", encoderRead(&encL), timer_get_counter(M_L_TIM));
+            len = mysprintf((char*)buf, 4, "%u:%d:%f\n", encoderRead(&encL),dCount, motorL.angularSpeed);
             serialSend(&ser1, buf, len);
             comsTask.lastTick = loopTick;
         }
@@ -161,7 +167,19 @@ int main(void){
             // Get Pitch Angle
             mpu6050Read(&mpu6050);
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurements
+
+            // Calculate Wheel Speed rad/s
+            mCount = encoderRead(&encL);
+            dCount =  (mCount - encL.lastCount); // delta count
+            
+            mSpeed = dCount * TICKS_TO_RPS; // measured speed rps
+            
+            motorL.angularSpeed = (1-0.2)*mSpeed + 0.2 *motorL.angularSpeed;
+            encL.lastCount = mCount; // update
+        
+
             llCtrlTask.lastTick = loopTick;
+
         }
 	}
 

@@ -217,11 +217,6 @@ static bool comsCmdExec(CmdList *cmdList, MsgFrame *msg){
     return true;
 }
 
-static void comsRetCmd(){
-    
-    return; 
-
-}
 
 
 //****** Message Tranmission packetization  ***********************************************************//
