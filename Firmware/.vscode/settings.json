@@ -18,13 +18,24 @@
         "queue.h": "c",
         "imu.h": "c",
         "encoder.h": "c",
-        "utils.h": "c"
+        "utils.h": "c",
+        "pwm.h": "c",
+        "stdint.h": "c"
     },
     "cSpell.words": [
         "acklogalged",
         "Calib",
         "DDMR",
-        "msgframe"
+        "GPIOA",
+        "GPIOB",
+        "GPIOC",
+        "LOOPTICK",
+        "msgframe",
+        "prescaler",
+        "pupd",
+        "Quaducore",
+        "SPEEDCTRL",
+        "VBAT"
     ],
     "editor.detectIndentation": false
 }

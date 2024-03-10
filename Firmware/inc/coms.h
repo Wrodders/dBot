@@ -91,6 +91,7 @@ typedef enum {
     // ADD Application Specific Publishers
     PUB_IMU,
     PUB_TELEM,
+    PUB_ODOM,
 
     NUM_PUBS
 }PUB_ID_t; // Publish Topic IDs
@@ -236,7 +237,13 @@ DATA -- LEN bytes of data
 EOF - End of Frame 
 */
 
-#define comsSendMsg(SER, ID, FORMAT, ... )                                   \
+
+#define  COMS_INIT()                                                         \
+const uint8_t DATA_IDX = 3                                                   \
+MsgFrame MSG;                                                                \
+uint8_t IDX = 0;                                                             
+
+#define COMS_SEND_MSG(SER, ID, FORMAT, ... )                                 \
 uint8_t DATA_IDX = 3;                                                        \
 MsgFrame MSG;                                                                \
 int SIZE = mysprintf((char *)&MSG.buf[DATA_IDX], 2, FORMAT, __VA_ARGS__ );   \
@@ -248,7 +255,7 @@ MSG.buf[IDX++] = ID;                                                         \
 IDX += SIZE;                                                                 \
 MSG.buf[IDX++] = EOF_BYTE;                                                   \
 serialSend(SER, MSG.buf, IDX);                                               \
-}                                                                           
+}                                                                         
 
 
 #endif // COMS_H

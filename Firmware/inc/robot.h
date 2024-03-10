@@ -1,7 +1,9 @@
-#ifndef KINEMATICS_H
-#define KINEMATICS_H
+#ifndef ROBOT_H
+#define ROBOT_H
 
+#include "../common/common.h"
 #include "motor.h"
+#include "pid.h"
 
 
 /*
@@ -20,50 +22,39 @@ DDMR - Differential Driver Mobile Robot
 */  
 
 
-typedef struct PID{
-    float kp,ki,kd;
-    float dt; // sample time
-    
-    float ref; // reference signal
-    float lastErr;
-    float controlU; 
-    float integrator; 
-}PID;
-
 typedef struct DDMR{
+    Motor motorL, motorR;
+    Encoder encL, encR;
+    PID pidL, pidR;
 
-    Motor motorL;
-    Motor motorR;
-
-    PID pidL;
-    PID pidR;
-
-    float wheelR; // R
-    float wheelBase; // 2L
+    const float wheelR; // R
+    const float wheelBase; // 2L
     
     // Pose
     float angularV;
     float linearV;
+    float posX, posY;
 
     float dt; // speed control update rate, s
 }DDMR; // Deferential Drive Mobile Robot
 
 
 
-static float pidStep(PID *pid, float err){
-    //Apply PID control to error
+static DDMR ddmrInit(){
+    //@Brief: Initializes Peripherals Sensors and Controllers for Low Level DDMR Robot
+    
+    DDMR ddmr = {0};
 
-    // proportional
+    ddmr.motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_CH1, TIM_OC2, M_L_CH2, DRV_EN_PIN, DRV_EN_PORT);
 
-    pid->integrator = (pid->integrator + pid->lastErr)*pid->dt;
-    pid->controlU = (pid->kp * err) + (pid->ki * pid->integrator);
-    pid->lastErr = err;
 
+
+    return ddmr;
 }
 
 
 static void ddmrDrive(DDMR *ddmr, float angV, float linV){
-    // Main Driving Procesess, majse sur eot call this often
+    // Main Driving Processes
 
     Motor *mL = &ddmr->motorL;
     Motor *mR = &ddmr->motorR; // calculations
@@ -83,20 +74,13 @@ static void ddmrDrive(DDMR *ddmr, float angV, float linV){
     float errL = wLTarget - mL->angularSpeed; // error is speed
     float errR = wRTarget - mR->angularSpeed;
 
-    // update motor last count
-    mL->enc->count = mLCount;
-    mR->enc->count = mRCount;
-
-    // apply Speed control PI
 
 
-    
+    // update encoders last count
+    ddmr->encL.lastCount = mLCount;
+    ddmr->encR.lastCount = mRCount;
 
-
-
-    
-    
 
 }
 
-#endif // KINEMATICS_H
+#endif // ROBOT_H

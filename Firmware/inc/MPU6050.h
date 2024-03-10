@@ -50,7 +50,6 @@ static void mpu6505Reset(uint32_t i2c){
     delay(100); // Wait for sensor to reset
     i2cWriteReg(i2c,MPU6050_ADDR, MPU6050_PWR_MGMT_1, 0x01); // Auto select clock source
     i2cWriteReg(i2c,MPU6050_ADDR, MPU6050_PWR_MGMT_2, 0x00); // Clear sleep bit
-    return;
 }
 
 static void mpu6050Config(uint32_t i2c){
@@ -61,7 +60,6 @@ static void mpu6050Config(uint32_t i2c){
 
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_GYRO_CONFIG, 0x05); // full scale range +/- 500 deg/s
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_ACCEL_CONFIG, 0x10); // full scale range +/- 8g
-    return;
 }
 
 
@@ -69,7 +67,6 @@ static void mpu6050Wake(uint32_t i2c){
     // Wake up device
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_PWR_MGMT_1, 0x00); // Clear sleep bit
     delay(300); // Wait for sensor to stabilize
-    return;
 }
 
 static void gyroCalib(MPU6050 *imu, int samples){
@@ -101,7 +98,6 @@ static void gyroCalib(MPU6050 *imu, int samples){
     imu->offset.gyro.x /= samples;
     imu->offset.gyro.y /= samples;
     imu->offset.gyro.z /= samples;
-    return;
 }
 
 static void accelCalib(MPU6050 *imu, int samples){
@@ -156,18 +152,16 @@ static void accelCalib(MPU6050 *imu, int samples){
     imu->offset.accel.x /= samples;
     imu->offset.accel.y /= samples;
     imu->offset.accel.z /= samples;
-    return;
-
 }
 
 
 // *** // **** // PUBLIC // **** // **** // 
 
 
-static MPU6050 mpu6050Init(uint32_t port, uint32_t scl, uint32_t sda){
+static MPU6050 mpu6050Init(uint32_t perif, uint32_t port, uint32_t scl, uint32_t sda){
     // Initialize MPU6050 Sensor
     MPU6050 imu;
-    imu.i2c = i2cInit(I2C1, port, scl, sda);
+    imu.i2c = i2cInit(perif, port, scl, sda);
     delay(100); 
 
     mpu6505Reset(imu.i2c);
@@ -232,7 +226,6 @@ static void mpu6050Read(MPU6050 *imu){
     imu->gyro.x -= imu->offset.gyro.x;
     imu->gyro.y -= imu->offset.gyro.y;
     imu->gyro.z -= imu->offset.gyro.z;
-    return;
 }
 
 #endif // MPU6050_H

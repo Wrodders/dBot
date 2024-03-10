@@ -12,6 +12,7 @@ All velocities are relative to the motors frame.
 #include "../common/common.h"
 #include "../drivers/pwm.h"
 #include "../drivers/encoder.h"
+#include "../drivers/gpio.h"
 
 
 typedef struct Driver{
@@ -62,7 +63,6 @@ static void motorConfig(Motor *m, Encoder *enc,float vPSU, float vLimit, float v
     m->drv.vLimit = vLimit < vPSU ? vLimit : vPSU ; // vLimit must be below or == vPSU
     m->drv.vMin = vMin;
     m->flipDir = flipDir;
-    return; 
 }
 
 
@@ -72,7 +72,6 @@ static void driverEnable(Driver *drv){
     pwmStart(drv->timPerif);
     timer_enable_break_main_output(drv->timPerif); // for advanced timers only
     gpio_set(drv->en.port, drv->en.pin); // enable driver
-    return;
 }
 
 
@@ -105,23 +104,18 @@ static void motorSetVoltage(Motor *motor, float v){
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, v);
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0); 
     }
-    return;
 }
 
 static void motorStop(Motor *motor){ 
     //@Brief: Sets H Brige Inputs High
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 1);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 1);
-    return;
 }
 
 static void motorBreak(Motor *motor){
     //@Brief: Sets H Bridge Inputs Low
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0);
-    return;
 }
-
-
 
 #endif // DCMOTOR_H

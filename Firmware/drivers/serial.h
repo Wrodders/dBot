@@ -33,15 +33,15 @@ typedef struct Serial{
 * This way users can simply access the buffer through serial->rb
 * The application will access the correct buffer through the global pointer
 ---------------------------------------------------*/
-RingBuffer *rx1_rb_ = NULL;
-RingBuffer *tx1_rb_ = NULL;
-RingBuffer *rx2_rb_ = NULL;
-RingBuffer *tx2_rb_ = NULL;
-RingBuffer *rx6_rb_ = NULL;
-RingBuffer *tx6_rb_ = NULL;
+RingBuffer* rx1_rb_ = NULL;
+RingBuffer* tx1_rb_ = NULL;
+RingBuffer* rx2_rb_ = NULL;
+RingBuffer* tx2_rb_ = NULL;
+RingBuffer* rx6_rb_ = NULL;
+RingBuffer* tx6_rb_ = NULL;
 
-static RingBuffer *getRB_TX(uint32_t usart){
-    RingBuffer *rb;
+static RingBuffer* getRB_TX(uint32_t usart){
+    RingBuffer* rb;
     switch(usart){ // assign global ring buffers
         case USART1:
             rb = tx1_rb_;
@@ -57,8 +57,8 @@ static RingBuffer *getRB_TX(uint32_t usart){
     }
     return rb;
 }
-static RingBuffer *getRB_RX(uint32_t usart){
-    RingBuffer *rb;
+static RingBuffer* getRB_RX(uint32_t usart){
+    RingBuffer* rb;
     switch(usart){ // assign global ring buffers
         case USART1:
             rb = rx1_rb_;
@@ -80,7 +80,7 @@ static void usartTX_ISR(uint32_t usart){
     //@Description: Gets data available from TX RingBuffer writes to USART Data Registers
     /*@Note: Disables TX Interrupts once no data is in RingBuffer
             this is enabled again by the SerialSend Cmd */
-    RingBuffer *  rb = getRB_TX(usart);
+    RingBuffer* const rb = getRB_TX(usart);
     if(rb == NULL){return;} // exit ensure appropriate USART is serialInit()
     uint8_t data = 0;
     
@@ -97,7 +97,7 @@ static void usartRX_ISR(uint32_t usart){
     //@Brief: Generic ISR Handler for RX USART
     //@Description: Puts Data to RX Ring Buffer if not full
     //@Note: Discards Data if RB is full 
-    RingBuffer * const rb = getRB_RX(usart);
+    RingBuffer* const rb = getRB_RX(usart);
     if(rb == NULL){return;} // ensure appropriate USART is serialInit()
    
     uint8_t data = 0;

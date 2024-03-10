@@ -50,14 +50,7 @@ static void imuRawEuler(vector_t *accel, float *roll, float *pitch){
     *roll = atanf(accel->y * invSqrt(ax2 + az2));
     // pitch (y-axis rotation)
     *pitch = atan(accel->x * invSqrt(ay2 + az2));
-    return;
 }
-
-
-
-
-
-
 
 
 // ********* Complementary Filter ******** // ************************************************// 
@@ -78,7 +71,6 @@ static void compFiltUpdate(CompFilt * filt, IMU *imu, vector_t *accel, vector_t 
     imu->pitch = filt->a * imu->pitch + (1 -filt->a) * pitchAcc;
     imu->roll = filt->a * imu->roll + (1 -filt->a) * rollAcc;
 }
-
 
 
 // ********* Madgwick Filter ******** // ************************************************// 
@@ -206,11 +198,5 @@ static bool madgwickGetEuler(IMU *imu, MadgwickFilter *filter){
     
     return true;
 }
-
-
-
-
-
-
 
 #endif // IMU_H
