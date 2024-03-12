@@ -29,12 +29,14 @@ typedef struct Driver{
 
 typedef struct Motor {
     Driver drv;
-    Encoder *enc; 
     bool flipDir; 
     float angularSpeed; // angular speed rad/s
 }Motor;
 
-static Motor motorInit(uint32_t timPerif,  uint32_t pwmPort, enum tim_oc_id timCH_A, uint32_t pwmA, enum tim_oc_id timCH_B, uint32_t pwmB,  uint32_t enPin, uint32_t enPort){
+static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort, 
+                        const enum tim_oc_id timCH_A, const uint32_t pwmA, 
+                        const enum tim_oc_id timCH_B, const uint32_t pwmB,  
+                        const uint32_t enPin, const uint32_t enPort){
     //@Brief: Inits Motor PWM
     Motor m;
     m.drv.timPerif = timPerif;
@@ -56,9 +58,10 @@ static Motor motorInit(uint32_t timPerif,  uint32_t pwmPort, enum tim_oc_id timC
     return m;
 }
 
-static void motorConfig(Motor *m, Encoder *enc,float vPSU, float vLimit, float vMin, bool flipDir){
+static void motorConfig(Motor *m,const float vPSU, const float vLimit, 
+                        const float vMin, const bool flipDir){
+    
     //@Brief: Configs Motor parameters
-    m->enc = enc;
     m->drv.vPSU = vPSU;
     m->drv.vLimit = vLimit < vPSU ? vLimit : vPSU ; // vLimit must be below or == vPSU
     m->drv.vMin = vMin;
@@ -66,7 +69,7 @@ static void motorConfig(Motor *m, Encoder *enc,float vPSU, float vLimit, float v
 }
 
 
-static void driverEnable(Driver *drv){
+static void driverEnable(const Driver *drv){
     //@Brief: Starts Motor Driver PWM
     
     pwmStart(drv->timPerif);
@@ -74,45 +77,44 @@ static void driverEnable(Driver *drv){
     gpio_set(drv->en.port, drv->en.pin); // enable driver
 }
 
-
-static void motorSetVoltage(Motor *motor, float v){
-    //@Brief: Sets PWM Duty Cycle as voltage vector
-    // Assumes 
-    // PWM A High == Forwards
-    // PWM B High == Backwards 
-    // XOR
-    // Forward Spin(1) & motor flipped(1) -> PWM B
-    bool dir;
-    float vAbs =  _fabs(v);
-    if(vAbs < motor->drv.vMin){v = 0;} // limit minium voltage
-    if(v >= 0.0f){ dir = 1;}
-    else{
-        dir = 0; 
-        v = -v;
-    }
-
-    v = _clamp(v, 0.0f, motor->drv.vLimit); // clamp to 
-    v = _clamp(v/motor->drv.vPSU, 0.0f, 1.0f); // make %
-    
+static void motorSetUnipolar(const Motor* motor, const float duty, const bool dir){
+    //@Brief: Sets the pwm on a Unipolar DC Hbridge:
+   
     if(dir == motor->flipDir){
         // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0); // drive low
-        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, v); 
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, duty); 
     }
     else{
         // Fwds = (1) flipped = (0) ||  BCK = (0) Flipped = (1) -> PWM A
-        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, v);
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, duty);
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0); 
     }
 }
 
-static void motorStop(Motor *motor){ 
+static void motorSetVoltage(const Motor* motor, const float voltage){
+    //@Brief: Sets PWM Duty Cycle as voltage vector
+    //@Description: Forwards == +ve 
+    //              Backwards == -ve
+    bool dir;
+    float v = voltage;
+    float vAbs =  _fabs(v);
+    if(vAbs < motor->drv.vMin){v = 0;} // limit minium voltage
+    if(v >= 0.0f){ dir = 1;}
+    else{dir = 0;}
+    float dc = _clamp(vAbs/motor->drv.vPSU, 0, 1); // convert to % of battery
+    motorSetUnipolar(motor, dc, dir); // apply to unipoladr H bridge
+}
+
+
+
+static void motorStop(const Motor *motor){ 
     //@Brief: Sets H Brige Inputs High
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 1);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 1);
 }
 
-static void motorBreak(Motor *motor){
+static void motorBreak(const Motor *motor){
     //@Brief: Sets H Bridge Inputs Low
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0);

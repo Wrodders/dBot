@@ -4,9 +4,9 @@
 #include "common/task.h"
 #include "drivers/systick.h"
 #include "drivers/serial.h"
-#include "inc/imu.h"
+//#include "inc/imu.h"
 #include "inc/coms.h"
-#include "inc/motor.h"
+#include "inc/robot.h"
 
 // ******* Clock Set Up ****************************************************** //
 static void clock_setup(void){
@@ -21,8 +21,9 @@ static void clock_setup(void){
     rcc_periph_clock_enable(RCC_USART2);
 
 	rcc_periph_clock_enable(RCC_I2C1); // MPU6050
-     rcc_periph_clock_enable(RCC_TIM2); // Motor PWM
-    rcc_periph_clock_enable(RCC_TIM3); // Encoder Quducore Input capture
+    rcc_periph_clock_enable(RCC_TIM2); // Motor PWM
+    rcc_periph_clock_enable(RCC_TIM3); // Encoder L Quducore Input capture
+    rcc_periph_clock_enable(RCC_TIM1); // Encoder R Quaducore Mode
 }
 
 static void systick_setup(void){
@@ -48,25 +49,21 @@ int main(void){
     MsgFrame txFrame = {0};
 
     // IMU
-	MPU6050 mpu6050 = mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
+	/*MPU6050 mpu6050 = mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
     if(mpu6050.initalized == false){
         serialWrite(&ser1, (uint8_t *)"MPU605 FAIL\n", 13);
     }else{
         serialWrite(&ser1, (uint8_t *)"MPU6050 SUCCESS\n", 17);
     }
+    */
+    //IMU imu = imuInit(0.5f, 0.01f);
 
-    IMU imu = imuInit(0.5f, 0.01f);
 
-
-    // Motor 
+    // DDMR ROBOT
+    DDMR robot = ddmrInit();
+    delay(1000);
+    //ddmrTankDrive(&robot,0.5,0.5);
     
-    Encoder encL = encoderInit(ENC_TIM, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT,UINT16_MAX); 
-    Motor motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_CH1, TIM_OC2, M_L_CH2, DRV_EN_PIN, DRV_EN_PORT);
-    motorConfig(&motorL, &encL, 12.0f, 9.0f, 0.3f,false);
-    driverEnable(&motorL.drv); // enable DRV8833 & pwm
-    motorSetVoltage(&motorL, -8);
-
-
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // 500ms = 2Hz
     FixedTimeTask comsTask = createTask(COMS_PERIOD); // 100ms = 10hz
@@ -90,7 +87,7 @@ int main(void){
             
             uint8_t DATA_IDX = 3;                                                        
             MsgFrame MSG = {0};                                                                
-            int SIZE = mysprintf((char *)&MSG.buf[DATA_IDX], 2, "%u:%u:%f", encoderRead(&encL),dCount, motorL.angularSpeed);   
+            int SIZE = mysprintf((char *)&MSG.buf[DATA_IDX], 2, "%u:%f:%f:%f",encoderRead(&robot.encL), robot.motorL.angularSpeed, robot.motorR.angularSpeed, robot.pidL.out);   
             if(SIZE <= (MAX_MSG_DATA_SIZE - 1)){                                         
                 uint8_t IDX = 0;                                                             
                 MSG.buf[IDX++] = SOF_BYTE;                                                   
@@ -98,7 +95,7 @@ int main(void){
                 MSG.buf[IDX++] = PUB_ODOM;                                                         
                 IDX += SIZE;                                                                 
                 MSG.buf[IDX++] = EOF_BYTE;                                                   
-                serialSend(&ser1, MSG.buf, IDX);                                               
+                serialWrite(&ser1, MSG.buf, IDX);                                               
             }
 
             comsTask.lastTick = loopTick;
@@ -106,16 +103,11 @@ int main(void){
 
         if(CHECK_PERIOD(llCtrlTask, loopTick)){
             // Get Pitch Angle
-            mpu6050Read(&mpu6050);
-            imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurements
+            //mpu6050Read(&mpu6050);
+            //imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurements
 
-            // Calculate Wheel Speed rad/s
-            mCount = encoderRead(&encL);
-            dCount =  (mCount - encL.lastCount); // delta count
-            mSpeed = dCount * TICKS_TO_RPS; // measured speed rps
-            
-            motorL.angularSpeed = (1.0f-0.2)*mSpeed + 0.2 *motorL.angularSpeed; // LPF
-            encL.lastCount = mCount; // update
+            ddmrSpeedCtrl(&robot); // run pid
+
 
             llCtrlTask.lastTick = loopTick;
 

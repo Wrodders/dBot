@@ -42,7 +42,7 @@ RingBuffer* tx6_rb_ = NULL;
 
 static RingBuffer* getRB_TX(uint32_t usart){
     RingBuffer* rb;
-    switch(usart){ // assign global ring buffers
+    switch(usart){ // assign global ring buffers pointers
         case USART1:
             rb = tx1_rb_;
             break;
@@ -59,7 +59,7 @@ static RingBuffer* getRB_TX(uint32_t usart){
 }
 static RingBuffer* getRB_RX(uint32_t usart){
     RingBuffer* rb;
-    switch(usart){ // assign global ring buffers
+    switch(usart){ // assign global ring buffers pointers
         case USART1:
             rb = rx1_rb_;
             break;
@@ -84,8 +84,8 @@ static void usartTX_ISR(uint32_t usart){
     if(rb == NULL){return;} // exit ensure appropriate USART is serialInit()
     uint8_t data = 0;
     
-    if(rb_empty(rb) == 0){
-        rb_get(rb, &data); // only write if there is data in the rb 
+    if(rbEmpty(rb) == 0){
+        rbGet(rb, &data); // only write if there is data in the rb 
         USART_DR(usart) = data & USART_DR_MASK; // write byte
     }
     else{
@@ -102,8 +102,8 @@ static void usartRX_ISR(uint32_t usart){
    
     uint8_t data = 0;
     data = (USART_DR(usart) & USART_DR_MASK); // read byte
-    if(rb_full(rb) == 0){
-        rb_put(rb, data); // add byte to buffer    
+    if(rbFull(rb) == 0){
+        rbPut(rb, &data); // add byte to buffer    
     }
 }
 
@@ -143,8 +143,8 @@ static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t
     // Create Serial Device 
     Serial ser = {
         .perif = perif,
-        .rxRB = rb_init(rxbuf, rxSize),
-        .txRB = rb_init(txbuf, txSize),
+        .rxRB = rbInit(rxbuf, rxSize, sizeof(uint8_t)),
+        .txRB = rbInit(txbuf, txSize, sizeof(uint8_t)),
     };
     return ser;    
 }
@@ -233,8 +233,8 @@ static void serialSend(Serial *ser, uint8_t *data, uint16_t size){
     //@Note: Blocks if ringbuffer full
 
     for(int i =0; i < size; i++){
-        while(rb_full(&ser->txRB) == 1){}; // block while full
-        rb_put(&ser->txRB, data[i]);
+        while(rbFull(&ser->txRB) == 1){}; // block while full
+        rbPut(&ser->txRB, &data[i]);
     }
     usart_enable_tx_interrupt(ser->perif); // Set up ISR 
 }
@@ -244,8 +244,8 @@ static uint8_t serialReceive(Serial *ser, uint8_t *buf, uint16_t size){
     //@Note: Blocks, Returns number of bytes read
     int i = 0;
     for(; i < size; i++){
-        while(rb_empty(&ser->rxRB) == 1){};
-        rb_get(&ser->rxRB, &buf[i]);
+        while(rbEmpty(&ser->rxRB) == 1){};
+        rbGet(&ser->rxRB, &buf[i]);
     }
     return i;
 }
@@ -255,8 +255,8 @@ static uint8_t serialGrab(Serial *ser, uint8_t *buf, uint16_t size){
     //@Note: If less bytes available returns num of bytes read
     int i = 0;
     for(; i < size; i++){
-        if(rb_empty(&ser->rxRB) == 1){return i;}
-        rb_get(&ser->rxRB, &buf[i]);
+        if(rbEmpty(&ser->rxRB) == 1){return i;}
+        rbGet(&ser->rxRB, &buf[i]);
     }
     return i;
 }

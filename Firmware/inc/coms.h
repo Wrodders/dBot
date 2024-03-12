@@ -172,10 +172,10 @@ static bool comsGetMsg(Serial *ser, MsgFrame *msg){
     //@Note: Message Discarded if EOF received before declared msg len
     //@Returns true Message Received
     static enum {IDLE, SIZE, ID, DATA, COMPLETE, ERROR} state = IDLE;
-    while (rb_empty(&ser->rxRB) == 0){
+    while (rbEmpty(&ser->rxRB) == 0){
         uint8_t dataIdx = 3; // start posiotn of data
         uint8_t byte;
-        rb_get(&ser->rxRB, &byte); // pop byte
+        rbGet(&ser->rxRB, &byte); // pop byte
         switch (state){
             case IDLE:
                 if(byte == SOF_BYTE){state=SIZE;}

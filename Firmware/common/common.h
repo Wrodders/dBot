@@ -42,25 +42,28 @@
 // DRV8833 2-CH PWM DC Motor Driver 
 #define M_L_TIM 	    TIM2    // Left Motor PWM Timer 
 #define M_L_PORT	    GPIOA   // Left Motor PWM Port
-#define M_L_CH1		    GPIO0   // Left Motor PWM CH1 Pin
-#define M_L_CH2		    GPIO1   // Left Motor PWM CH2 Pin
+#define M_L_PWMA        GPIO0   // Left Motor PWM CH1 Pin
+#define M_L_PWMB	    GPIO1   // Left Motor PWM CH2 Pin
 
 #define M_R_TIM		    TIM2    // Right Motor PWM Timer 
 #define M_R_PORT	    GPIOA   // Right Motor PWM Port
-#define M_R_CH1		    GPIO2   // Right Motor PWM CH1 Pin
-#define M_R_CH2		    GPIO3   // Right Motor PWM CH2 Pin
+#define M_R_PWMA		GPIO2   // Right Motor PWM CH3 Pin
+#define M_R_PWMB		GPIO3   // Right Motor PWM CH4 Pin
 
 #define DRV_EN_PIN      GPIO4   // DRV8833 Enable PIN
 #define DRV_EN_PORT     GPIOA   // DRV8833 Enable PORT
 // Quaducore Hall Effect Encoder
-#define ENC_TIM         TIM3
+#define ENC_L_TIM       TIM3
+#define ENC_L_AF        GPIO_AF2
 #define ENC_L_PORT      GPIOB
 #define ENC_L_A         GPIO4   // TIM3 CH1
 #define ENC_L_B         GPIO5   // TIM3 CH2
 
-#define ENC_R_PORT      GPIOB
-#define ENC_R_A         GPIO0   // TIM3 CH3
-#define ENC_R_B         GPIO1   // TIM3 CH4
+#define ENC_R_TIM       TIM1
+#define ENC_R_AF        GPIO_AF1
+#define ENC_R_PORT      GPIOA
+#define ENC_R_A         GPIO8   // TIM1 CH1
+#define ENC_R_B         GPIO9   // TIM1 CH2
 
 
 // ************* Task Execution Periods ******************** // 
@@ -72,18 +75,25 @@
 #define GEAR_RATIO          20.00f
 #define EDGE_NUM            4.00f
 const float MOTOR_CPR = ENC_CPR * GEAR_RATIO * EDGE_NUM;
-const float TICKS_TO_RPS  = (float)(1/ MOTOR_CPR) * (1/(SPEEDCTRL_PERIOD * 0.001));
+const float MS_TO_S = 0.001f;
+const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S)));
+
 
 #define WHEEL_BASE      0.07f   // m
 #define WHEEL_RADIUS    0.035f  // m
 #define VBAT_MAX        8.40f   // 2*4.2V
 #define BAT_CAPACITY    2300    // mAh
 
+#define KP  0.1f
+#define KI  0.01f
+#define KD  0.0f
+
+
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
-#define RB_SIZE 64          // ACCESS THROUGH RING BUFFER 
+#define RB_SIZE 16          // ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
 

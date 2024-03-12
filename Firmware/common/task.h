@@ -10,7 +10,7 @@
 
 typedef struct FixedTimeTask{
     uint32_t lastTick;
-    uint32_t period;	
+    uint32_t period;	 // ms
 	bool enable;
 }FixedTimeTask;
 

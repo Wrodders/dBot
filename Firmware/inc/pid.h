@@ -4,7 +4,6 @@
 #include "../common/common.h"
 
 typedef struct PID{
-
     float target;
     float error;
     float lastError;
@@ -20,6 +19,16 @@ typedef struct PID{
 
     float out;
 }PID;
+
+static PID pidInit(float min, float max, float kp, float ki, float kd, float deltaT){
+    PID pid = {.dt = deltaT};
+    pid.kp = kp/deltaT;
+    pid.ki  = ki/deltaT;
+    pid.kd = kd/deltaT;
+    pid.min = min;
+    pid.max = max;
+    return pid;
+}
 
 static float pidRun(PID* pid, float measurement){
     //@Brief: Steps through PID Algorithm at constant dt
@@ -40,10 +49,11 @@ static float pidRun(PID* pid, float measurement){
     return pid->out;
 }
 
-static void pidSetKp(PID *pid, float kp){pid->kp = kp / pid->dt;}
-static void pidSetKi(PID *pid, float ki){pid->ki = ki / pid->dt;}
-static void pidSetKd(PID *pid, float kd){pid->kd = kd / pid->dt;}
-
+static inline void pidSetKp(PID *pid, float kp){pid->kp = kp / pid->dt;}
+static inline void pidSetKi(PID *pid, float ki){pid->ki = ki / pid->dt;}
+static inline void pidSetKd(PID *pid, float kd){pid->kd = kd / pid->dt;}
+static inline void pidSetMin(PID* pid, float min){pid->min = min;}
+static inline void pidSetMax(PID* pid, float max){pid->min = max;}
 
 
 #endif // CONTROLLER_H
