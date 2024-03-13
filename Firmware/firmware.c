@@ -44,6 +44,8 @@ int main(void){
                             rx1_buf_, ARR_SIZE(rx1_buf_), 
                             tx1_buf_, ARR_SIZE(tx1_buf_));
     serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
+
+    serialSend(&ser1, (uint8_t *)"Hello PC\n", 10);
     // Coms Messages
     MsgFrame rxFrame = {0}; 
     MsgFrame txFrame = {0};
@@ -95,7 +97,7 @@ int main(void){
                 MSG.buf[IDX++] = PUB_ODOM;                                                         
                 IDX += SIZE;                                                                 
                 MSG.buf[IDX++] = EOF_BYTE;                                                   
-                serialWrite(&ser1, MSG.buf, IDX);                                               
+                serialSend(&ser1, MSG.buf, IDX);                                               
             }
 
             comsTask.lastTick = loopTick;

@@ -93,7 +93,7 @@ const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S))
 static float VBAT_VAL_ = VBAT_MAX;     
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
-#define RB_SIZE 16          // ACCESS THROUGH RING BUFFER 
+#define RB_SIZE 64          // ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
 
