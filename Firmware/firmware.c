@@ -34,12 +34,12 @@ int main(void){
     const Topic pubMap[NUM_PUBS] = {
         {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%c:%s"}, // CMD_ID : RET_VAL
         {{.pubId = PUB_ERROR}, .name = "ERROR", .format = "%s"}, // Error Message
-        {{.pubId = PUB_INFO}, .name = "INFO", .format = "%0.3f:%0.3f:%0.3f"}, // System INFO
+        {{.pubId = PUB_INFO}, .name = "INFO", .format = "%s"}, // System INFO
         {{.pubId = PUB_DEBUG}, .name = "DEBUG", .format = "%s"}, // Debug prints 
 
         // Application Publisher Topics 
         {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.2f:%0.2f:%0.2f"}, // ROLL:PITCH:YAW
-        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%d:%d"} // LSPEED:RSPEED
+        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.2f:%0.2f:%0.2f"} // LSPEED:RSPEED
     };
 
     const Topic cmdMap[NUM_CMDS] = {
@@ -83,8 +83,7 @@ int main(void){
         }
 
         if(CHECK_PERIOD(comsTask, loopTick)){
-            char* pubFmt = comsGetPubFmt(&coms, PUB_IMU);
-            comsSendMsg(&coms, &ser1, PUB_INFO, imu.roll, imu.pitch, imu.yaw);
+            comsSendMsg(&coms, &ser1, PUB_ODOM, robot.motorL.angularSpeed, robot.motorR.angularSpeed, robot.pidL.out);
             //serialSend(&ser1, (uint8_t* )pubFmt, uClen(pubFmt));
             comsTask.lastTick = loopTick;
         }
@@ -96,8 +95,6 @@ int main(void){
             imuRawEuler(&imu.flitAccel, &imu.roll, &imu.pitch);
 
             robotSpeedCtrl(&robot); // run pid
-
-
             speedCtrlTask.lastTick = loopTick;
 
         }

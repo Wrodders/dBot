@@ -82,11 +82,11 @@ static void robotSpeedCtrl(Robot *ddmr){
     Encoder* const encL = &ddmr->encL;
     Encoder* const encR = &ddmr->encR;
     PID* const pidL = &ddmr->pidL;
-    PID* const pidR = &ddmr->pidR;
+    PID* const pidR = &ddmr->pidR; 
 
     // Get target Wheel Speeds
-    pidL->target = 8.0f; // placeholder
-    pidR->target = 8.0f;
+    pidL->target = -3.0f; // placeholder
+    pidR->target = -3.0f;
 
     // Compute Current wheel speed
     motorCalSpeed(mL, encL);
@@ -107,7 +107,6 @@ static void robotDiffDrive(Robot* ddmr, const float linVel, const float angVel){
 
     float wLTarget = linVel + (angVel * ddmr->wheelBase); // left wheel angular speed rad/s
     float wRTarget = linVel - (angVel * ddmr->wheelBase); // right wheel angular speed rad/s
-
 }
 
 

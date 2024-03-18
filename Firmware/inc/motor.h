@@ -125,7 +125,6 @@ static void motorCalSpeed(Motor* motor, Encoder* enc){
     uint16_t mCount = encoderRead(enc);
     int16_t dCount = mCount - enc->lastCount;
     enc->lastCount = mCount;
-    if(motor->flipDir){dCount = -dCount;} // ensure speed measurement is uniform to motor config
     float mSpeed = dCount * TICKS_TO_RPS; // rotations per second
     // Apply Low pass filter to speed measurement (1 - b)speed[n] + b*speed[n-1] 
     motor->angularSpeed = (motor->beta * mSpeed) + (1.00f - motor->beta) * motor->angularSpeed;
