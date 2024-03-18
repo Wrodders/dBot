@@ -22,7 +22,6 @@ typedef struct Driver{
     GPIO pwmB;
     GPIO en;
     float vPSU;
-    float vLimit;
     float vMin; 
 }Driver; // Motor Driver DRV8833
 
@@ -61,12 +60,11 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
     return m;
 }
 
-static void motorConfig(Motor *m,const float vPSU, const float vLimit, 
-                        const float vMin, const bool flipDir, float beta){
+static void motorConfig(Motor *m,const float vPSU, const float vMin,
+                        const bool flipDir, float beta){
     
     //@Brief: Configs Motor parameters
     m->drv.vPSU = vPSU;
-    m->drv.vLimit = vLimit < vPSU ? vLimit : vPSU ; // vLimit must be below or == vPSU
     m->drv.vMin = vMin;
     m->flipDir = flipDir;
     m->beta = beta;
@@ -83,11 +81,13 @@ static void motorSetUnipolar(const Motor* motor, const float duty, const bool di
    
     if(dir == motor->flipDir){
         // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
+        // DRIVE BACKWARDS
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0); // drive low
-        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, duty); 
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, duty);  
     }
     else{
         // Fwds = (1) flipped = (0) ||  BCK = (0) Flipped = (1) -> PWM A
+        // DRIVE FORWARDS
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, duty);
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0); 
     }
@@ -95,8 +95,8 @@ static void motorSetUnipolar(const Motor* motor, const float duty, const bool di
 
 static void motorSetVoltage(const Motor* motor, const float voltage){
     //@Brief: Sets PWM Duty Cycle as voltage vector
-    //@Description: Forwards == +ve 
-    //              Backwards == -ve
+    //@Description: Forwards == +ve => dir 1
+    //              Backwards == -ve => dir 0
     bool dir;
     float v = voltage;
     float vAbs =  _fabs(v);

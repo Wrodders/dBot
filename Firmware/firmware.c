@@ -38,7 +38,7 @@ int main(void){
         {{.pubId = PUB_DEBUG}, .name = "DEBUG", .format = "%s"}, // Debug prints 
 
         // Application Publisher Topics 
-        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.2f:%0.2f:%0.2f"}, // ROLL:PITCH:YAW
+        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.2f:%0.2f"}, // ROLL:PITCH:YAW
         {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.2f:%0.2f:%0.2f"} // LSPEED:RSPEED
     };
 
@@ -84,7 +84,8 @@ int main(void){
 
         if(CHECK_PERIOD(comsTask, loopTick)){
             comsSendMsg(&coms, &ser1, PUB_ODOM, robot.motorL.angularSpeed, robot.motorR.angularSpeed, robot.pidL.out);
-            //serialSend(&ser1, (uint8_t* )pubFmt, uClen(pubFmt));
+            
+            comsSendMsg(&coms, &ser1, PUB_IMU, imu.roll, imu.pitch);
             comsTask.lastTick = loopTick;
         }
 

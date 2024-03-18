@@ -27,7 +27,6 @@ typedef struct Robot{
     Encoder encL, encR;
     PID pidL;
     PID pidR;
-    float beta; // LPF
 
     const float wheelR; // R
     const float wheelBase; // 2L
@@ -46,9 +45,7 @@ static Robot robotInit(void){
     
     Robot ddmr = {
         .wheelBase = WHEEL_BASE, 
-        .wheelR = WHEEL_RADIUS,
-        .beta = 1,
-        
+        .wheelR = WHEEL_RADIUS,        
         .encL = encoderHWInit(ENC_L_TIM, UINT16_MAX, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT, ENC_L_AF),
         .motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT),
         .pidL = pidInit(-VBAT_MAX, VBAT_MAX, KP,KI,KD, SPEEDCTRL_PERIOD * MS_TO_S),
@@ -58,8 +55,8 @@ static Robot robotInit(void){
         .pidR = pidInit(-VBAT_MAX, VBAT_MAX, KP,KI,KD, SPEEDCTRL_PERIOD * MS_TO_S)
     };
 
-    motorConfig(&ddmr.motorL, 12.0f, 9.0f, 0.0f, true, 0.5f);
-    motorConfig(&ddmr.motorR, 12.0f, 9.0f, 0.0f, false, 0.5f);
+    motorConfig(&ddmr.motorL, VBAT_MAX, 0.0f, true, 1.00f);
+    motorConfig(&ddmr.motorR, VBAT_MAX, 0.0f, false,  1.00f);
 
     driverEnable(&ddmr.motorL.drv); // enable DRV8833 & pwm
     driverEnable(&ddmr.motorR.drv); // enable DRV8833 & pwm
@@ -85,8 +82,8 @@ static void robotSpeedCtrl(Robot *ddmr){
     PID* const pidR = &ddmr->pidR; 
 
     // Get target Wheel Speeds
-    pidL->target = -3.0f; // placeholder
-    pidR->target = -3.0f;
+    pidL->target = -8.0f; // placeholder
+    pidR->target = -8.0f;
 
     // Compute Current wheel speed
     motorCalSpeed(mL, encL);
@@ -95,7 +92,6 @@ static void robotSpeedCtrl(Robot *ddmr){
     // Run PID Algorithm For Both Motors
     pidRun(&ddmr->pidL, mL->angularSpeed);
     pidRun(&ddmr->pidR, mR->angularSpeed);
-
     // Apply output to Motors
     motorSetVoltage(mL, ddmr->pidL.out);
     motorSetVoltage(mR, ddmr->pidR.out);

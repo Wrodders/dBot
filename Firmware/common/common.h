@@ -83,8 +83,9 @@ const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S))
 
 #define WHEEL_BASE      0.07f   // m
 #define WHEEL_RADIUS    0.035f  // m
-#define VBAT_MAX        8.40f   // 2*4.2V
+#define VBAT_MAX       10.00f   // 2*4.2V
 #define BAT_CAPACITY    2300    // mAh
+#define RPS_MAX         10.00f  // rps
 
 #define KP  0.1f
 #define KI  0.01f

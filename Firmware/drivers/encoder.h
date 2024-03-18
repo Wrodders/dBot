@@ -18,9 +18,10 @@ typedef struct Encoder {
 }Encoder;
 
  static Encoder encoderHWInit(uint32_t timPerif, uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
-    Encoder e = {0};
+    Encoder e;
     // Store the timer peripheral in the encoder structure
     e.timPerif = timPerif;
+    e.lastCount = 0;
 
 
     // Configure pins for alternate function mode
