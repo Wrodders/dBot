@@ -4,6 +4,8 @@
 #include "../common/common.h"
 #include "../drivers/serial.h"
 
+
+
 /*
 Communication Protocol:
 Tranmission and reception are handled separately.
@@ -11,189 +13,228 @@ Tranmission and reception are handled separately.
 Tranmission: 
 The Device; on which this firmware is executed, acts as a data publisher.
 Unique Topics are used in a Pub Sub model where another program acts as a Subscriber.
-It is the Subscribers responsibilty to correctly interpret the messages per topic.
+It is the Subscribers responsibilty to correctly interpret the messages per id.
 The Device may only publish over a set list of topics, which can be activated/deactivated.
-gstThe Device may list the format & description of each topic at start up and/or upon request.
+gstThe Device may list the format & description of each id at start up and/or upon request.
 
-Messages are framed as 
-|-----+-----+-------+------+-------+- - - +-------+-------|
-| SOF | LEN | DELIM |TOPIC | DELIM | DATA | DELIM | CKSUM |
-| 1   | 2   | 1     | 2    | 1     | ...   | 1     | 2    |
-|-----+-----+-------+------+-------+- - - +-------+-------|
+Messages are framed inside a packet:
 
-SOF -- Start of Frame (0x3C / < )
+|-------------Packet---------|
+|-----+-----+----+- - - +----|
+| SOF | LEN | ID | DATA | EOF|
+| 1   | 1   | 1  | ...  | 1  |
+|-----------+----+- - - +----|
+      |-------Frame-----|
+
+
+SOF -- Start of Frame 
 LEN -- Size of Data (bytes)
-TOPIC -- Hashed Topic String Identifier 
+ID -- Hashed Topic String Identifier 
 DATA -- LEN bytes of data
-CKSUM -- 2 byte XOR 
+EOF - End of Frame 
 
-Message Frames Have a Max Size
 
-Topics must declare their message protocols in a format specifier string, e.g "%0.2f:%c:%d:%02d"
+Message Frames Have a max size. 
+Topics must declare their message protocols in a format specifier string, e.g "f:c:d:d" using the same format as printf and sprintf ect. 
 This will be used to encode a message into the frame, and allows the subscriber to correctly decode it. 
 
 Subscribers will delimit messages based on receiving the start of frame byte, 
-If a SOF is received before LEN bytes message is aborted and new message begins
+If a SOF is received before LEN bytes message is aborted and new message begins. This acts as an escape/abort key. 
+
+Data Received Byte By Byte in USART ISR
+Put into Ringbuffer, serviced by Main through Non-Blocking GetMessage() returns a
+MsgFrame Struct used to Handle msgs by TopicIDs 
+
+Async messages passed to Queue of MessagesPackets
+Queue serviced by Main every 100ms and written to TX ring buffer for transmission via ISR
 
 *************************************************
 Reception
-Activating the Engineering Command program requires the reception of an Engineering Mode byte sequence. 
-Exiting Engineering mode can only be done though reset. 
-
-ID command runs upon entering engineering mode and reports all commands available on device and format as single source of truth. 
-Commands consist of GET/SET/RUN modifiers which act on unique ids. 
+In order ot solve the issue of dynamic discovery and possible miss match of commands and protocols between various systems
+a variant of AT Commands logic is used. Devices have a default set of commands that can be used to identify the devices commands and protocols. 
+ID command reports all commands available on device and format as single source of truth. 
+Commands consist of GET/SET/RUN modifiers which act on unique ids mapped to pointers in an ordered array. 
 Commands must register their input and response format.
-All Commands have a timeout. Error messages are transmitted back over the Error topic. 
+All Commands have a timeout. Error messages are transmitted back over the Error id. 
 Parameters to be passed to commands may be specified as required or optional with default values
 
-A successful command message will be parsed, executed, its responds over cmdResp topic and its acklogalged over cmdRet topic
+A successful command message will be parsed, executed, its responds over cmdResp id and its acknowledge over cmdRet id
 Error in any part of this process will result in a Failed cmdRet and an accompanying error message 
-over error topic identifiable by command id
+over error id identifiable by command id
 
 */
 
 
-#define START_BYTE '<' // hex 0x3C 
-#define STOP_BYTE  '>' // 
-#define DELIM_BYTE ',' // hex 0x3A
-#define TOPIC_SIZE 2
-#define CKSUM_SIZE 2
+#define SOF_BYTE '<' // hex 0x3C 
+#define EOF_BYTE  '\n' // 
+#define DELIM_BYTE ':' // hex 0x3A
 #define MAX_MSG_DATA_SIZE 64
-#define MSG_OVERHEAD_SIZE  sizeof(START_BYTE) + 2 + 1 + TOPIC_SIZE + 1 + CKSUM_SIZE
+#define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
  
 
-#define QUEUE_SIZE 3
-
-#define MAX_TOPICS 10
-#define NAME_SIZE 10
-#define MAX_DATA_ARGS 5
-#define FORMAT_SIZE (MAX_DATA_ARGS * 2) + MAX_DATA_ARGS - 1
-
-
-
 typedef struct MsgFrame{
-    uint8_t size;
-    char buf[MAX_MSG_FRAME_SIZE]; 
+    uint8_t size; // current size of msg buffer
+    uint8_t id; // id 
+    uint8_t buf[MAX_MSG_FRAME_SIZE]; 
 }MsgFrame;
 
 
-typedef struct MsgTopic{
-    char id[TOPIC_SIZE];
-    char name[NAME_SIZE]; 
-    char delim;
-    char fmt[FORMAT_SIZE]; // argument format
-    uint8_t numArgs; 
-    bool active;
-}MsgTopic;
+typedef enum {
+    PUB_CMD_RET = 0,
+    PUB_ERROR,
+    PUB_INFO, 
+    PUB_DEBUG, 
 
-typedef struct MsgHandler{
-    uint8_t count;
-    MsgTopic *topics[MAX_TOPICS];
-}MsgHandler;
+    // ADD Application Specific Publishers
+    PUB_IMU,
+    PUB_ODOM,
 
-static MsgTopic initTopic(char *name, const char delim, char *format, uint8_t numArgs){
-    MsgTopic tp;
+    NUM_PUBS
+}PUB_ID_t; // Publish Topic IDs
 
-    if(uCpy(tp.name, name, NAME_SIZE) == 0){tp.active = false;}
+typedef enum {
+    CMD_ID = 0,
+    CMD_RESET,
 
-    if(numArgs > MAX_DATA_ARGS){tp.active = false;}
-    tp.numArgs = numArgs;
-    if(uCpy(tp.fmt, format, FORMAT_SIZE) == 0){tp.active = false;}
-    tp.delim = delim;
-    tp.active = true;
-    return tp;
-}
+    // ADD Application Specific Cmds 
+    CMD_HELLO,
 
-static void activateTopic(MsgTopic *tp){ tp->active = true;}
+    NUM_CMDS
+}CMD_ID_t; // Cmd Topic Ids
 
-static void disableTopic(MsgTopic *tp){ tp->active = false;}
 
-static int addTopic(MsgHandler *handler, MsgTopic *tp){
-    if(handler == NULL && tp == NULL){return -1;}
-    if(handler->count >= MAX_TOPICS){return -1;}
-    handler->topics[handler->count++] = tp;
-    // ecode index into letters
-    int base = 26;
-    tp->id[0] = 'A' + (handler->count/base) - 1;
-    tp->id[1] = 'A' + (handler->count % base);
+typedef struct {
+    union {
+        CMD_ID_t cmdId;
+        PUB_ID_t pubId;
+    }id;
+    const char* name;
+    const char* format;
+}Topic;
 
-}
 
-static *MsgTopic getTopic(MsgHandler *handler, char *id){
-    int base = 26; // Number of letters in the alphabet
-    int idx = 0;
-    idx += (letters[0] - 'A' + 1) * base;
-    idx += letters[1] - 'A' + 1;
-    
+typedef struct Coms{
+    MsgFrame rxFrame;
+    MsgFrame txFrame;
+
+    const Topic* pubMap;
+    const Topic* cmdMap;
+}Coms;
+
+static Coms comsInit(const Topic* pubMap, const Topic* cmdMap){
+    Coms c = { .pubMap = pubMap, .cmdMap = cmdMap};
+    return c;
 }
 
 
+static inline const char* comsGetPubFmt(Coms* coms, PUB_ID_t ID){return coms->pubMap[ID].format;}
+static inline const char* comsGetPubName(Coms* coms, PUB_ID_t ID){return coms->pubMap[ID].name;}
+static inline const char* comsGetCmdFmt(Coms* coms, CMD_ID_t ID){return coms->cmdMap[ID].format;}
+static inline const char* comsGetCmdName(Coms* coms, CMD_ID_t ID){return coms->cmdMap[ID].name;}
+
+//****** Message Tranmission packetization  ***************//
+/*
+|-------Packet---------|
+|-----+----+- - - +----|
+| SOF | ID | DATA | EOF|
+| 1   | 1  | .... | 1  |
+|-----+----+- - - +----|
+      |------Frame-----|
+SOF -- Start of Frame 
+ID --  Topic Identifier 
+DATA -- LEN bytes of data
+EOF - End of Frame 
+*/
+static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t ID, ...){
+    //@Brief: Formats and Packets a Message, sends over serial. 
+    const uint8_t DATA_IDX = 2;
+    uint8_t* msgBuf = coms->txFrame.buf; // readability
+    const char* pubFmt = comsGetPubFmt(coms, ID);
+
+    va_list args;
+    va_start(args, ID);
+    const size_t dataSize = vsnprintf((char*)&msgBuf[DATA_IDX],MAX_MSG_DATA_SIZE, pubFmt, args); 
+    va_end(args);
+    if(dataSize > MAX_MSG_DATA_SIZE - 1 ){return false;}
+    size_t idx = 0;
+    msgBuf[idx++] = SOF_BYTE;
+    msgBuf[idx++] = ID + 'a';
+    idx += dataSize;
+    msgBuf[idx++] = EOF_BYTE;
+    serialSend(ser, msgBuf, idx);
 
 
-
-
-
-
-
-//****** Transmission Queue ***********************************************************//
-
-QUEUE_DECLARATION(serTXQueue, MsgFrame, QUEUE_SIZE);
-QUEUE_DEFINITION(serTXQueue, MsgFrame);
-
-struct serTXQueue sertxQueue;
-
-static void beginComs(void){
-    serTXQueue_init(&sertxQueue);
-    return;
-}
-
-
-// ****** Public API *****************************************************//
-
-static void publish(const char *buf, uint8_t dataSize, MsgTopic topic){
-    //@Breif: Publishes Message over topic to Serial TX Queue
-    #define START_IDX = 0,
-    #define TOPIC_IDX = 1,
-    #define SIZE_IDX = 3, // skip delim
-    #define DATA_IDX = 5, //skip delim
-    
-    MsgFrame packet;
-    uint8_t idx = 0;
-    uint8_t payloadSize;
-    if (dataSize > MAX_MSG_DATA_SIZE){
-        payloadSize = MAX_MSG_DATA_SIZE;
-        topic = DEBUG; // redirect to error handler
-    }else{
-        payloadSize = dataSize;
-    }
-    packet.buf[idx++] = START_BYTE;
-    packet.buf[idx++] = topic;
-
-    packet.buf[idx++] = DELIM_BYTE;
-    packet.buf[idx++] = payloadSize; 
-    packet.buf[idx++] = DELIM_BYTE;
-    for(int i = 0; i < payloadSize; i++){
-        packet.buf[idx++] = buf[i];
-    }
-    packet.buf[idx++] = STOP_BYTE; 
-
-    packet.size = idx;
-
-    serTXQueue_enqueue(&sertxQueue,&packet);
-    return;
-}
-
-static bool sendPckt(Serial *ser){
-    //@Breif: Pulls message from queue and sends to UART buffer
-    MsgFrame pckt;
-    enum dequeue_result res = serTXQueue_dequeue(&sertxQueue,&pckt);
-    if(res == DEQUEUE_RESULT_EMPTY){
-        return false;
-    }
-    serialSend(ser, (uint8_t *)pckt.buf, pckt.size);
     return true;
 }
 
 
-#endif // COMMS_H
+static bool comsGrabMsg(Serial *ser, MsgFrame *msg){
+    //@Brief: Grabs a message from the serial buffer is available
+    //@Note: Message Discarded if EOF received before declared msg len
+    //@Returns true Message Received
+    static enum {IDLE, SIZE, ID, DATA, COMPLETE, ERROR} state = IDLE;
+    while (rbEmpty(&ser->rxRB) == 0){
+        uint8_t dataIdx = 3; // start position of data
+        uint8_t byte;
+        rbGet(&ser->rxRB, &byte); // pop byte
+        switch (state){
+            case IDLE:
+                if(byte == SOF_BYTE){state=SIZE;}
+                msg->size = 0; 
+                break;
+            case SIZE:
+                msg->size = byte; 
+                state = ID;
+                break;
+            case ID:
+                msg->id = byte;
+                state = DATA;
+                break;
+            case DATA:
+                if(dataIdx > msg->size){state = ERROR; break;} // src overflow
+                if(byte == SOF_BYTE){state = IDLE; break;} // multiple start bytes detected 
+                if(byte == EOF_BYTE){state = COMPLETE; break;} // EOF
+                msg->buf[dataIdx++] = byte; 
+                break;
+            case COMPLETE:
+                USART_DR(USART1) = 'X' & USART_DR_MASK; // write byte test
+                state=IDLE; // reload 
+                return true; // exit   
+            case ERROR:
+                msg->buf[0] = '\0';
+                state=IDLE;
+                return false; // exit 
+        }
+    }
+    return false;
+}
+
+
+static void comsDeclarePubs(Coms* coms, Serial* ser){
+
+    const uint8_t DATA_IDX = 2;
+    uint8_t* msgBuf = coms->txFrame.buf; // readability
+    const Topic* pubMap = coms->pubMap;
+    const Topic* cmdMap = coms->cmdMap;
+    size_t idx;
+    // Pack Pub Topic Info: Name:Format
+    for(int i = 0; i < NUM_PUBS; i++){
+        idx = 0;
+        msgBuf[idx++] = SOF_BYTE;
+        msgBuf[idx++] = PUB_CMD_RET + 'a';
+        msgBuf[idx++] = CMD_ID; // Calling Cmd IDmake
+        msgBuf[idx++] = ':'; // delim
+
+        const char* pubName = comsGetPubName(coms, i);
+        idx += uCpy((char*)&msgBuf[idx],pubName, 0); 
+        msgBuf[idx++] = ':';
+        const char* pubFmt = comsGetPubFmt(coms, i);
+        idx += uCpy((char*)&msgBuf[idx], pubFmt, 0);
+        msgBuf[idx++] = EOF_BYTE;
+        serialSend(ser, msgBuf, idx);
+    }
+}
+
+
+#endif // COMS_H

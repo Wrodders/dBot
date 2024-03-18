@@ -1,126 +1,103 @@
 // Motor Driver Firmware
 
 #include "common/common.h"
-#include "drivers/serial.h"
+#include "common/task.h"
+
+#include "inc/coms.h"
 #include "inc/imu.h"
+#include "inc/robot.h"
 
 
 
+// ********** GLOBAL STATIC BUFFERS *************************************** // 
+#define RB_SIZE 64          // ACCESS THROUGH RING BUFFER 
+uint8_t rx1_buf_[RB_SIZE] = {0};
+uint8_t tx1_buf_[RB_SIZE] = {0};
 
-#define LED_PORT 		GPIOC
-#define LED_PIN			GPIO13
-
-// Debug UART 
-#define DEBUG_USART		USART1
-#define DEBUG_PORT		GPIOA
-#define DEBUG_RX		GPIO10 // UART1 PB7/8
-#define DEBUG_TX		GPIO9
-
-// Bluetooth UART
-#define BT_USART		USART6
-#define BT_PORT			GPIOA
-#define BT_TX			GPIO11
-#define BTRX			GPIO12
-
-// MPU6050 IMU @ I2C1 on GPIOB 
-#define I2C_PORT		GPIOB 
-#define I2C_SDA			GPIO9
-#define I2C_SCL			GPIO8
-
-// DRV8833 2-CH PWM DC Motor Controller 
-#define PWMA_TIM 		TIM2
-#define PWMA_PORT		GPIOA
-#define PWMACH1_PIN		GPIO0
-#define PWMACH2_PIN		GPIO1
-#define PWMB_TIM		TIM2
-#define PWMB_PORT		GPIOA
-#define PWMBCH3_PIN		GPIO2
-#define PWMBCH4_PIN		GPIO3
-
-// ******* Clock Set Up ****************************************************** //
-static void clock_setup(void){
-	// Black pill has 25mhz external crystal
-	rcc_clock_setup_pll(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_84MHZ]);
-	// Peripheral enables
-	rcc_periph_clock_enable(RCC_GPIOA);
-	rcc_periph_clock_enable(RCC_GPIOB);
-	rcc_periph_clock_enable(RCC_GPIOC);
-
-
-	rcc_periph_clock_enable(RCC_USART1);
-
-	rcc_periph_clock_enable(RCC_I2C1);
-	return;
-}
-
-static void systick_setup(void){
-	systick_set_frequency(TICK, CPU_FREQ); // 1 ms interupt	
-    systick_interrupt_enable();
-	systick_counter_enable();
-	return;
-}
 
 
 int main(void){
 
-	// ***** SETUP ********** //
+	// ***** HARDWARE SETUP ********** //
 	clock_setup(); // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup(); // 1ms Tick
-
-
+    
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 	
-    Serial ser1 = serialInit(USART1, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ);
-	serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-	serialSend(&ser1, (uint8_t *)"Hello World\n", 13);
-
-	//MPU6050_t mpu6050 = initMPU6050(I2C_PORT, I2C_SCL, I2C_SDA);
-    IMU imu = {0};
-    uint8_t len;
-	uint8_t buf[20] = {0}; // Transmit data buffer
-	//if(mpu6050.initalized == false){
-	//	len = mysprintf((char *)buf, 0, "FAIL: %d :\n", mpu6050.data);
-    //    serialSend(&ser1, buf, len);
-	//}
+    Serial ser1 = serialInit(DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ,
+                            rx1_buf_, ARR_SIZE(rx1_buf_), 
+                            tx1_buf_, ARR_SIZE(tx1_buf_));
+    serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
 
 
+    // ***** COMMUNICATIONS *************************** // 
+    const Topic pubMap[NUM_PUBS] = {
+        {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%c:%s"}, // CMD_ID : RET_VAL
+        {{.pubId = PUB_ERROR}, .name = "ERROR", .format = "%s"}, // Error Message
+        {{.pubId = PUB_INFO}, .name = "INFO", .format = "%s"}, // System INFO
+        {{.pubId = PUB_DEBUG}, .name = "DEBUG", .format = "%s"}, // Debug prints 
 
-    // ***** Create Fixed time Tasks ***** // 
+        // Application Publisher Topics 
+        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.2f:%0.2f"}, // ROLL:PITCH:YAW
+        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.2f:%0.2f:%0.2f"} // LSPEED:RSPEED
+    };
 
-    TaskHandle blinkTask = createTask(1000); // 1sec = 1 Hz 
-    TaskHandle mpu6050Task = createTask(1); // 2ms = 500 Hz 
-    TaskHandle imuTask = createTask(1); // 50ms = 200 Hz
-    TaskHandle serialTask = createTask(100); // 100ms = 10hz
-    mpu6050Task.enable = false;
-    imuTask.enable = false;
-    uint32_t loopTick;
-    uint32_t imuTickTime = 0;
+    const Topic cmdMap[NUM_CMDS] = {
+        {{.cmdId = CMD_ID }, .name = "IDENT", .format = "" },
+        {{.cmdId = CMD_RESET}, .name = "RESET", .format = ""},
 
+        // Application Cmd Topics
+        {{.cmdId = CMD_HELLO}, .name = "HELLO", .format = ""}
+    };
+
+    Coms coms = comsInit(pubMap, cmdMap);
+
+    comsSendMsg(&coms, &ser1, PUB_INFO, "Hello PC");
+
+    // Coms Messages
+    MsgFrame rxFrame = {0}; 
+    MsgFrame txFrame = {0};
+
+    // IMU
+	MPU6050 mpu6050 = mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);    
+    IMU imu = imuInit(0.5f, 0.01f);
+    // Robot ROBOT
+    Robot robot = robotInit();
+    delay(1000);
+    
+    // ***** Application Tasks ***** // 
+    FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // 500ms = 2Hz
+    FixedTimeTask comsTask = createTask(COMS_PERIOD); // 100ms = 10hz
+    FixedTimeTask speedCtrlTask = createTask(SPEEDCTRL_PERIOD); // 50ms = 200Hz
+
+    // ****** Loop Parameters ******* // 
+    uint8_t buf[40]; // tx coms buffer
+    uint8_t len = 0; // msg len
+    uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
-        if(CHECK_TASK(mpu6050Task, loopTick)){
-            //readMPU6050(&mpu6050);
-            mpu6050Task.lastTick = loopTick;
-        }
 
-        else if(CHECK_TASK(imuTask, loopTick)){
-            //updateOrientation(&imu, &mpu6050.accel, &mpu6050.gyro);
-            imuTask.lastTick = loopTick;
-        }
-        else if(CHECK_TASK(blinkTask, loopTick)){
-            gpio_toggle(led.port, led.pin);    
+        if(CHECK_PERIOD(blinkTask, loopTick)){
+            gpio_toggle(led.port, led.pin);
             blinkTask.lastTick = loopTick;
         }
-        else if(CHECK_TASK(serialTask, loopTick)){
-            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",mpu6050.accel.x, mpu6050.accel.y, mpu6050.accel.z);
-            //len = mysprintf((char *)buf, 3,"%f:%f:%f\n",imu.roll, imu.pitch, imu.yaw);
-            len = mysprintf((char *)buf, 3,"%d:%f\n",get_ticks(), (float)(get_ticks()/1000));
-		    serialSend(&ser1, buf,len );
-            serialTask.lastTick = loopTick;
+
+        if(CHECK_PERIOD(comsTask, loopTick)){
+            comsSendMsg(&coms, &ser1, PUB_ODOM, robot.motorL.angularSpeed, robot.motorR.angularSpeed, robot.pidL.out);
+            
+            comsSendMsg(&coms, &ser1, PUB_IMU, imu.roll, imu.pitch);
+            comsTask.lastTick = loopTick;
         }
 
-	}
+        if(CHECK_PERIOD(speedCtrlTask, loopTick)){
+            // Get Pitch Angle
+            mpu6050Read(&mpu6050);
+            imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurements
+            imuRawEuler(&imu.flitAccel, &imu.roll, &imu.pitch);
 
-	
-	
+            robotSpeedCtrl(&robot); // run pid
+            speedCtrlTask.lastTick = loopTick;
+
+        }
+	}
 }

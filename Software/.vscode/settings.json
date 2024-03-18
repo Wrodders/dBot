@@ -1,0 +1,19 @@
+{
+    "files.associations": {
+        "czmq.h": "c",
+        "czmq_library.h": "c",
+        "czmq_prelude.h": "c",
+        "zmq.h": "c",
+        "libserialport.h": "c",
+        "stdio.h": "c",
+        "__locale": "c",
+        "random": "c",
+        "common.h": "c",
+        "iostream": "cpp",
+        "serialcoms.h": "c"
+    },
+    "cSpell.words": [
+        "partiy",
+        "zsock"
+    ]
+}
