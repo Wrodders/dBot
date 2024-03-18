@@ -8,8 +8,11 @@
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/gpio.h>
 
+#include "../drivers/clock.h"
+
 #include "../../modules/cutils/ringbuffer.h"
 #include "../../modules/cutils/utils.h"
+#include "../../modules/cUtils/printf.h"
 #include "../../modules/cutils/queue.h"
 
 #ifndef NULL
@@ -78,7 +81,6 @@ const float MOTOR_CPR = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 const float MS_TO_S = 0.001f;
 const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S)));
 
-
 #define WHEEL_BASE      0.07f   // m
 #define WHEEL_RADIUS    0.035f  // m
 #define VBAT_MAX        8.40f   // 2*4.2V
@@ -91,11 +93,6 @@ const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S))
 
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
-
-// ********** GLOBAL STATIC BUFFERS *************************************** // 
-#define RB_SIZE 64          // ACCESS THROUGH RING BUFFER 
-uint8_t rx1_buf_[RB_SIZE] = {0};
-uint8_t tx1_buf_[RB_SIZE] = {0};
 
 
 #endif // COMMON_h

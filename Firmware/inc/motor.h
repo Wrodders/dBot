@@ -1,7 +1,6 @@
 #ifndef DCMOTOR_H
 #define DCMOTOR_H
 
-
 /************************** 
 DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
 NOTE: TIMER PERIF RCC Must be initialized previously. 
@@ -31,6 +30,7 @@ typedef struct Motor {
     Driver drv;
     bool flipDir; 
     float angularSpeed; // angular speed rad/s
+    float beta; // speed lowpass filter parameter
 }Motor;
 
 static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort, 
@@ -54,31 +54,32 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
     pwmInit(m.drv.timPerif,84,25000); // set freq to 1Hz period to 25000 ARR reg
 	pwmConfig(m.drv.timPerif, m.drv.timCH_A, m.drv.pwmA.port, m.drv.pwmA.pin, GPIO_AF1); 
 	pwmConfig(m.drv.timPerif, m.drv.timCH_B, m.drv.pwmB.port, m.drv.pwmB.pin, GPIO_AF1); 
-   
+    
+    pwmStart(m.drv.timPerif);
+    timer_enable_break_main_output(m.drv.timPerif); // for advanced timers only
+
     return m;
 }
 
 static void motorConfig(Motor *m,const float vPSU, const float vLimit, 
-                        const float vMin, const bool flipDir){
+                        const float vMin, const bool flipDir, float beta){
     
     //@Brief: Configs Motor parameters
     m->drv.vPSU = vPSU;
     m->drv.vLimit = vLimit < vPSU ? vLimit : vPSU ; // vLimit must be below or == vPSU
     m->drv.vMin = vMin;
     m->flipDir = flipDir;
+    m->beta = beta;
 }
 
 
 static void driverEnable(const Driver *drv){
     //@Brief: Starts Motor Driver PWM
-    
-    pwmStart(drv->timPerif);
-    timer_enable_break_main_output(drv->timPerif); // for advanced timers only
     gpio_set(drv->en.port, drv->en.pin); // enable driver
 }
 
 static void motorSetUnipolar(const Motor* motor, const float duty, const bool dir){
-    //@Brief: Sets the pwm on a Unipolar DC Hbridge:
+    //@Brief: Sets the pwm on a Unipolar DC H bridge:
    
     if(dir == motor->flipDir){
         // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
@@ -103,13 +104,11 @@ static void motorSetVoltage(const Motor* motor, const float voltage){
     if(v >= 0.0f){ dir = 1;}
     else{dir = 0;}
     float dc = _clamp(vAbs/motor->drv.vPSU, 0, 1); // convert to % of battery
-    motorSetUnipolar(motor, dc, dir); // apply to unipoladr H bridge
+    motorSetUnipolar(motor, dc, dir); // apply to unipolar H bridge
 }
 
-
-
 static void motorStop(const Motor *motor){ 
-    //@Brief: Sets H Brige Inputs High
+    //@Brief: Sets H Bridge Inputs High
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 1);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 1);
 }
@@ -118,6 +117,18 @@ static void motorBreak(const Motor *motor){
     //@Brief: Sets H Bridge Inputs Low
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0);
+}
+
+static void motorCalSpeed(Motor* motor, Encoder* enc){
+    //@Brief: Calculate Angular Speed in Rotations per Second
+    //@Description: Applies lowpass filter to smooth Quantization errors 
+    uint16_t mCount = encoderRead(enc);
+    int16_t dCount = mCount - enc->lastCount;
+    enc->lastCount = mCount;
+    if(motor->flipDir){dCount = -dCount;} // ensure speed measurement is uniform to motor config
+    float mSpeed = dCount * TICKS_TO_RPS; // rotations per second
+    // Apply Low pass filter to speed measurement (1 - b)speed[n] + b*speed[n-1] 
+    motor->angularSpeed = (motor->beta * mSpeed) + (1.00f - motor->beta) * motor->angularSpeed;
 }
 
 #endif // DCMOTOR_H

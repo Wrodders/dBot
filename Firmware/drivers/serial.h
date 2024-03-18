@@ -151,7 +151,7 @@ static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t
 
 
 static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t stopBits, uint32_t parity, uint32_t flowcontroll ){
-    //@Breif: Configures USART Parameters
+    //@Brief: Configures USART Parameters
 
     uint32_t usart = ser->perif;
     usart_set_mode(usart, USART_MODE_TX_RX);
@@ -185,10 +185,10 @@ static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t s
 
 
 // *********** POLLING *************************** //
-//@Note: This doesent fully work when the ISR is enabled ???? gives some wired values on read
+//@Note: This doesn't fully work when the ISR is enabled ???? gives some wired values on read
 
 static void serialWrite(Serial *ser, uint8_t *data, uint16_t size){
-    //@Brief: Writes Bytes to USART Trasmit Data Register 
+    //@Brief: Writes Bytes to USART Transmit Data Register 
     //@Note: Blocking, waits on transmit complete
     for(int i =0; i<size; i++){
         while((USART_SR(ser->perif) & USART_SR_TXE) == 0){}; // wait for shift register to be empty

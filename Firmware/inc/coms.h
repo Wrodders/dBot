@@ -58,7 +58,7 @@ Commands must register their input and response format.
 All Commands have a timeout. Error messages are transmitted back over the Error id. 
 Parameters to be passed to commands may be specified as required or optional with default values
 
-A successful command message will be parsed, executed, its responds over cmdResp id and its acklogalged over cmdRet id
+A successful command message will be parsed, executed, its responds over cmdResp id and its acknowledge over cmdRet id
 Error in any part of this process will result in a Failed cmdRet and an accompanying error message 
 over error id identifiable by command id
 
@@ -72,8 +72,6 @@ over error id identifiable by command id
 #define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
  
-
-
 
 typedef struct MsgFrame{
     uint8_t size; // current size of msg buffer
@@ -90,7 +88,6 @@ typedef enum {
 
     // ADD Application Specific Publishers
     PUB_IMU,
-    PUB_TELEM,
     PUB_ODOM,
 
     NUM_PUBS
@@ -112,68 +109,73 @@ typedef struct {
         CMD_ID_t cmdId;
         PUB_ID_t pubId;
     }id;
-    const char *name;
-    const char *format;
+    const char* name;
+    const char* format;
 }Topic;
-
-const Topic pubMap[NUM_PUBS] = {
-    {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%c:%s"}, // CMD_ID : RET_VAL
-    {{.pubId = PUB_ERROR}, .name = "ERR", .format = "%s"}, // Error Message
-    {{.pubId = PUB_INFO}, .name = "INFO", .format = "%s"}, // System INFO
-    {{.pubId = PUB_DEBUG}, .name = "DBUG", .format = "%s"}, // Debug prints 
-
-    // Application Publisher Topics 
-    {{.pubId = PUB_IMU}, .name = "IMU", .format = "%f:%f:%f"}, // ROLL:PITCH:YAW
-};
-
-const Topic cmdMap[NUM_CMDS] = {
-    {{.cmdId = CMD_ID }, .name = "IDENT", .format = "" },
-    {{.cmdId = CMD_RESET}, .name = "RESET", .format = ""},
-
-    // Application Cmd Topics
-    {{.cmdId = CMD_HELLO}, .name = "HELLO", .format = ""}
-};
-
-typedef uint8_t (*Service)(MsgFrame *msg);
-
-typedef struct Command{
-    CMD_ID_t id; 
-    Service func;
-}Command;
-
-typedef struct CmdList{
-    Command cmds[NUM_CMDS];
-    uint8_t count;
-    uint8_t retVal; // Store last return value of function executed
-}CmdList;
 
 
 typedef struct Coms{
     MsgFrame rxFrame;
     MsgFrame txFrame;
-    CmdList server; // handles access to commands
+
+    const Topic* pubMap;
+    const Topic* cmdMap;
 }Coms;
 
+static Coms comsInit(const Topic* pubMap, const Topic* cmdMap){
+    Coms c = { .pubMap = pubMap, .cmdMap = cmdMap};
+    return c;
+}
 
-// ******* Commander *************************************************************// 
 
-static bool registerCmd(CmdList *cmdList, Service func){
-    //Adds Cmd index by index in list
-    uint8_t *cnt = &cmdList->count;
-    if(cmdList->count == NUM_CMDS){return false;}
-    Command *cmd = &cmdList->cmds[*cnt++];
-    cmd->func = func;
-    cmd->id = *cnt++;
+static inline const char* comsGetPubFmt(Coms* coms, PUB_ID_t ID){return coms->pubMap[ID].format;}
+static inline const char* comsGetPubName(Coms* coms, PUB_ID_t ID){return coms->pubMap[ID].name;}
+static inline const char* comsGetCmdFmt(Coms* coms, CMD_ID_t ID){return coms->cmdMap[ID].format;}
+static inline const char* comsGetCmdName(Coms* coms, CMD_ID_t ID){return coms->cmdMap[ID].name;}
+
+//****** Message Tranmission packetization  ***************//
+/*
+|-------Packet---------|
+|-----+----+- - - +----|
+| SOF | ID | DATA | EOF|
+| 1   | 1  | .... | 1  |
+|-----+----+- - - +----|
+      |------Frame-----|
+SOF -- Start of Frame 
+ID --  Topic Identifier 
+DATA -- LEN bytes of data
+EOF - End of Frame 
+*/
+static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t ID, ...){
+    //@Brief: Formats and Packets a Message, sends over serial. 
+    const uint8_t DATA_IDX = 2;
+    uint8_t* msgBuf = coms->txFrame.buf; // readability
+    const char* pubFmt = comsGetPubFmt(coms, ID);
+
+    va_list args;
+    va_start(args, ID);
+    const size_t dataSize = vsnprintf((char*)&msgBuf[DATA_IDX],MAX_MSG_DATA_SIZE, pubFmt, args); 
+    va_end(args);
+    if(dataSize > MAX_MSG_DATA_SIZE - 1 ){return false;}
+    size_t idx = 0;
+    msgBuf[idx++] = SOF_BYTE;
+    msgBuf[idx++] = ID + 'a';
+    idx += dataSize;
+    msgBuf[idx++] = EOF_BYTE;
+    serialSend(ser, msgBuf, idx);
+
+
     return true;
 }
 
-static bool comsGetMsg(Serial *ser, MsgFrame *msg){
+
+static bool comsGrabMsg(Serial *ser, MsgFrame *msg){
     //@Brief: Grabs a message from the serial buffer is available
     //@Note: Message Discarded if EOF received before declared msg len
     //@Returns true Message Received
     static enum {IDLE, SIZE, ID, DATA, COMPLETE, ERROR} state = IDLE;
     while (rbEmpty(&ser->rxRB) == 0){
-        uint8_t dataIdx = 3; // start posiotn of data
+        uint8_t dataIdx = 3; // start position of data
         uint8_t byte;
         rbGet(&ser->rxRB, &byte); // pop byte
         switch (state){
@@ -196,7 +198,7 @@ static bool comsGetMsg(Serial *ser, MsgFrame *msg){
                 msg->buf[dataIdx++] = byte; 
                 break;
             case COMPLETE:
-                USART_DR(USART1) = 'X' & USART_DR_MASK; // write byte
+                USART_DR(USART1) = 'X' & USART_DR_MASK; // write byte test
                 state=IDLE; // reload 
                 return true; // exit   
             case ERROR:
@@ -208,54 +210,31 @@ static bool comsGetMsg(Serial *ser, MsgFrame *msg){
     return false;
 }
 
-static bool comsCmdExec(CmdList *cmdList, MsgFrame *msg){
-    //@Brief: LooksUp Cmd by ID, validates protocol
-    //@Return: NULL if command not found
-    if(msg->id > cmdList->count){return false;} // no cmd implemented
-    
-    Command *cmd = &cmdList->cmds[msg->id];
-    cmdList->retVal = cmd->func(msg);
-    return true;
+
+static void comsDeclarePubs(Coms* coms, Serial* ser){
+
+    const uint8_t DATA_IDX = 2;
+    uint8_t* msgBuf = coms->txFrame.buf; // readability
+    const Topic* pubMap = coms->pubMap;
+    const Topic* cmdMap = coms->cmdMap;
+    size_t idx;
+    // Pack Pub Topic Info: Name:Format
+    for(int i = 0; i < NUM_PUBS; i++){
+        idx = 0;
+        msgBuf[idx++] = SOF_BYTE;
+        msgBuf[idx++] = PUB_CMD_RET + 'a';
+        msgBuf[idx++] = CMD_ID; // Calling Cmd IDmake
+        msgBuf[idx++] = ':'; // delim
+
+        const char* pubName = comsGetPubName(coms, i);
+        idx += uCpy((char*)&msgBuf[idx],pubName, 0); 
+        msgBuf[idx++] = ':';
+        const char* pubFmt = comsGetPubFmt(coms, i);
+        idx += uCpy((char*)&msgBuf[idx], pubFmt, 0);
+        msgBuf[idx++] = EOF_BYTE;
+        serialSend(ser, msgBuf, idx);
+    }
 }
-
-
-
-//****** Message Tranmission packetization  ***********************************************************//
-/*
-|-------------Packet---------|
-|-----+-----+----+- - - +----|
-| SOF | LEN | ID | DATA | EOF|
-| 1   | 1   | 1  | ...  | 1  |
-|-----------+----+- - - +----|
-      |-------Frame-----|
-
-
-SOF -- Start of Frame 
-LEN -- Size of Data (bytes)
-ID -- Hashed Topic String Identifier 
-DATA -- LEN bytes of data
-EOF - End of Frame 
-*/
-
-
-#define  COMS_INIT()                                                         \
-const uint8_t DATA_IDX = 3                                                   \
-MsgFrame MSG;                                                                \
-uint8_t IDX = 0;                                                             
-
-#define COMS_SEND_MSG(SER, ID, FORMAT, ... )                                 \
-uint8_t DATA_IDX = 3;                                                        \
-MsgFrame MSG;                                                                \
-int SIZE = mysprintf((char *)&MSG.buf[DATA_IDX], 2, FORMAT, __VA_ARGS__ );   \
-if(SIZE <= (MAX_MSG_DATA_SIZE - 1)){                                         \
-uint8_t IDX = 0;                                                             \
-MSG.buf[IDX++] = SOF_BYTE;                                                   \
-MSG.buf[IDX++] = SIZE;                                                       \
-MSG.buf[IDX++] = ID;                                                         \
-IDX += SIZE;                                                                 \
-MSG.buf[IDX++] = EOF_BYTE;                                                   \
-serialSend(SER, MSG.buf, IDX);                                               \
-}                                                                         
 
 
 #endif // COMS_H

@@ -3,7 +3,7 @@ BUILD_DIR = bin
 
 SHARED_DIR = /
 CFILES = firmware.c
-#CFILES += api.c
+CFILES += ../modules/cUtils/printf.c
 #AFILES += api-asm.S
 
 # TODO - you will need to edit these two lines!
