@@ -20,7 +20,7 @@
 #endif
 
 // ******************** MACROS **************************** //
-#define ARR_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define ARR_SIZE(arr) (size_t)(sizeof(arr) / sizeof((arr)[0]))
 
 
 // **************** PIN DEFINITIONS ********************** //
@@ -71,8 +71,9 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define SPEEDCTRL_PERIOD    50  // 20Hz
+#define SPEEDCTRL_PERIOD    15  // 1000Hz
 #define BLINK_PERIOD        500 // 2Hz
+#define BALANCE_PERIOD      10  // 100Hz
 // *********** GLOBAL CONSTANTS *************************** //
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
@@ -91,6 +92,7 @@ const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S))
 #define KI  0.01f
 #define KD  0.0f
 
+#define BETA_SPEED 00.90f
 
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     

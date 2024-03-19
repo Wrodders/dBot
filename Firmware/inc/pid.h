@@ -27,6 +27,7 @@ static PID pidInit(float min, float max, float kp, float ki, float kd, float del
     pid.kd = kd/deltaT;
     pid.min = min;
     pid.max = max;
+    pid.target = 0.0f;
     return pid;
 }
 

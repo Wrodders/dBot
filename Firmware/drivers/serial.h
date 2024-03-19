@@ -128,7 +128,9 @@ void usart2_isr(void){
 
 // ************ SETUP ***************************** // 
 
-static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t txPin, uint32_t pinMode, uint32_t irq, uint8_t * const rxbuf, size_t rxSize, uint8_t * const txbuf, size_t txSize){
+static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t txPin,
+                         uint32_t pinMode, uint32_t irq, uint8_t* const rxBuf, size_t rxSize, 
+                         uint8_t* const txBuf, size_t txSize){
     //@Brief: Initializes the USART Peripheral Hardware
     //@Brief: If irc == NULL serial device will be confirmed without ISR 
     gpio_mode_setup(port, GPIO_MODE_AF, GPIO_PUPD_NONE, rxPin | txPin);
@@ -143,14 +145,15 @@ static Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t
     // Create Serial Device 
     Serial ser = {
         .perif = perif,
-        .rxRB = rbInit(rxbuf, rxSize, sizeof(uint8_t)),
-        .txRB = rbInit(txbuf, txSize, sizeof(uint8_t)),
+        .rxRB = rbInit(rxBuf,rxSize, sizeof(uint8_t)),
+        .txRB = rbInit(txBuf,txSize, sizeof(uint8_t))
     };
     return ser;    
 }
 
 
-static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t stopBits, uint32_t parity, uint32_t flowcontroll ){
+static void serialConfig(Serial *ser, uint32_t baud, uint8_t databits, uint8_t stopBits, 
+                        uint32_t parity, uint32_t flowcontroll ){
     //@Brief: Configures USART Parameters
 
     uint32_t usart = ser->perif;
@@ -200,7 +203,8 @@ static void serialRead(Serial *ser, uint8_t *buf, uint16_t size){
     //@Brief: Reads from USART Receive Data Register
     //@Note: Blocking, waits on data available
     for(int i =0; i< size; i++){
-        while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; // wait for data to be available in receive shift register
+        // wait for data to be available in receive shift register
+        while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; 
         buf[i] = (USART_DR(ser->perif) & USART_DR_MASK);
     }
 }

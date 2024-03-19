@@ -3,8 +3,7 @@
 
 
 #include "../common/common.h"
-#include "../drivers/i2c.h"
-#include "../drivers/serial.h"
+#include "i2c.h"
 #include <math.h>
 
 // MPU6050 Config Registers

@@ -24,7 +24,8 @@ int main(void){
     
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 	
-    Serial ser1 = serialInit(DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, NVIC_USART1_IRQ,
+    Serial ser1 = serialInit(DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, 
+                            NVIC_USART1_IRQ, 
                             rx1_buf_, ARR_SIZE(rx1_buf_), 
                             tx1_buf_, ARR_SIZE(tx1_buf_));
     serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
@@ -39,7 +40,7 @@ int main(void){
 
         // Application Publisher Topics 
         {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.2f:%0.2f"}, // ROLL:PITCH:YAW
-        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.2f:%0.2f:%0.2f"} // LSPEED:RSPEED
+        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.2f:%0.2f:%0.2f:%0.2f:%0.2f:%0.2f"} // LSPEED:UL:RSPEED:UR
     };
 
     const Topic cmdMap[NUM_CMDS] = {
@@ -54,23 +55,23 @@ int main(void){
 
     comsSendMsg(&coms, &ser1, PUB_INFO, "Hello PC");
 
-    // Coms Messages
-    MsgFrame rxFrame = {0}; 
-    MsgFrame txFrame = {0};
+    //***** Two Wheel Self Balancing Robot ************* //
+    Robot bot = robotInit();
+    delay(1000);
 
-    // IMU
+    //***** IMU *************************************** //
 	MPU6050 mpu6050 = mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);    
     IMU imu = imuInit(0.5f, 0.01f);
-    // Robot ROBOT
-    Robot robot = robotInit();
-    delay(1000);
     
     // ***** Application Tasks ***** // 
-    FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // 500ms = 2Hz
-    FixedTimeTask comsTask = createTask(COMS_PERIOD); // 100ms = 10hz
-    FixedTimeTask speedCtrlTask = createTask(SPEEDCTRL_PERIOD); // 50ms = 200Hz
+    FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
+    FixedTimeTask comsTask = createTask(COMS_PERIOD); // PUB SUB RPC
+    FixedTimeTask speedCtrlTask = createTask(SPEEDCTRL_PERIOD); // Motor PI Loop
+    FixedTimeTask balanceTask = createTask(BALANCE_PERIOD); // IMU Process Loop
 
     // ****** Loop Parameters ******* // 
+    float vel = 0.01f;
+    bool ramp = 0;
     uint8_t buf[40]; // tx coms buffer
     uint8_t len = 0; // msg len
     uint16_t loopTick = 0;
@@ -79,25 +80,43 @@ int main(void){
 
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
+            switch(ramp){
+                case 1:
+                    if(vel < 0.9f){vel += 0.1;}
+                    else{ramp = 0;}
+                    break;
+                case 0:
+                    if(vel > -0.9f){vel -= 0.1;}
+                    else{ramp = 1;}
+                    break;
+            }
+            robotTankDrive(&bot, vel, vel);
+
+
             blinkTask.lastTick = loopTick;
         }
 
         if(CHECK_PERIOD(comsTask, loopTick)){
-            comsSendMsg(&coms, &ser1, PUB_ODOM, robot.motorL.angularSpeed, robot.motorR.angularSpeed, robot.pidL.out);
-            
+            comsSendMsg(&coms, &ser1, PUB_ODOM, bot.motorL.angularVel,bot.motorL.pi.out,
+                                                bot.motorR.angularVel, bot.motorR.pi.out, 
+                                                bot.motorL.pi.target, bot.motorR.pi.target);
             comsSendMsg(&coms, &ser1, PUB_IMU, imu.roll, imu.pitch);
+
+
+            
+
             comsTask.lastTick = loopTick;
         }
-
         if(CHECK_PERIOD(speedCtrlTask, loopTick)){
+            robotSpeedCtrl(&bot); // run speed PI controller on both motors
+            speedCtrlTask.lastTick = loopTick;
+        }
+        if(CHECK_PERIOD(balanceTask, loopTick)){
             // Get Pitch Angle
             mpu6050Read(&mpu6050);
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // apply digital LPF to raw measurements
             imuRawEuler(&imu.flitAccel, &imu.roll, &imu.pitch);
-
-            robotSpeedCtrl(&robot); // run pid
-            speedCtrlTask.lastTick = loopTick;
-
+            balanceTask.lastTick = loopTick;
         }
 	}
 }
