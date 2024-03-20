@@ -6,6 +6,12 @@ DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
 NOTE: TIMER PERIF RCC Must be initialized previously. 
 Motors Bind To Encoders. 
 All velocities are relative to the motors frame. 
+
+
+
+DC Motor Transfer Function
+wR = wL = V * Kt / (s^2(LaJm) + s(RaJm + BmLa) + KtKe + RaBm)    
+
 **************************/
 
 #include "../common/common.h"

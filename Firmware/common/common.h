@@ -72,7 +72,7 @@
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
 #define SPEEDCTRL_PERIOD    15  // 1000Hz
-#define BLINK_PERIOD        500 // 2Hz
+#define BLINK_PERIOD        500// 2Hz
 #define BALANCE_PERIOD      10  // 100Hz
 // *********** GLOBAL CONSTANTS *************************** //
 #define ENC_CPR             12.00f
@@ -80,6 +80,8 @@
 #define EDGE_NUM            4.00f
 const float MOTOR_CPR = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 const float MS_TO_S = 0.001f;
+const float S_TO_MS = 1000;
+const float TO_INVERSE = 0.1f;
 const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S)));
 
 #define WHEEL_BASE      0.07f   // m
@@ -93,6 +95,11 @@ const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S))
 #define KD  0.0f
 
 #define BETA_SPEED 00.90f
+#define STEP_SIZE  0.05f
+
+#define MIN_FREQUENCY 0.01    // Minimum frequency in Hz
+#define MAX_FREQUENCY 10  // Maximum frequency in Hz
+#define CHIRP_PERIOD_S 5
 
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     

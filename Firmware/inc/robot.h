@@ -5,20 +5,23 @@
 #include "motor.h"
 #include "pid.h"
 
+#define M_PI 3.14159265358979323846f
 
 /*
 Kinematics Controller for TWSB-Robot Model of robot. 
 
 Robot - Differential Driver Mobile Robot 
-    Models and Controls the kinematics of the Robot in the 2D Plane 
-    Each motor has a PD Speed controller, utilizes Quadrupole Encoder Timer
+    Models and Controls the kinematics of the TWSB Robot in the 2D Plane 
+    Provides a DDMR Controllable Robot via cascaded PID 
+
+    Forward Kinematics:
+    Va = R * (wR + wL) / 2
+    Wa = 2R * (wR - wL) / L
+
+    Inverse Kinematics: 
+    wR = Va - (Wa * L 
+    wL = Va + Wa * L)
     
-    The model maps Target Linear & Angular Velocity to Motor Velocities
-    by the transfer function :
-
-    q = [ x_dot y_dot theta_dot ]^T * [wR wR]^T
-
-    wR = wL = V * Ki/(s^2(LaRa) +s(RaJm + BmLa) + KtKe + RaBm)        
 */  
 
 
@@ -26,14 +29,15 @@ typedef struct Robot{
     Motor motorL, motorR;
     Encoder encL, encR;
 
-
     const float wheelR; // R
-    const float wheelBase; // 2L
+    const float wheelBase; // L
     
-    // Pose
+    // kinematic state
+    struct{
     float angularV;
     float linearV;
     float posX, posY;
+    }state;
 }Robot; // Deferential Drive Mobile Robot
 
 
@@ -67,41 +71,53 @@ static Robot robotInit(void){
 }
 
 
-static void robotSpeedCtrl(Robot *bot){
-    //@Brief: Main Speed Control Process 
-    //@Description: Drives the mobile robot according to 
+static void robotOdometry(Robot *bot){
+    //@Brief: Calculate Mobile Robots Kinematic State
+    //@Description: xdot = linVel * cos(theta)
+    //              ydot = linVel * sin(theta)
+    //              thetadot = angVel
+    // Integrating these values we can obtain the Mobile Robots Pose q = [x y theta]^T
+    // Assuming the constant acceleration.
 
-    // shortens calculations
-    Motor* const mL = &bot->motorL;
-    Motor* const mR = &bot->motorR;
-    // Get target Wheel Speeds
-    // Use old speed if no new speed set
-    motorSpeedCtrl(mL);
-    motorSpeedCtrl(mR);
-    
+    //  [linV angV]^T =  R/2 * [1 1; 1/L -1/L]^T * [wR wL]^T
+    //  x(t) = (vR + vL)/(vR -vL) * w/2 * sin(t*(vR - VL)/w)
+    //  y(t) = (vR + vL)/(vR -vL) * w/2 * cos(t*(vR - VL)/w) + (vR + vL)/(vR - vL) * w/2
+
+    bot->state.linearV = (bot->wheelR / 2) * (bot->motorL.angularVel + bot->motorR.angularVel);
+    bot->state.angularV = (bot->wheelR / (2* bot->wheelBase)) * (bot->motorL.angularVel - bot->motorR.angularVel);
+
+  
+
 }
 
 static void robotDiffDrive(Robot* bot, const float linVel, const float angVel){
     //@Brief: Drive Mobile robot in Differential Drive Configuration
-    //@Description: Computes Inverse Kinematics of Robot Model, Applies Speed Ramp via RingBuffer
+    //@Description: Computes Inverse Kinematics of Robot Model.
 
-    float wLTarget = linVel + (angVel * bot->wheelBase); // left wheel angular speed rad/s
-    float wRTarget = linVel - (angVel * bot->wheelBase); // right wheel angular speed rad/s
+    float wLTarget = linVel + (angVel * 2 * bot->wheelBase); // left wheel angular speed rad/s
+    float wRTarget = linVel - (angVel * 2 * bot->wheelBase); // right wheel angular speed rad/s
+    motorSetSpeed(&bot->motorL,wLTarget);
+    motorSetSpeed(&bot->motorR,wRTarget);
 }
 
 
-static void robotTankDrive(Robot* bot, const float velL, const float velR){
+static void robotTankDrive(Robot* bot, const float pwrL, const float pwrR){
     //@Brief: Drive Mobile Robot in Tank Drive Configuration
-    //@Description: Sets Motor Voltage independently.
-    //@Param: velL is a % 0-1
+    //@Description: Wheel Power Sets Motor Voltage Independently 
 
-    float vL = _clamp(velL, -1, 1) * VBAT_MAX; // convert % to voltage
-    float vR = _clamp(velR, -1, 1) * VBAT_MAX;
-    
+    float vL = _clamp(pwrL, -1, 1) * VBAT_MAX; // convert % to voltage
+    float vR = _clamp(pwrR, -1, 1) * VBAT_MAX;
     motorSetSpeed(&bot->motorL, vL);
     motorSetSpeed(&bot->motorR, vR);
- //
-    
 }
+
+
+
+
+
+
+
+
+
 
 #endif // ROBOT_H
