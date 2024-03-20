@@ -74,6 +74,7 @@
 #define SPEEDCTRL_PERIOD    15  // 1000Hz
 #define BLINK_PERIOD        500// 2Hz
 #define BALANCE_PERIOD      10  // 100Hz
+#define CHIRP_PERIOD        50
 // *********** GLOBAL CONSTANTS *************************** //
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
@@ -93,13 +94,15 @@ const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S))
 #define KP  0.1f
 #define KI  0.01f
 #define KD  0.0f
+#define BETA_SPEED 0.9f
 
-#define BETA_SPEED 00.90f
-#define STEP_SIZE  0.05f
 
-#define MIN_FREQUENCY 0.01    // Minimum frequency in Hz
-#define MAX_FREQUENCY 10  // Maximum frequency in Hz
+#define CHIRP_BUF_SIZE 128 // Adjust array size as needed
+#define POPULATION_INTERVAL 5 // Population interval in seconds
+#define MIN_FREQUENCY 0.1f    // Minimum frequency in Hz
+#define MAX_FREQUENCY 1  // Maximum frequency in Hz
 #define CHIRP_PERIOD_S 5
+#define CHIRP_M        2.2f
 
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     

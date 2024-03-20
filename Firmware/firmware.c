@@ -6,48 +6,8 @@
 #include "inc/coms.h"
 #include "inc/imu.h"
 #include "inc/robot.h"
+#include "inc/calib.h"
 
-#define ARRAY_SIZE 100 // Adjust array size as needed
-#define POPULATION_INTERVAL 5 // Population interval in seconds
-
-double chirp_frequency(double t, double min_freq, double max_freq, double period) {
-    // Calculate the chirp frequency based on time
-    double slope = (max_freq - min_freq) / period;
-    return min_freq + slope * t;
-}
-
-// Function to populate the array with a chirp waveform
-void populateArray(float *array, double min_freq, double max_freq, double period) {
-    double t_increment = period / ARRAY_SIZE;
-    double t = 0.0;
-
-    for (int i = 0; i < ARRAY_SIZE; i++) {
-        double frequency = chirp_frequency(t, min_freq, max_freq, period);
-        double amplitude = 1.0; // Adjust amplitude as needed
-
-        // Calculate the value of the chirp waveform (sine wave)
-       double value = amplitude * sin(0.1*t + (0.0f - 0.1f)*t*t*1/(2*0.1));
-
-        // Store the value in the array
-        array[i] = (float)value;
-
-        // Increment time
-        t += t_increment;
-    }
-}
-
-float getNextValue(float *array, size_t *index, bool *rampUp) {
-    if (*rampUp) {
-        if ((*index)++ == ARRAY_SIZE - 1) {
-            *rampUp = false;
-        }
-    } else {
-        if ((*index)-- <= 0) {
-            *rampUp = true;
-        }
-    }
-    return array[*index];
-}
 
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
@@ -93,7 +53,6 @@ int main(void){
     };
 
     Coms coms = comsInit(pubMap, cmdMap);
-
     comsSendMsg(&coms, &ser1, PUB_INFO, "Hello PC");
 
     //***** Two Wheel Self Balancing Robot ************* //
@@ -103,6 +62,12 @@ int main(void){
     //***** IMU *************************************** //
 	MPU6050 mpu6050 = mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);    
     IMU imu = imuInit(0.5f, 0.01f);
+
+
+    // ******** SELF TESTS CALLIBRATION ************** // 
+    float chip_array[CHIRP_BUF_SIZE];
+    ChirpTest chirp = chirpInit(chip_array, ARR_SIZE(chip_array));
+    chirpComputeLUT(&chirp,MIN_FREQUENCY, MAX_FREQUENCY, CHIRP_PERIOD_S, CHIRP_M);
     
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
@@ -112,33 +77,16 @@ int main(void){
     FixedTimeTask sweepTask = createTask(50); // init at 1Hz
   
 
+
+
+
     // ****** Loop Parameters ******* // 
-
-    float chip_array[ARRAY_SIZE];
-
-    populateArray(chip_array, MIN_FREQUENCY, MAX_FREQUENCY, CHIRP_PERIOD_S);
-
-
-    // Define global variables
-    float currentTime = 0; // Current time
-    float currentFrequency = MIN_FREQUENCY; // Current frequency
-    float targetFrequency = MAX_FREQUENCY; // Target frequency
-    bool increasing = true; // Flag to indicate whether the frequency is increasing or decreasing
-    float sineValue = 0; // Value of the sine function
-    static float freq = 0;
-
-
-
-
-
+    // Define loop global variables
+    float chirpValue = 0; // Value of the sine function
     double time =0;
-    uint8_t buf[40]; // tx coms buffer
-    uint8_t len = 0; // msg len
     uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
-
-
         // ********* FIXED TIME TASKS ************ // 
         //@Brief: Uses SysTick to execute periodic tasks
         //@Note: Tasks must be non blocking
@@ -147,12 +95,9 @@ int main(void){
             blinkTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
-
-            
-
             comsSendMsg(&coms, &ser1, PUB_ODOM, bot.motorL.angularVel,bot.motorR.angularVel,
                                                 bot.motorL.pi.target, bot.motorR.pi.target);
-            comsSendMsg(&coms, &ser1, PUB_IMU, freq, imu.roll);
+            comsSendMsg(&coms, &ser1, PUB_IMU, imu.pitch, imu.roll);
             comsTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(speedCtrlTask, loopTick)){
@@ -174,23 +119,12 @@ int main(void){
         // Inside CHECK_PERIOD state code
         if (CHECK_PERIOD(sweepTask, loopTick)) {
 
-            static size_t index = 0;
-
-
-            // Update current time
-            currentTime = loopTick;
-            static int step = -3;
-            static bool rampUp  = true;
-            int dir = rampUp == true ? 1 : -1;
-            // Calculate sine value based on the current frequency
-            //sineValue = sin(2 * M_PI * freq  - currentTime ) * 0.5; // Convert currentTime to seconds
-
-
-            sineValue = getNextValue(chip_array, &index, &rampUp)* dir;
+    
+            chirpValue = chirpNext(&chirp) * chirp.rampDir;
             // Normalize sine value to keep amplitude constant
 
             // Drive robot with sine wave signal
-            robotTankDrive(&bot, sineValue, sineValue);
+            robotTankDrive(&bot, chirpValue, chirpValue) ;
 
             // Update last tick
             sweepTask.lastTick = loopTick;
