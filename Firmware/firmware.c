@@ -5,10 +5,8 @@
 
 #include "inc/coms.h"
 #include "inc/imu.h"
-#include "inc/robot.h"
-#include "inc/calib.h"
-
-
+#include "inc/ddmr.h"
+#include "inc/twsb.h"
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
 #define RB_SIZE 128          // ACCESS THROUGH RING BUFFER 
@@ -55,20 +53,20 @@ int main(void){
     comsSendMsg(&coms, &ser1, PUB_INFO, "Hello PC");
 
     //***** Two Wheel Self Balancing Robot ************* //
-    Robot bot = robotInit();
-    robotSetBalanceAngle(&bot, 0.0f);
-    robotDiffDrive(&bot, 1.4f, 10.0f);
+    DDMR dBot = ddmrInit();
+    TWSB bBot = twsbInit();
+    twsbSetRef(&bBot, 0.0f);
+    
     delay(1000);   
-    //robotTankDrive(&bot, 0.2, 0.2);
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
     FixedTimeTask comsTask = createTask(COMS_PERIOD); // PUB SUB RPC
     FixedTimeTask speedCtrlTask = createTask(SPEEDCTRL_PERIOD); // Motor PI Loop
     FixedTimeTask balanceTask = createTask(BALANCE_PERIOD); // IMU Process Loop
-    
-  
     // ****** Loop Parameters ******* // 
     // Define loop global variables
+    int rampDir = 1;
+    float trgVel = 1;
     uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
@@ -80,22 +78,43 @@ int main(void){
             blinkTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
-            comsSendMsg(&coms, &ser1, PUB_ODOM, bot.motorL.angularVel,bot.motorR.angularVel,
-                                                bot.motorL.pi.target, bot.motorR.pi.target,
-                                                bot.balancer.out);
-            comsSendMsg(&coms, &ser1, PUB_IMU,bot.imu.pitch, bot.imu.roll);
+            
+            switch(rampDir){
+
+                case 1:
+                    if(trgVel >= VEL_MAX){rampDir = -1;}
+                    else{trgVel += 0.2f;}
+                    break;
+                
+
+                case -1:
+                    if(trgVel <= -VEL_MAX){rampDir = 1;}
+                    else{trgVel -= 0.2f;}
+                    break;
+
+            };
+
+            ddmrDrive(&dBot,trgVel, 10.0f);
+
+
+
+
+
+            comsSendMsg(&coms, &ser1, PUB_ODOM, dBot.motorL.angularVel,dBot.motorR.angularVel,
+                                                dBot.motorL.pi.target, dBot.motorR.pi.target,
+                                                bBot.balancer.out);
+            comsSendMsg(&coms, &ser1, PUB_IMU,bBot.imu.pitch, bBot.imu.roll);
             comsTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(speedCtrlTask, loopTick)){
             //@Brief: DC Motor Speed Control Process 
             //@Description: Drives the mobile robot according to 
-            motorSpeedCtrl(&bot.motorL);
-            motorSpeedCtrl(&bot.motorR);
+            motorSpeedCtrl(&dBot.motorL);
+            motorSpeedCtrl(&dBot.motorR);
             speedCtrlTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(balanceTask, loopTick)){
-
-            robotBalance(&bot);
+            twsbBalancer(&bBot);
             balanceTask.lastTick = loopTick;
         }
     }
