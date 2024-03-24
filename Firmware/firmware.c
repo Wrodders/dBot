@@ -56,9 +56,9 @@ int main(void){
 
     //***** Two Wheel Self Balancing Robot ************* //
     Robot bot = robotInit();
+    robotSetBalanceAngle(&bot, 0.0f);
+    robotDiffDrive(&bot, 1.4f, 10.0f);
     delay(1000);   
-
-    robotDiffDrive(&bot, 1, 3); 
     //robotTankDrive(&bot, 0.2, 0.2);
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
@@ -81,7 +81,8 @@ int main(void){
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
             comsSendMsg(&coms, &ser1, PUB_ODOM, bot.motorL.angularVel,bot.motorR.angularVel,
-                                                bot.motorL.pi.target, bot.motorR.pi.target,bot.motorR.pi.out);
+                                                bot.motorL.pi.target, bot.motorR.pi.target,
+                                                bot.balancer.out);
             comsSendMsg(&coms, &ser1, PUB_IMU,bot.imu.pitch, bot.imu.roll);
             comsTask.lastTick = loopTick;
         }

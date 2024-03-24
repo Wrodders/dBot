@@ -73,7 +73,8 @@
 #define COMS_PERIOD         100 // 10Hz
 #define SPEEDCTRL_PERIOD    15  // 66Hz
 #define BLINK_PERIOD        500// 2Hz
-#define BALANCE_PERIOD      10  // 100Hz
+#define BALANCE_PERIOD      50  // 100Hz
+
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI 3.14159265358979323846f
 #define ENC_CPR             12.00f
@@ -94,24 +95,24 @@ const float MPS_TO_RPS  = (float)1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 
 #define RPS_MAX         10.00f  // rps
-#define VEL_MAX        RPS_MAX * MPS_TO_RPS;
+#define VEL_MAX         RPS_MAX * RPS_TO_MPS /2
 
 // Speed Control Parameters
-#define SPEED_KP  0.1f
-#define SPEED_KI  0.01f
+#define SPEED_KP  10.0f
+#define SPEED_KI  20.0f
 #define SPEED_KD  0.0f
 #define BETA_SPEED 0.9f
 
 // Balance Controll Paramters
 
 #define BAL_KP      0.01f
-#define BAL_KI      0.0f; 
-#define BAL_KD      0.0f;
+#define BAL_KI      0.001f
+#define BAL_KD      0.0f
 
 // CHIRP Test Parameters
 #define CHIRP_BUF_SIZE  100 // Adjust array size as needed
 #define MIN_FREQUENCY   0.1f    // Minimum frequency in Hz
-#define MAX_FREQUENCY   0.051  // Maximum frequency in Hz
+#define MAX_FREQUENCY   1.0f  // Maximum frequency in Hz
 #define CHIRP_PERIOD_S  5
 #define CHIRP_M         5.0f
 #define CHIRP_W1        0.0f

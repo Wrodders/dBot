@@ -65,11 +65,11 @@ static Robot robotInit(void){
         
         .mpu6050 =  mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA),
         .imu =  imuInit(0.5f, 0.01f),
-        .comp = compFiltInit(BALANCE_PERIOD * MS_TO_S, 0.05f)
+        .comp = compFiltInit(BALANCE_PERIOD * MS_TO_S, 0.05f),
+
+        .balancer = pidInit(-VEL_MAX, VEL_MAX, BAL_KP, BAL_KI, BAL_KD, (BALANCE_PERIOD * MS_TO_S))
 
         };
-
-
 
     motorConfig(&bot.motorL, &bot.encL, VBAT_MAX, 0.0f, true, BETA_SPEED);
     motorConfig(&bot.motorR, &bot.encR, VBAT_MAX, 0.0f, false,  BETA_SPEED);
@@ -141,11 +141,16 @@ static void robotBalance(Robot *bot){
 
     // Calculate angle error 
     robotCalPitch(bot);
-    float mPitch = bot->imu.pitch; // updated at BALANCE_PERDIOD rate
-    //pidRun(&bot->balancer, mPitch); // apply pid
+    float mRoll = bot->imu.roll; // updated at BALANCE_PERDIOD rate
+    pidRun(&bot->balancer, mRoll); // apply pid
+    
     //robotDiffDrive(bot, bot->balancer.out, 0); // Inverse Kineatics
 }
 
+static void robotSetBalanceAngle(Robot *bot, float angle){
+    //@Brief: Sets Balancig PID Reference
+    bot->balancer.target = angle;
+}
 
 
 
