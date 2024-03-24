@@ -64,10 +64,11 @@ int main(void){
     IMU imu = imuInit(0.5f, 0.01f);
 
 
-    // ******** SELF TESTS CALLIBRATION ************** // 
+    // ******** SELF TESTS CALIBRATION ************** // 
     float chip_array[CHIRP_BUF_SIZE];
     ChirpTest chirp = chirpInit(chip_array, ARR_SIZE(chip_array));
-    chirpComputeLUT(&chirp,MIN_FREQUENCY, MAX_FREQUENCY, CHIRP_PERIOD_S, CHIRP_M);
+    chirpComputeLUT(&chirp,MIN_FREQUENCY, MAX_FREQUENCY, CHIRP_PERIOD_S, 
+                    CHIRP_W1, CHIRP_W2, CHIRP_M);
     
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
@@ -119,10 +120,10 @@ int main(void){
         // Inside CHECK_PERIOD state code
         if (CHECK_PERIOD(sweepTask, loopTick)) {
 
-    
-            chirpValue = chirpNext(&chirp) * chirp.rampDir;
+            int dir = chirp.rampDir == 1 ? -1 : 1;
+            chirpValue = chirpNext(&chirp) * dir * 0.5;
             // Normalize sine value to keep amplitude constant
-
+            
             // Drive robot with sine wave signal
             robotTankDrive(&bot, chirpValue, chirpValue) ;
 

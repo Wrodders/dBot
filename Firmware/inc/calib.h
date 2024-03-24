@@ -33,7 +33,8 @@ static float chirpGetFreq(float t, float min_freq, float max_freq, float period)
 }
 
 
-static void chirpComputeLUT(ChirpTest *chirp, float min_freq, float max_freq, float period, float M) {
+static void chirpComputeLUT(ChirpTest *chirp, float min_freq, float max_freq, 
+                            float period, float w1, float w2, float M) {
     //@Brief: Computes a polulatea LUT
     float t_increment = period / chirp->size;
     float t = 0.0;
@@ -43,7 +44,7 @@ static void chirpComputeLUT(ChirpTest *chirp, float min_freq, float max_freq, fl
         float amplitude = 1.0; // Adjust amplitude as needed
 
         // Calculate the value of the chirp waveform (sine wave)
-       float value = amplitude * cos(0.0*t + (-7.0f - 0.0f)*t*t/(2*M));
+       float value = amplitude * cos(w1*t + (w2 - w1)*t*t/(2*M));
 
         // Store the value in the array
         chirp->buf[i] = value;
@@ -55,7 +56,7 @@ static void chirpComputeLUT(ChirpTest *chirp, float min_freq, float max_freq, fl
 
 static float chirpNext(ChirpTest *chirp) {
     //@Brief: Gets the next value of the chirp LUT, pingPongs left to right
-    if (chirp->rampDir >= 0) {
+    if (chirp->rampDir > 0) {
         if (chirp->index++ >= CHIRP_BUF_SIZE - 1) {chirp->rampDir = -1;}
     } else {
         if (chirp->index-- <= 0) {chirp->rampDir = 1;}
