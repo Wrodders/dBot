@@ -71,34 +71,46 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define SPEEDCTRL_PERIOD    15  // 1000Hz
+#define SPEEDCTRL_PERIOD    15  // 66Hz
 #define BLINK_PERIOD        500// 2Hz
 #define BALANCE_PERIOD      10  // 100Hz
-#define CHIRP_PERIOD        50
 // *********** GLOBAL CONSTANTS *************************** //
+#define M_PI 3.14159265358979323846f
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
 #define EDGE_NUM            4.00f
+
+#define WHEEL_BASE          0.07f   // m
+#define WHEEL_RADIUS        0.035f  // m
+#define VBAT_MAX            10.00f   // 2*4.2V
+#define BAT_CAPACITY        2300    // mAh
+
 const float MOTOR_CPR = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 const float MS_TO_S = 0.001f;
 const float S_TO_MS = 1000;
 const float TO_INVERSE = 0.1f;
 const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S)));
+const float MPS_TO_RPS  = (float)1/(WHEEL_RADIUS*2*M_PI);
+const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 
-#define WHEEL_BASE      0.07f   // m
-#define WHEEL_RADIUS    0.035f  // m
-#define VBAT_MAX       10.00f   // 2*4.2V
-#define BAT_CAPACITY    2300    // mAh
 #define RPS_MAX         10.00f  // rps
+#define VEL_MAX        RPS_MAX * MPS_TO_RPS;
 
-#define KP  0.1f
-#define KI  0.01f
-#define KD  0.0f
+// Speed Control Parameters
+#define SPEED_KP  0.1f
+#define SPEED_KI  0.01f
+#define SPEED_KD  0.0f
 #define BETA_SPEED 0.9f
 
+// Balance Controll Paramters
 
+#define BAL_KP      0.01f
+#define BAL_KI      0.0f; 
+#define BAL_KD      0.0f;
+
+// CHIRP Test Parameters
 #define CHIRP_BUF_SIZE  100 // Adjust array size as needed
-#define MIN_FREQUENCY   0.01f    // Minimum frequency in Hz
+#define MIN_FREQUENCY   0.1f    // Minimum frequency in Hz
 #define MAX_FREQUENCY   0.051  // Maximum frequency in Hz
 #define CHIRP_PERIOD_S  5
 #define CHIRP_M         5.0f

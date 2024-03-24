@@ -42,9 +42,6 @@ typedef struct Motor {
 
     Encoder *enc;
     PID pi;
-
-    float trgtSpeed_buf[MAX_SPEED_INTRP];
-    RingBuffer speedRamp;
     float angularVel; // angular speed rad/s
     float beta; // speed lowpass filter parameter
 }Motor;
@@ -63,10 +60,9 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
         .drv.pwmB.pin = pwmB,
         .drv.pwmB.port = pwmPort,
         .drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE),
-        .speedRamp = rbInit(&m.trgtSpeed_buf, ARR_SIZE(m.trgtSpeed_buf), sizeof(float)),
-        .pi = pidInit(-VBAT_MAX, VBAT_MAX, KP, KI, KD, (SPEEDCTRL_PERIOD * MS_TO_S))
+        .pi = pidInit(-VBAT_MAX, VBAT_MAX, SPEED_KP, SPEED_KI, SPEED_KD, (SPEEDCTRL_PERIOD * MS_TO_S))
     };
-    rbClear(&m.speedRamp); // clear ring buffer
+
     gpio_clear(m.drv.en.port, m.drv.en.pin); // set off
     // Initialize Timer PWM
     pwmInit(m.drv.timPerif,84,25000); // set freq to 1Hz period to 25000 ARR reg
@@ -85,16 +81,16 @@ static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMi
     //@Brief: Configs Motor parameters
     m->enc = enc;
     m->drv.vPSU = vPSU;
-    m->drv.vMin = vMin;
+    m->drv.vMin = vMin; 
     m->flipDir = flipDir;
     m->beta = beta;
 }
 
 
 
-static void driverEnable(const Driver *drv){
+static void motorDrvEn(Motor *motor){
     //@Brief: Starts Motor Driver PWM
-    gpio_set(drv->en.port, drv->en.pin); // enable driver
+    gpio_set(motor->drv.en.port, motor->drv.en.pin); // enable driver
 }
 
 static void motorSetUnipolar(const Motor* motor, const float duty, const bool dir){

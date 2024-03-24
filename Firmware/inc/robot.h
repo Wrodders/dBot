@@ -4,8 +4,8 @@
 #include "../common/common.h"
 #include "motor.h"
 #include "pid.h"
+#include "imu.h"
 
-#define M_PI 3.14159265358979323846f
 
 /*
 Kinematics Controller for TWSB-Robot Model of robot. 
@@ -28,6 +28,13 @@ Robot - Differential Driver Mobile Robot
 typedef struct Robot{
     Motor motorL, motorR;
     Encoder encL, encR;
+
+    MPU6050 mpu6050;
+    IMU imu;
+    CompFilt comp;
+
+    PID balancer;
+
 
     const float wheelR; // R
     const float wheelBase; // L
@@ -52,16 +59,23 @@ static Robot robotInit(void){
 
         .encL = encoderInit(ENC_L_TIM, UINT16_MAX, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT, ENC_L_AF),
         .motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT),
-    
+            
         .encR = encoderInit(ENC_R_TIM, UINT16_MAX, ENC_R_A, ENC_R_PORT, ENC_R_B, ENC_R_PORT, ENC_R_AF),
         .motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT),
-    };
+        
+        .mpu6050 =  mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA),
+        .imu =  imuInit(0.5f, 0.01f),
+        .comp = compFiltInit(BALANCE_PERIOD * MS_TO_S, 0.05f)
+
+        };
+
+
 
     motorConfig(&bot.motorL, &bot.encL, VBAT_MAX, 0.0f, true, BETA_SPEED);
     motorConfig(&bot.motorR, &bot.encR, VBAT_MAX, 0.0f, false,  BETA_SPEED);
 
-    driverEnable(&bot.motorL.drv); // enable DRV8833 & pwm
-    driverEnable(&bot.motorR.drv); // enable DRV8833 & pwm
+    motorDrvEn(&bot.motorL); // enable DRV8833 & pwm
+    motorDrvEn(&bot.motorR); // enable DRV8833 & pwm
 
     motorStop(&bot.motorL);
     motorStop(&bot.motorR);
@@ -93,9 +107,10 @@ static void robotOdometry(Robot *bot){
 static void robotDiffDrive(Robot* bot, const float linVel, const float angVel){
     //@Brief: Drive Mobile robot in Differential Drive Configuration
     //@Description: Computes Inverse Kinematics of Robot Model.
+    //              
 
-    float wLTarget = linVel + (angVel * 2 * bot->wheelBase); // left wheel angular speed rad/s
-    float wRTarget = linVel - (angVel * 2 * bot->wheelBase); // right wheel angular speed rad/s
+    float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * bot->wheelBase); // left wheel angular speed rad/s
+    float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * bot->wheelBase); // right wheel angular speed rad/s
     motorSetSpeed(&bot->motorL,wLTarget);
     motorSetSpeed(&bot->motorR,wRTarget);
 }
@@ -109,6 +124,26 @@ static void robotTankDrive(Robot* bot, const float pwrL, const float pwrR){
     float vR = _clamp(pwrR, -1, 1) * VBAT_MAX;
     motorSetSpeed(&bot->motorL, vL);
     motorSetSpeed(&bot->motorR, vR);
+}
+
+static void robotCalPitch(Robot *bot){
+    //@Brief: Calculate Robots Pitch Angle
+
+    mpu6050Read(&bot->mpu6050);
+    // apply digital LPF to raw measurements
+    imuLPF(&bot->imu, &bot->mpu6050.accel, &bot->mpu6050.gyro);
+    compFilter(&bot->comp, &bot->imu);
+}
+
+static void robotBalance(Robot *bot){
+    //@Brief: Run Balance PID Control Loop 
+    //@Description: Outputs Target Mobile Robot Linear Velocity
+
+    // Calculate angle error 
+    robotCalPitch(bot);
+    float mPitch = bot->imu.pitch; // updated at BALANCE_PERDIOD rate
+    //pidRun(&bot->balancer, mPitch); // apply pid
+    //robotDiffDrive(bot, bot->balancer.out, 0); // Inverse Kineatics
 }
 
 
