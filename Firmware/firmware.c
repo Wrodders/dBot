@@ -78,28 +78,6 @@ int main(void){
             blinkTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
-            
-            switch(rampDir){
-
-                case 1:
-                    if(trgVel >= VEL_MAX){rampDir = -1;}
-                    else{trgVel += 0.2f;}
-                    break;
-                
-
-                case -1:
-                    if(trgVel <= -VEL_MAX){rampDir = 1;}
-                    else{trgVel -= 0.2f;}
-                    break;
-
-            };
-
-            ddmrDrive(&dBot,trgVel, 10.0f);
-
-
-
-
-
             comsSendMsg(&coms, &ser1, PUB_ODOM, dBot.motorL.angularVel,dBot.motorR.angularVel,
                                                 dBot.motorL.pi.target, dBot.motorR.pi.target,
                                                 bBot.balancer.out);
@@ -115,6 +93,7 @@ int main(void){
         }
         if(CHECK_PERIOD(balanceTask, loopTick)){
             twsbBalancer(&bBot);
+            ddmrDrive(&dBot, bBot.balancer.out, 0.0f);
             balanceTask.lastTick = loopTick;
         }
     }

@@ -56,8 +56,6 @@ static void twsbBalancer(TWSB *bBot){
     twsbCalcTheta(bBot);
     float mTheta = bBot->imu.roll; // updated at BALANCE_PERDIDO rate
     pidRun(&bBot->balancer, mTheta); // apply pid
-    
-    //robotDiffDrive(bot, bot->balancer.out, 0); // Inverse Kinematics
 }
 
 #endif // ROBOT_H

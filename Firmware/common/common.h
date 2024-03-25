@@ -105,8 +105,8 @@ const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 
 // Balance Controll Paramters
 
-#define BAL_KP      0.01f
-#define BAL_KI      0.001f
+#define BAL_KP      2.0f
+#define BAL_KI      0.0f
 #define BAL_KD      0.0f
 
 // CHIRP Test Parameters
