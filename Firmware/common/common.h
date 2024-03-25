@@ -71,9 +71,9 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define SPEEDCTRL_PERIOD    10  // 66Hz
+#define CTRL_PERIOD         10  // 100Hz
 #define BLINK_PERIOD        500// 2Hz
-#define BALANCE_PERIOD      50  // 100Hz
+
 
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI 3.14159265358979323846f
@@ -90,7 +90,7 @@ const float MOTOR_CPR = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 const float MS_TO_S = 0.001f;
 const float S_TO_MS = 1000;
 const float TO_INVERSE = 0.1f;
-const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (SPEEDCTRL_PERIOD * MS_TO_S)));
+const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (CTRL_PERIOD * MS_TO_S)));
 const float MPS_TO_RPS  = (float)1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 
@@ -104,7 +104,7 @@ const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 #define BETA_SPEED 0.9f
 
 // Balance Controll Paramters
-
+#define BAL_THETA   0.0f
 #define BAL_KP      2.0f
 #define BAL_KI      0.0f
 #define BAL_KD      0.0f

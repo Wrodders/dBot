@@ -6,7 +6,7 @@
 #include "inc/coms.h"
 #include "inc/imu.h"
 #include "inc/ddmr.h"
-#include "inc/twsb.h"
+#include "inc/robot.h"
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
 #define RB_SIZE 128          // ACCESS THROUGH RING BUFFER 
@@ -54,15 +54,15 @@ int main(void){
 
     //***** Two Wheel Self Balancing Robot ************* //
     DDMR dBot = ddmrInit();
-    TWSB bBot = twsbInit();
-    twsbSetRef(&bBot, 0.0f);
+    Robot bBot = robotInit();
+    robotSetTheta(&bBot, BAL_THETA);
     
     delay(1000);   
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
     FixedTimeTask comsTask = createTask(COMS_PERIOD); // PUB SUB RPC
-    FixedTimeTask speedCtrlTask = createTask(SPEEDCTRL_PERIOD); // Motor PI Loop
-    FixedTimeTask balanceTask = createTask(BALANCE_PERIOD); // IMU Process Loop
+    FixedTimeTask speedCtrlTask = createTask(CTRL_PERIOD); // Motor PI Loop
+
     // ****** Loop Parameters ******* // 
     // Define loop global variables
     int rampDir = 1;
@@ -87,15 +87,19 @@ int main(void){
         if(CHECK_PERIOD(speedCtrlTask, loopTick)){
             //@Brief: DC Motor Speed Control Process 
             //@Description: Drives the mobile robot according to 
+            
+            // Body Speed Controller
+
+            // Balance 
+            robotBalancer(&bBot);
+
+            // Compute Wheel Speeds 
+            ddmrDrive(&dBot, bBot.target.linearV, bBot.target.angularV);
             motorSpeedCtrl(&dBot.motorL);
             motorSpeedCtrl(&dBot.motorR);
             speedCtrlTask.lastTick = loopTick;
         }
-        if(CHECK_PERIOD(balanceTask, loopTick)){
-            twsbBalancer(&bBot);
-            ddmrDrive(&dBot, bBot.balancer.out, 0.0f);
-            balanceTask.lastTick = loopTick;
-        }
+
     }
 }
 

@@ -22,6 +22,11 @@
     wR = Va - (Wa * L 
     wL = Va + Wa * L)
 */
+typedef struct State{
+    float angularV;
+    float linearV;
+    float posX, posY;
+}State;
 
 
 typedef struct DDMR{
@@ -31,11 +36,7 @@ typedef struct DDMR{
     const float wheelBase; // L
     
     // kinematic state
-    struct{
-    float angularV;
-    float linearV;
-    float posX, posY;
-    }state;
+    State state;
 }DDMR; // Deferential Drive Mobile Robot
 
 
