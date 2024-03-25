@@ -113,7 +113,7 @@ static void motorSetVoltage(const Motor* motor, const float voltage){
     bool dir;
     float v = voltage;
     float vAbs =  _fabs(v);
-    if(vAbs < motor->drv.vMin){v = 0;} // limit minium voltage
+    if(vAbs < motor->drv.vMin){v = motor->drv.vMin;} // limit minium voltage
     if(v >= 0.0f){ dir = 1;}
     else{dir = 0;}
     float dc = _clamp(vAbs/motor->drv.vPSU, 0, 1); // convert to % of battery

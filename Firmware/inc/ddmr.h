@@ -60,8 +60,8 @@ static DDMR ddmrInit(void){
 
         };
 
-    motorConfig(&dBot.motorL, &dBot.encL, VBAT_MAX, 0.0f, true, BETA_SPEED);
-    motorConfig(&dBot.motorR, &dBot.encR, VBAT_MAX, 0.0f, false,  BETA_SPEED);
+    motorConfig(&dBot.motorL, &dBot.encL, VBAT_MAX, 0.3f, true, BETA_SPEED);
+    motorConfig(&dBot.motorR, &dBot.encR, VBAT_MAX, 0.3f, false,  BETA_SPEED);
 
     motorDrvEn(&dBot.motorL); // enable DRV8833 & pwm
     motorDrvEn(&dBot.motorR); // enable DRV8833 & pwm

@@ -106,9 +106,9 @@ const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 
 // Balance Control Parameters
 #define BAL_THETA   0.0f
-#define BAL_KP      0.85f
-#define BAL_KI      3.0f
-#define BAL_KD      0.00007f
+#define BAL_KP      3.0f
+#define BAL_KI      0.0f
+#define BAL_KD      0.0f
 // Motion Control Parameters
 #define VEL_KP      0.0f
 #define VEL_KI      0.0f
