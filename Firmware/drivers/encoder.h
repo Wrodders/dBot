@@ -17,7 +17,7 @@ typedef struct Encoder {
     uint16_t lastCount; // encoder count
 }Encoder;
 
- static Encoder encoderHWInit(uint32_t timPerif, uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
+ static Encoder encoderInit(uint32_t timPerif, uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
     Encoder e;
     // Store the timer peripheral in the encoder structure
     e.timPerif = timPerif;

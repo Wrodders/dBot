@@ -6,6 +6,12 @@ DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
 NOTE: TIMER PERIF RCC Must be initialized previously. 
 Motors Bind To Encoders. 
 All velocities are relative to the motors frame. 
+
+
+
+DC Motor Transfer Function
+wR = wL = V * Kt / (s^2(LaJm) + s(RaJm + BmLa) + KtKe + RaBm)    
+
 **************************/
 
 #include "../common/common.h"
@@ -13,6 +19,7 @@ All velocities are relative to the motors frame.
 #include "../drivers/encoder.h"
 #include "../drivers/gpio.h"
 
+#include "pid.h"
 
 typedef struct Driver{
     uint32_t timPerif;
@@ -27,8 +34,11 @@ typedef struct Driver{
 
 typedef struct Motor {
     Driver drv;
-    bool flipDir; 
-    float angularSpeed; // angular speed rad/s
+    bool flipDir;
+
+    Encoder *enc;
+    PID pi;
+    float angularVel; // angular speed rad/s
     float beta; // speed lowpass filter parameter
 }Motor;
 
@@ -36,18 +46,19 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
                         const enum tim_oc_id timCH_A, const uint32_t pwmA, 
                         const enum tim_oc_id timCH_B, const uint32_t pwmB,  
                         const uint32_t enPin, const uint32_t enPort){
-    //@Brief: Inits Motor PWM
-    Motor m;
-    m.drv.timPerif = timPerif;
-    m.drv.timCH_A = timCH_A;
-    m.drv.timCH_B = timCH_B;
-    m.drv.pwmA.pin = pwmA;
-    m.drv.pwmA.port = pwmPort;
-    m.drv.pwmB.pin = pwmB;
-    m.drv.pwmB.port = pwmPort;
+    //@Brief: Inits Motor 
+    Motor m = {
+        .drv.timPerif = timPerif,
+        .drv.timCH_A = timCH_A,
+        .drv.timCH_B = timCH_B,
+        .drv.pwmA.pin = pwmA,
+        .drv.pwmA.port = pwmPort,
+        .drv.pwmB.pin = pwmB,
+        .drv.pwmB.port = pwmPort,
+        .drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE),
+        .pi = pidInit(-VBAT_MAX, VBAT_MAX, SPEED_KP, SPEED_KI, SPEED_KD, (CTRL_PERIOD * MS_TO_S))
+    };
 
-
-    m.drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
     gpio_clear(m.drv.en.port, m.drv.en.pin); // set off
     // Initialize Timer PWM
     pwmInit(m.drv.timPerif,84,25000); // set freq to 1Hz period to 25000 ARR reg
@@ -60,20 +71,22 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
     return m;
 }
 
-static void motorConfig(Motor *m,const float vPSU, const float vMin,
+static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMin,
                         const bool flipDir, float beta){
     
     //@Brief: Configs Motor parameters
+    m->enc = enc;
     m->drv.vPSU = vPSU;
-    m->drv.vMin = vMin;
+    m->drv.vMin = vMin; 
     m->flipDir = flipDir;
     m->beta = beta;
 }
 
 
-static void driverEnable(const Driver *drv){
+
+static void motorDrvEn(Motor *motor){
     //@Brief: Starts Motor Driver PWM
-    gpio_set(drv->en.port, drv->en.pin); // enable driver
+    gpio_set(motor->drv.en.port, motor->drv.en.pin); // enable driver
 }
 
 static void motorSetUnipolar(const Motor* motor, const float duty, const bool dir){
@@ -100,7 +113,7 @@ static void motorSetVoltage(const Motor* motor, const float voltage){
     bool dir;
     float v = voltage;
     float vAbs =  _fabs(v);
-    if(vAbs < motor->drv.vMin){v = 0;} // limit minium voltage
+    if(vAbs < motor->drv.vMin){v = motor->drv.vMin;} // limit minium voltage
     if(v >= 0.0f){ dir = 1;}
     else{dir = 0;}
     float dc = _clamp(vAbs/motor->drv.vPSU, 0, 1); // convert to % of battery
@@ -119,15 +132,31 @@ static void motorBreak(const Motor *motor){
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0);
 }
 
-static void motorCalSpeed(Motor* motor, Encoder* enc){
+static void motorCalSpeed(Motor* motor){
     //@Brief: Calculate Angular Speed in Rotations per Second
     //@Description: Applies lowpass filter to smooth Quantization errors 
-    uint16_t mCount = encoderRead(enc);
-    int16_t dCount = mCount - enc->lastCount;
-    enc->lastCount = mCount;
+    uint16_t mCount = encoderRead(motor->enc);
+    int16_t dCount = mCount - motor->enc->lastCount;
+    motor->enc->lastCount = mCount;
     float mSpeed = dCount * TICKS_TO_RPS; // rotations per second
     // Apply Low pass filter to speed measurement (1 - b)speed[n] + b*speed[n-1] 
-    motor->angularSpeed = (motor->beta * mSpeed) + (1.00f - motor->beta) * motor->angularSpeed;
+    motor->angularVel = (motor->beta * mSpeed) + (1.00f - motor->beta) * motor->angularVel;
+    
 }
 
+
+static void motorSpeedCtrl(Motor* motor){
+    //@Brief: Regulates Estimated Speed to target speed
+    motorCalSpeed(motor);
+    pidRun(&motor->pi, motor->angularVel);
+    motorSetVoltage(motor, motor->pi.out);
+}
+
+static void motorSetSpeed(Motor *motor, const float vel){
+    //@Brief: Pushes Target speed through speedCurve buffer.
+    //@Description: Applies Trapezium Ramp to velocities
+    //              Ramps at increments of SPEED_CTRL_PERIOD 
+    //              Based on max acceleration value
+    motor->pi.target = vel;
+}
 #endif // DCMOTOR_H

@@ -2,44 +2,17 @@
 
 ## Bare metal peripheral drivers for STM32F401 BlackPill
 
-### Serial
+The Firmware presents a high level API representing a DifferentialDrive Mobile Robot; in which the Robots Linear and Angular Velocities are controlled[1]. 
 
-This should generally be used as part of a higher level communication functionality 
+The Firmware implements a cascaded controller to maintain balance. 
 
-* **Polling** 
-  *  Blocks on waiting for byte Received, byte Transmitted & byte Match
-  * ***serialRead()*** ***serialWrite()*** ***serialReadLine()***
-
-* **ISR**      
-  * Reads/Writes data byte by byte into allocated RingBuffer, new data ignored if full  
-  * Must be serviced by main loop fast enough to ensure buffer doesn't fill up.
-  * ***serialSend()*** blocks if buffer full. TX ISR flushes Ringbuffer by the TXE interrupt
-  * ***serialReceive()*** reads n bytes from RX ringbuffer, blocks if empty 
-  * ***serialGrab()*** non-blocking reads n bytes from ringbuffer, if empty returns num bytes read
-
-
-### I2C
- * **Polling** -Reads/Write n bytes from/to address, blocks on waiting for data
-
-
-## Sensor Drivers
-
-* **MPU6050**  
-  * Reads 3-Axis Accel & Gyro Values
-  * Accel & Gyro Offset calibration
-* **IMU**
-  * FIR LowPass Filter
-  * Kalman Filter Pitch Roll Yaw **WIP** 
-   
-
-
-## Communications 
-
-Built on top of the serial driver, 
+More detailed control is available via RPC style Commands (GET/SET/RUN) execute functions via cmd ID lookup. 
+Data Is published over topics at 10Hz.
 
 
 
-## Control Algorithm 
 
+### Cascaded PID Controller
+![Cascaded_Controller](../Docs/Charts/CascadedPID.svg)
 
 

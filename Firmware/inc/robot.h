@@ -2,119 +2,48 @@
 #define ROBOT_H
 
 #include "../common/common.h"
-#include "motor.h"
+
+#include "imu.h"
 #include "pid.h"
+#include "ddmr.h"
 
+// ******* Two Wheel Self-Balancing  Mobile TWSB ********* // 
+//@Brief: Controls TWSB Balance
 
-/*
-Kinematics Controller for TWSB-Robot Model of robot. 
-
-Robot - Differential Driver Mobile Robot 
-    Models and Controls the kinematics of the Robot in the 2D Plane 
-    Each motor has a PD Speed controller, utilizes Quadrupole Encoder Timer
-    
-    The model maps Target Linear & Angular Velocity to Motor Velocities
-    by the transfer function :
-
-    q = [ x_dot y_dot theta_dot ]^T * [wR wR]^T
-
-    wR = wL = V * Ki/(s^2(LaRa) +s(RaJm + BmLa) + KtKe + RaBm)        
-*/  
 
 
 typedef struct Robot{
-    Motor motorL, motorR;
-    Encoder encL, encR;
-    PID pidL;
-    PID pidR;
-
-    const float wheelR; // R
-    const float wheelBase; // 2L
-    
-    // Pose
-    float angularV;
-    float linearV;
-    float posX, posY;
-}Robot; // Deferential Drive Mobile Robot
-
+    MPU6050 mpu6050;
+    IMU imu;
+    CompFilt comp;
+    PID balanceCtrl;
+}Robot; // Deferential Drive Mobile TWSB
 
 static Robot robotInit(void){
-    //@Brief: Initializes Peripherals Sensors and Controllers for Low Level Robot Robot
-    //@Description: Sets Up Low Level Differential Drive Robot Model with constant speed motors  
-    //Constant speed required by kinematics model implemented with PI Controller though Fixed Time Task
-    
-    Robot ddmr = {
-        .wheelBase = WHEEL_BASE, 
-        .wheelR = WHEEL_RADIUS,        
-        .encL = encoderHWInit(ENC_L_TIM, UINT16_MAX, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT, ENC_L_AF),
-        .motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT),
-        .pidL = pidInit(-VBAT_MAX, VBAT_MAX, KP,KI,KD, SPEEDCTRL_PERIOD * MS_TO_S),
-    
-        .encR = encoderHWInit(ENC_R_TIM, UINT16_MAX, ENC_R_A, ENC_R_PORT, ENC_R_B, ENC_R_PORT, ENC_R_AF),
-        .motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT),
-        .pidR = pidInit(-VBAT_MAX, VBAT_MAX, KP,KI,KD, SPEEDCTRL_PERIOD * MS_TO_S)
+    //@Brief: Inittialaiizses controllers for Self Balancing 
+
+    Robot bot = {
+        .mpu6050 =  mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA),
+        .imu =  imuInit(0.5f, 0.01f),
+        .comp = compFiltInit(CTRL_PERIOD * MS_TO_S, 0.05f),
+        .balanceCtrl = pidInit(-VEL_MAX, VEL_MAX, BAL_KP, BAL_KI, BAL_KD, (CTRL_PERIOD * MS_TO_S))
     };
 
-    motorConfig(&ddmr.motorL, VBAT_MAX, 0.0f, true, 1.00f);
-    motorConfig(&ddmr.motorR, VBAT_MAX, 0.0f, false,  1.00f);
-
-    driverEnable(&ddmr.motorL.drv); // enable DRV8833 & pwm
-    driverEnable(&ddmr.motorR.drv); // enable DRV8833 & pwm
-
-    motorStop(&ddmr.motorL);
-    motorStop(&ddmr.motorR);
+    bot.balanceCtrl.target = BAL_THETA;
     
-
-    return ddmr;
+    return bot;
 }
 
-
-static void robotSpeedCtrl(Robot *ddmr){
-    //@Brief: Main Speed Control Process 
-    //@Description: Drives the mobile robot according to 
-
-    // shortens calculations
-    Motor* const mL = &ddmr->motorL;
-    Motor* const mR = &ddmr->motorR;
-    Encoder* const encL = &ddmr->encL;
-    Encoder* const encR = &ddmr->encR;
-    PID* const pidL = &ddmr->pidL;
-    PID* const pidR = &ddmr->pidR; 
-
-    // Get target Wheel Speeds
-    pidL->target = -8.0f; // placeholder
-    pidR->target = -8.0f;
-
-    // Compute Current wheel speed
-    motorCalSpeed(mL, encL);
-    motorCalSpeed(mR, encR);
-
-    // Run PID Algorithm For Both Motors
-    pidRun(&ddmr->pidL, mL->angularSpeed);
-    pidRun(&ddmr->pidR, mR->angularSpeed);
-    // Apply output to Motors
-    motorSetVoltage(mL, ddmr->pidL.out);
-    motorSetVoltage(mR, ddmr->pidR.out);
-}
-
-static void robotDiffDrive(Robot* ddmr, const float linVel, const float angVel){
-    //@Brief: Drive Mobile robot in Differential Drive Configuration
-    //@Description: Computes Inverse Kinematics of Robot Model, Applies Speed Ramp via RingBuffer
-
-    float wLTarget = linVel + (angVel * ddmr->wheelBase); // left wheel angular speed rad/s
-    float wRTarget = linVel - (angVel * ddmr->wheelBase); // right wheel angular speed rad/s
-}
+static inline void robotSetTheta(Robot *bot, float angle){bot->balanceCtrl.target = angle;}
 
 
-static void robotTankDrive(Robot* ddmr, const float velL, const float velR){
-    //@Brief: Drive Mobile Robot in Tank Drive Configuration
-    //@Description: Sets Motor Voltage independently.
-    //@Param: velL is a % 0-1
+static void robotCalTheta(Robot *bot){
+    //@Brief: Calculate Robots Pitch Angle
 
-    float vL = velL * VBAT_MAX; // convert % to voltage
-    float vR = velR * VBAT_MAX;
-    motorSetVoltage(&ddmr->motorL, vL); // apply voltage
-    motorSetVoltage(&ddmr->motorR, vR); 
+    mpu6050Read(&bot->mpu6050);
+    // apply digital LPF to raw measurements
+    imuLPF(&bot->imu, &bot->mpu6050.accel, &bot->mpu6050.gyro);
+    compFilter(&bot->comp, &bot->imu); // sensor fuction euler angles
 }
 
 #endif // ROBOT_H

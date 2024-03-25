@@ -3,8 +3,7 @@
 
 
 #include "../common/common.h"
-#include "../drivers/i2c.h"
-#include "../drivers/serial.h"
+#include "i2c.h"
 #include <math.h>
 
 // MPU6050 Config Registers
@@ -26,16 +25,16 @@
 
 // MPU6050 Functions
 
-typedef struct Calib{
+typedef struct IMUCalib{
     vector_t accel;
     vector_t gyro;
-}Calib;
+}IMUCalib;
 
 typedef struct MPU6050{
     uint32_t i2c; //STM32 I2C Device handler
     bool initalized;
     uint8_t data; // read data byte
-    Calib offset; // Calibration offset
+    IMUCalib offset; // Calibration offset
     vector_t accel; //xyz
     vector_t gyro; // xyz
     float pitch, roll;
