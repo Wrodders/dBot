@@ -29,9 +29,9 @@
 #define LED_PIN			GPIO13
 // Debug UART 
 #define DEBUG_USART		USART1
-#define DEBUG_PORT		GPIOB
-#define DEBUG_RX		GPIO7 
-#define DEBUG_TX		GPIO6
+#define DEBUG_PORT		GPIOA
+#define DEBUG_RX		GPIO10 
+#define DEBUG_TX		GPIO9
 // Bluetooth UART
 #define BT_USART		USART2
 #define BT_PORT			GPIOA
@@ -62,11 +62,11 @@
 #define ENC_L_A         GPIO4   // TIM3 CH1
 #define ENC_L_B         GPIO5   // TIM3 CH2
 
-#define ENC_R_TIM       TIM1
-#define ENC_R_AF        GPIO_AF1
-#define ENC_R_PORT      GPIOA
-#define ENC_R_A         GPIO8   // TIM1 CH1
-#define ENC_R_B         GPIO9   // TIM1 CH2
+#define ENC_R_TIM       TIM4
+#define ENC_R_AF        GPIO_AF2
+#define ENC_R_PORT      GPIOB
+#define ENC_R_A         GPIO6   // TIM4 CH1
+#define ENC_R_B         GPIO7   // TIM4 CH2
 
 
 // ************* Task Execution Periods ******************** // 
