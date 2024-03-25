@@ -35,7 +35,4 @@ static Robot robotInit(void){
 static inline void robotTrgtLinVel(Robot *bot, float linVel){bot->motionCtrl.target = linVel;}
 static inline void robotTrgtAngVel(Robot *bot, float angVel){bot->trgtAngVel = angVel;}
 
-
-
-
 #endif // ROBOT_H

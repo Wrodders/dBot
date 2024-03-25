@@ -13,14 +13,12 @@
 /*
     Models and Controls the kinematics of the TWSB Robot in the 2D Plane 
     Provides a DDMR Controllable Robot via cascaded PID 
-
     Forward Kinematics:
     Va = R * (wR + wL) / 2
     Wa = 2R * (wR - wL) / L
-
     Inverse Kinematics: 
-    wR = Va - (Wa * L 
-    wL = Va + Wa * L)
+    wR = (Va - Wa) * L
+    wL = (Va + Wa) * L
 */
 typedef struct State{
     float angularV;
@@ -52,8 +50,6 @@ static DDMR ddmrInit(void){
             
         .encR = encoderInit(ENC_R_TIM, UINT16_MAX, ENC_R_A, ENC_R_PORT, ENC_R_B, ENC_R_PORT, ENC_R_AF),
         .motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT),
-        
-
         };
 
     motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 0.3f, true, BETA_SPEED);
@@ -65,7 +61,6 @@ static DDMR ddmrInit(void){
     motorStop(&ddmr.motorL);
     motorStop(&ddmr.motorR);
     
-
     return ddmr;
 }
 
@@ -88,6 +83,5 @@ static void ddmrTankDrive(DDMR* ddmr, const float pwrL, const float pwrR){
     motorSetSpeed(&ddmr->motorL, vL);
     motorSetSpeed(&ddmr->motorR, vR);
 }
-
 
 #endif // DDMR_H

@@ -6,9 +6,6 @@ DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
 NOTE: TIMER PERIF RCC Must be initialized previously. 
 Motors Bind To Encoders. 
 All velocities are relative to the motors frame. 
-
-
-
 DC Motor Transfer Function
 wR = wL = V * Kt / (s^2(LaJm) + s(RaJm + BmLa) + KtKe + RaBm)    
 
@@ -73,7 +70,6 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
 
 static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMin,
                         const bool flipDir, float beta){
-    
     //@Brief: Configs Motor parameters
     m->enc = enc;
     m->drv.vPSU = vPSU;
@@ -81,8 +77,6 @@ static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMi
     m->flipDir = flipDir;
     m->beta = beta;
 }
-
-
 
 static void motorDrvEn(Motor *motor){
     //@Brief: Starts Motor Driver PWM
@@ -141,7 +135,6 @@ static void motorCalSpeed(Motor* motor){
     float mSpeed = dCount * TICKS_TO_RPS; // rotations per second
     // Apply Low pass filter to speed measurement (1 - b)speed[n] + b*speed[n-1] 
     motor->angularVel = (motor->beta * mSpeed) + (1.00f - motor->beta) * motor->angularVel;
-    
 }
 
 
