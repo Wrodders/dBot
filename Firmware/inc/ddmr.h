@@ -28,7 +28,6 @@ typedef struct State{
     float posX, posY;
 }State;
 
-
 typedef struct DDMR{
     Motor motorL, motorR;
     Encoder encL, encR;
@@ -39,15 +38,12 @@ typedef struct DDMR{
     State state;
 }DDMR; // Deferential Drive Mobile Robot
 
-
-
-
 static DDMR ddmrInit(void){
     //@Brief: Initializes Peripherals Sensors and Controllers for Low Level Robot Robot
     //@Description: Sets Up Low Level Differential Drive Robot Model with constant speed motors  
     //Constant speed required by kinematics model implemented with PI Controller though Fixed Time Task
     
-    DDMR dBot = {
+    DDMR ddmr = {
         .wheelBase = WHEEL_BASE, 
         .wheelR = WHEEL_RADIUS,        
 
@@ -60,59 +56,37 @@ static DDMR ddmrInit(void){
 
         };
 
-    motorConfig(&dBot.motorL, &dBot.encL, VBAT_MAX, 0.3f, true, BETA_SPEED);
-    motorConfig(&dBot.motorR, &dBot.encR, VBAT_MAX, 0.3f, false,  BETA_SPEED);
+    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 0.3f, true, BETA_SPEED);
+    motorConfig(&ddmr.motorR, &ddmr.encR, VBAT_MAX, 0.3f, false,  BETA_SPEED);
 
-    motorDrvEn(&dBot.motorL); // enable DRV8833 & pwm
-    motorDrvEn(&dBot.motorR); // enable DRV8833 & pwm
+    motorDrvEn(&ddmr.motorL); // enable DRV8833 & pwm
+    motorDrvEn(&ddmr.motorR); // enable DRV8833 & pwm
 
-    motorStop(&dBot.motorL);
-    motorStop(&dBot.motorR);
+    motorStop(&ddmr.motorL);
+    motorStop(&ddmr.motorR);
     
 
-    return dBot;
+    return ddmr;
 }
 
-
-static void ddmrOdometry(DDMR *dBot){
-    //@Brief: Calculate Mobile Robots Kinematic State
-    //@Description: xdot = linVel * cos(theta)
-    //              ydot = linVel * sin(theta)
-    //              thetadot = angVel
-    // Integrating these values we can obtain the Mobile Robots Pose q = [x y theta]^T
-    // Assuming the constant acceleration.
-
-    //  [linV angV]^T =  R/2 * [1 1; 1/L -1/L]^T * [wR wL]^T
-    //  x(t) = (vR + vL)/(vR -vL) * w/2 * sin(t*(vR - VL)/w)
-    //  y(t) = (vR + vL)/(vR -vL) * w/2 * cos(t*(vR - VL)/w) + (vR + vL)/(vR - vL) * w/2
-
-    dBot->state.linearV = (dBot->wheelR / 2) * (dBot->motorL.angularVel + dBot->motorR.angularVel);
-    dBot->state.angularV = (dBot->wheelR / (2* dBot->wheelBase)) * (dBot->motorL.angularVel - dBot->motorR.angularVel);
-
-  
-
-}
-
-static void ddmrDrive(DDMR* dBot, const float linVel, const float angVel){
+static void ddmrDrive(DDMR* ddmr, const float linVel, const float angVel){
     //@Brief: Drive Mobile robot in Differential Drive Configuration
     //@Description: Computes Inverse Kinematics of Robot Model.
-    //              
 
-    float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * dBot->wheelBase); // left wheel angular speed rad/s
-    float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * dBot->wheelBase); // right wheel angular speed rad/s
-    motorSetSpeed(&dBot->motorL,wLTarget);
-    motorSetSpeed(&dBot->motorR,wRTarget);
+    float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * ddmr->wheelBase); // left wheel angular speed rad/s
+    float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * ddmr->wheelBase); // right wheel angular speed rad/s
+    motorSetSpeed(&ddmr->motorL,wLTarget);
+    motorSetSpeed(&ddmr->motorR,wRTarget);
 }
 
-
-static void ddmrTankDrive(DDMR* dBot, const float pwrL, const float pwrR){
+static void ddmrTankDrive(DDMR* ddmr, const float pwrL, const float pwrR){
     //@Brief: Drive Mobile Robot in Tank Drive Configuration
     //@Description: Wheel Power Sets Motor Voltage Independently 
 
     float vL = _clamp(pwrL, -1, 1) * VBAT_MAX; // convert % to voltage
     float vR = _clamp(pwrR, -1, 1) * VBAT_MAX;
-    motorSetSpeed(&dBot->motorL, vL);
-    motorSetSpeed(&dBot->motorR, vR);
+    motorSetSpeed(&ddmr->motorL, vL);
+    motorSetSpeed(&ddmr->motorR, vR);
 }
 
 
