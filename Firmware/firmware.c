@@ -88,13 +88,17 @@ int main(void){
             //@Description: Drives the mobile robot according to 
             
             // Body Speed Controller
-
+            
            // Balance 
             robotCalTheta(&bot);
-            float mTheta = bot.imu.roll; // measured theta
-            pidRun(&bot.balanceCtrl, mTheta); // apply pid
+            float mTheta = _round(bot.imu.roll, 3); // measured theta
+            if(_fabs(mTheta) > 1.3f){
+                ddmrDrive(&ddmr, 0, 0);
+            }else{
+                pidRun(&bot.balanceCtrl, mTheta); // apply pid
+                ddmrDrive(&ddmr, bot.balanceCtrl.out, 0);
+            }
             // Compute Wheel Speeds 
-            ddmrDrive(&ddmr, bot.balanceCtrl.out, 0);
             motorSpeedCtrl(&ddmr.motorL);
             motorSpeedCtrl(&ddmr.motorR);
             ctrlTask.lastTick = loopTick;

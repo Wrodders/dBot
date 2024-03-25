@@ -71,7 +71,7 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define CTRL_PERIOD         20  // 100Hz
+#define CTRL_PERIOD         10  // 100Hz
 #define BLINK_PERIOD        500 // 2Hz
 
 
@@ -95,8 +95,8 @@ const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (CTRL_PERIOD * MS_TO_S)));
 const float MPS_TO_RPS  = (float)1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 
-#define RPS_MAX         10.00f  // rps
-#define VEL_MAX         RPS_MAX * RPS_TO_MPS /2
+#define RPS_MAX         8.00f  // rps
+#define VEL_MAX         RPS_MAX * RPS_TO_MPS
 
 // Speed Control Parameters
 #define SPEED_KP  6.0f
@@ -104,12 +104,12 @@ const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 #define SPEED_KD  0.0f
 #define BETA_SPEED 0.9f
 
-// Balance Controll Paramters
+// Balance Control Parameters
 #define BAL_THETA   0.0f
-#define BAL_KP      1.0f
-#define BAL_KI      0.0f
-#define BAL_KD      0.0f
-// Motion Controll Paramteres
+#define BAL_KP      0.85f
+#define BAL_KI      3.0f
+#define BAL_KD      0.00007f
+// Motion Control Parameters
 #define VEL_KP      0.0f
 #define VEL_KI      0.0f
 #define VEL_KD      0.0f
