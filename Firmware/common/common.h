@@ -71,8 +71,9 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define CTRL_PERIOD         10  // 100Hz
-#define BLINK_PERIOD        500// 2Hz
+#define CTRL_PERIOD         20  // 100Hz
+#define BLINK_PERIOD        500 // 2Hz
+
 
 
 // *********** GLOBAL CONSTANTS *************************** //
@@ -105,19 +106,13 @@ const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 
 // Balance Controll Paramters
 #define BAL_THETA   0.0f
-#define BAL_KP      2.0f
+#define BAL_KP      1.0f
 #define BAL_KI      0.0f
 #define BAL_KD      0.0f
-
-// CHIRP Test Parameters
-#define CHIRP_BUF_SIZE  100 // Adjust array size as needed
-#define MIN_FREQUENCY   0.1f    // Minimum frequency in Hz
-#define MAX_FREQUENCY   1.0f  // Maximum frequency in Hz
-#define CHIRP_PERIOD_S  5
-#define CHIRP_M         5.0f
-#define CHIRP_W1        0.0f
-#define CHIRP_W2        -7.0f
-
+// Motion Controll Paramteres
+#define VEL_KP      0.0f
+#define VEL_KI      0.0f
+#define VEL_KD      0.0f
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
 

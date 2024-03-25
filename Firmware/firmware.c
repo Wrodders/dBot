@@ -53,15 +53,14 @@ int main(void){
     comsSendMsg(&coms, &ser1, PUB_INFO, "Hello PC");
 
     //***** Two Wheel Self Balancing Robot ************* //
-    DDMR dBot = ddmrInit();
-    Robot bBot = robotInit();
-    robotSetTheta(&bBot, BAL_THETA);
-    
-    delay(1000);   
+    DDMR ddmr = ddmrInit();
+    Robot bot = robotInit();    
+    delay(200);   
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
     FixedTimeTask comsTask = createTask(COMS_PERIOD); // PUB SUB RPC
-    FixedTimeTask speedCtrlTask = createTask(CTRL_PERIOD); // Motor PI Loop
+    FixedTimeTask ctrlTask = createTask(CTRL_PERIOD); // Motor PI Loop
+
 
     // ****** Loop Parameters ******* // 
     // Define loop global variables
@@ -78,26 +77,27 @@ int main(void){
             blinkTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
-            comsSendMsg(&coms, &ser1, PUB_ODOM, dBot.motorL.angularVel,dBot.motorR.angularVel,
-                                                dBot.motorL.pi.target, dBot.motorR.pi.target,
-                                                bBot.balancer.out);
-            comsSendMsg(&coms, &ser1, PUB_IMU,bBot.imu.pitch, bBot.imu.roll);
+            comsSendMsg(&coms, &ser1, PUB_ODOM, ddmr.motorL.angularVel, ddmr.motorR.angularVel,
+                                                ddmr.motorL.pi.target, ddmr.motorR.pi.target,
+                                                bot.balanceCtrl.out);
+            comsSendMsg(&coms, &ser1, PUB_IMU,bot.imu.pitch, bot.imu.roll);
             comsTask.lastTick = loopTick;
         }
-        if(CHECK_PERIOD(speedCtrlTask, loopTick)){
+        if(CHECK_PERIOD(ctrlTask, loopTick)){
             //@Brief: DC Motor Speed Control Process 
             //@Description: Drives the mobile robot according to 
             
             // Body Speed Controller
 
-            // Balance 
-            robotBalancer(&bBot);
-
+           // Balance 
+            robotCalTheta(&bot);
+            float mTheta = bot.imu.roll; // measured theta
+            pidRun(&bot.balanceCtrl, mTheta); // apply pid
             // Compute Wheel Speeds 
-            ddmrDrive(&dBot, bBot.target.linearV, bBot.target.angularV);
-            motorSpeedCtrl(&dBot.motorL);
-            motorSpeedCtrl(&dBot.motorR);
-            speedCtrlTask.lastTick = loopTick;
+            ddmrDrive(&ddmr, bot.balanceCtrl.out, 0);
+            motorSpeedCtrl(&ddmr.motorL);
+            motorSpeedCtrl(&ddmr.motorR);
+            ctrlTask.lastTick = loopTick;
         }
 
     }
