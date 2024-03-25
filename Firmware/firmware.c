@@ -81,6 +81,7 @@ int main(void){
                                                 ddmr.motorL.pi.target, ddmr.motorR.pi.target,
                                                 bot.balanceCtrl.out);
             comsSendMsg(&coms, &ser1, PUB_IMU,bot.imu.pitch, bot.imu.roll);
+            comsSendMsg(&coms, &ser1, PUB_INFO,"hello");
             comsTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(ctrlTask, loopTick)){
