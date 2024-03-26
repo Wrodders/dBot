@@ -36,7 +36,7 @@ typedef struct Motor {
     Encoder *enc;
     PID pi;
     float angularVel; // angular speed rad/s
-    float beta; // speed lowpass filter parameter
+    float alpha; // speed lowpass filter parameter
 }Motor;
 
 static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort, 
@@ -69,13 +69,13 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
 }
 
 static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMin,
-                        const bool flipDir, float beta){
+                        const bool flipDir, float alpha){
     //@Brief: Configs Motor parameters
     m->enc = enc;
     m->drv.vPSU = vPSU;
     m->drv.vMin = vMin; 
     m->flipDir = flipDir;
-    m->beta = beta;
+    m->alpha = alpha;
 }
 
 static void motorDrvEn(Motor *motor){
@@ -134,12 +134,12 @@ static void motorCalSpeed(Motor* motor){
     motor->enc->lastCount = mCount;
     float mSpeed = dCount * TICKS_TO_RPS; // rotations per second
     // Apply Low pass filter to speed measurement (1 - b)speed[n] + b*speed[n-1] 
-    motor->angularVel = (motor->beta * mSpeed) + (1.00f - motor->beta) * motor->angularVel;
+    motor->angularVel = (motor->alpha * mSpeed) + (1.00f - motor->alpha) * motor->angularVel;
 }
 
 
 static void motorSpeedCtrl(Motor* motor){
-    //@Brief: Regulates Estimated Speed to target speed
+    //@Brief: Regulates Estimated Speed to ref speed
     motorCalSpeed(motor);
     pidRun(&motor->pi, motor->angularVel);
     motorSetVoltage(motor, motor->pi.out);
@@ -150,6 +150,6 @@ static void motorSetSpeed(Motor *motor, const float vel){
     //@Description: Applies Trapezium Ramp to velocities
     //              Ramps at increments of SPEED_CTRL_PERIOD 
     //              Based on max acceleration value
-    motor->pi.target = vel;
+    motor->pi.ref = vel;
 }
 #endif // DCMOTOR_H

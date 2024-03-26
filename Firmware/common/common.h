@@ -110,7 +110,7 @@ const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 #define BAL_KI      0.0f
 #define BAL_KD      0.0f
 // Motion Control Parameters
-#define VEL_KP      0.0f
+#define VEL_KP      1.0f
 #define VEL_KI      0.0f
 #define VEL_KD      0.0f
 // *********** GLOBAL VARIABLES **************************** //

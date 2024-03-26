@@ -6,7 +6,7 @@
 #include "inc/coms.h"
 #include "inc/imu.h"
 #include "inc/ddmr.h"
-#include "inc/robot.h"
+#include "inc/control.h"
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
 #define RB_SIZE 128          // ACCESS THROUGH RING BUFFER 
@@ -46,7 +46,8 @@ int main(void){
     comsSendMsg(&coms, &ser1, PUB_INFO, "Hello PC");
     //***** Two Wheel Self Balancing Robot ************* //
     DDMR ddmr = ddmrInit();
-    Robot bot = robotInit();    
+    IMU imu =  imuInit(0.5f, 0.01f, 0.05f, (CTRL_PERIOD *MS_TO_S));
+    Controller cntrl = cntrlInit();    
     delay(200);   
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
@@ -54,8 +55,6 @@ int main(void){
     FixedTimeTask ctrlTask = createTask(CTRL_PERIOD); // Motor PI Loop
     // ****** Loop Parameters ******* // 
     // Define loop global variables
-    int rampDir = 1;
-    float trgVel = 1;
     uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
@@ -68,9 +67,9 @@ int main(void){
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
             comsSendMsg(&coms, &ser1, PUB_ODOM, ddmr.motorL.angularVel, ddmr.motorR.angularVel,
-                                                ddmr.motorL.pi.target, ddmr.motorR.pi.target,
-                                                bot.balanceCtrl.out);
-            comsSendMsg(&coms, &ser1, PUB_IMU,bot.imu.pitch, bot.imu.roll);
+                                                ddmr.motorL.pi.ref, ddmr.motorR.pi.ref,
+                                                cntrl.balanceCtrl.out);
+            comsSendMsg(&coms, &ser1, PUB_IMU,imu.pitch, imu.roll);
             comsTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(ctrlTask, loopTick)){
@@ -79,21 +78,19 @@ int main(void){
             // trgtVel -> Motion Ctrl -> refAngle -> Balance -> refVel -> DDMR --> refAngVel -> Speed Ctrl
             // trgtAngVel -> DDMR -> refAngVel
             // Body Speed Controller
-            float mSpeed = (ddmr.motorL.angularVel + ddmr.motorR.angularVel) * 0.5f;
-            pidRun(&bot.motionCtrl, mSpeed); // outputs reference angle
-            bot.balanceCtrl.target = bot.motionCtrl.out; // Cascade Motion to Angle Ctrl
+            ddmrFwdK(&ddmr);            
+            pidRun(&cntrl.motionCtrl, ddmr.linVel); // outputs reference angle
+            cntrl.balanceCtrl.ref = cntrl.motionCtrl.out - cntrl.thetaOffset; // Cascade Motion to Angle Ctrl
             // Balance Controller 
-            mpu6050Read(&bot.mpu6050);
-            imuLPF(&bot.imu, &bot.mpu6050.accel, &bot.mpu6050.gyro);
-            compFilter(&bot.comp, &bot.imu); // sensor fuction euler angles
-            float mTheta = _round(bot.imu.roll, 3); // measured theta Quat Error Correction
+            imuFusion(&imu);
+            float mTheta = _round(imu.roll, 3); // measured theta Quat Error Correction
 
             if(_fabs(mTheta) > 1.3f){  // Fail Safe
                 motorSetSpeed(&ddmr.motorL, 0.0f);
                 motorSetSpeed(&ddmr.motorR, 0.0f);
             }else{
-                pidRun(&bot.balanceCtrl, mTheta); // outputs reference linVel
-                ddmrDrive(&ddmr, bot.balanceCtrl.out, bot.trgtAngVel); // Convert linVel to wheel angVel
+                pidRun(&cntrl.balanceCtrl, mTheta); // outputs reference linVel
+                ddmrInvK(&ddmr, cntrl.balanceCtrl.out, cntrl.trgtAngVel); // Convert linVel to wheel angVel
             }
             // Motor Speed PI 
             motorSpeedCtrl(&ddmr.motorL);

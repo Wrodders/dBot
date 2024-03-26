@@ -20,11 +20,7 @@
     wR = (Va - Wa) * L
     wL = (Va + Wa) * L
 */
-typedef struct State{
-    float angularV;
-    float linearV;
-    float posX, posY;
-}State;
+
 
 typedef struct DDMR{
     Motor motorL, motorR;
@@ -33,7 +29,9 @@ typedef struct DDMR{
     const float wheelBase; // L
     
     // kinematic state
-    State state;
+    float linVel;
+    const float aLinVel;  // lpf alpha
+  
 }DDMR; // Deferential Drive Mobile Robot
 
 static DDMR ddmrInit(void){
@@ -63,11 +61,15 @@ static DDMR ddmrInit(void){
     
     return ddmr;
 }
+static void ddmrFwdK(DDMR *ddmr){
+    //@Brief: Compute Kinematic State of Mobile Robot using Odometry
+    float mVel = (ddmr->motorL.angularVel * RPS_TO_MPS + ddmr->motorL.angularVel * RPS_TO_MPS ) * 0.5f; // avgVel
+    ddmr->linVel = (ddmr->aLinVel * ddmr->linVel) + (1.0f - ddmr->aLinVel) * mVel; 
+}
 
-static void ddmrDrive(DDMR* ddmr, const float linVel, const float angVel){
+static void ddmrInvK(DDMR* ddmr, const float linVel, const float angVel){
     //@Brief: Drive Mobile robot in Differential Drive Configuration
-    //@Description: Computes Inverse Kinematics of Robot Model.
-
+    //@Description: Computes Inverse Kinematics of Robot Model. Applies Motor Speeds.
     float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * ddmr->wheelBase); // left wheel angular speed rad/s
     float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * ddmr->wheelBase); // right wheel angular speed rad/s
     motorSetSpeed(&ddmr->motorL,wLTarget);
