@@ -3,85 +3,77 @@
 
 #include "../drivers/MPU6050.h"
 
-#define RAD_TO_DEG 57.295779513082320876798154814105
-
 typedef struct IMU{
+    MPU6050 sensor;
+    // Low Pass IIR Filter 
+    struct{
+        float aAccel;
+        float aGyro;
+        vector_t accel; 
+        vector_t gyro;
+    }lpf;
+    struct{// Complementary Filter
+        const float dt;
+        const float a;
+    }comp;
     // Estimated Euler Angles
     float roll;
     float pitch;
     float yaw;
-
-    // Low Pass IIR Filter 
-    vector_t filtAccel; 
-    vector_t filtGyro;
-    float aAccel; 
-    float aGyro;
 }IMU; 
 
-
-static IMU imuInit(float aAccel, float aGyro){
-    IMU imu = {0};
-    imu.aAccel = aAccel;
-    imu.aGyro = aGyro;
+static IMU imuInit(float aAccel, float aGyro, float compAlpha, float dt){
+    IMU imu = {
+        .sensor = mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA),
+        .lpf = {.aAccel = aAccel, .aGyro = aGyro},
+        .comp = {.a = compAlpha, .dt = dt},      
+    };
     return imu;
 }
 
 static void imuLPF(IMU *imu, vector_t *accel, vector_t *gyro){
     // first order IIR filter
+    imu->lpf.accel.x = (imu->lpf.aAccel * imu->lpf.accel.x) + (1.0f - imu->lpf.aAccel) * accel->x;
+    imu->lpf.accel.y = (imu->lpf.aAccel * imu->lpf.accel.y) + (1.0f - imu->lpf.aAccel) * accel->y;
+    imu->lpf.accel.z = (imu->lpf.aAccel * imu->lpf.accel.z) + (1.0f - imu->lpf.aAccel) * accel->z;
 
-    imu->filtAccel.x = (imu->aAccel * imu->filtAccel.x) + (1.0f - imu->aAccel) * accel->x;
-    imu->filtAccel.y = (imu->aAccel * imu->filtAccel.y) + (1.0f - imu->aAccel) * accel->y;
-    imu->filtAccel.z = (imu->aAccel * imu->filtAccel.z) + (1.0f - imu->aAccel) * accel->z;
-
-    imu->filtGyro.x = (imu->aGyro * imu->filtGyro.x) + (1.0f - imu->aGyro) * gyro->x;
-    imu->filtGyro.y = (imu->aGyro * imu->filtGyro.y) + (1.0f - imu->aGyro) * gyro->y;
-    imu->filtGyro.z = (imu->aGyro * imu->filtGyro.z) + (1.0f - imu->aGyro) * gyro->z;
+    imu->lpf.gyro.x = (imu->lpf.aGyro * imu->lpf.gyro.x) + (1.0f - imu->lpf.aGyro) * gyro->x;
+    imu->lpf.gyro.y = (imu->lpf.aGyro * imu->lpf.gyro.y) + (1.0f - imu->lpf.aGyro) * gyro->y;
+    imu->lpf.gyro.z = (imu->lpf.aGyro * imu->lpf.gyro.z) + (1.0f - imu->lpf.aGyro) * gyro->z;
 }
-
 
 static void imuRawEuler(IMU *imu){
+    //@Brief: Computes Euler from raw accelerometer data
 
     // roll (x-axis rotation)
-    float ax2 = imu->filtAccel.x * imu->filtAccel.x;
-    float ay2 = imu->filtAccel.y * imu->filtAccel.y;
-    float az2 = imu->filtAccel.z * imu->filtAccel.z;
-
-
-    imu->pitch = atanf(imu->filtAccel.y * invSqrt(ax2 + az2));
-    imu->roll = atan(imu->filtAccel.x * invSqrt(ay2 + az2));
+    float ax2 = imu->lpf.accel.x * imu->lpf.accel.x;
+    float ay2 = imu->lpf.accel.y * imu->lpf.accel.y;
+    float az2 = imu->lpf.accel.z * imu->lpf.accel.z;
+    imu->pitch = atanf(imu->lpf.accel.y * invSqrt(ax2 + az2));
+    imu->roll = atan(imu->lpf.accel.x * invSqrt(ay2 + az2));
 }
 
-
-// ********* Complementary Filter ******** // ************************************************// 
-typedef struct CompFilt{
-    float dt; // s
-    float a;
-}CompFilt;
-
-static CompFilt compFiltInit(float dt, float alpha){
-    //@Brief Initializes Complementary filter
-    CompFilt comp = {
-        .a = alpha,
-        .dt = dt
-    };
-    return comp;
-}
-static void compFilter(CompFilt * filt, IMU *imu){
+static void imuCompFilt(IMU *imu){
     //@Brief: Complementary Filter Converts imu data into Euler Angles
-    vector_t *accel = &imu->filtAccel;
-    vector_t *gyro = &imu->filtGyro;
+    vector_t *accel = &imu->lpf.accel;
+    vector_t *gyro = &imu->lpf.accel;
 
     double pitchAcc = atan2(accel->y, sqrt((accel->x * accel->x) + (accel->z * accel->z))); //  angle between horizontal plane and accel vector
     double rollAcc = atan2(-accel->x, accel->z);
     // apply integrator
-    imu->pitch += gyro->x * filt->dt;
-    imu->roll += gyro->y * filt->dt;
-    imu->yaw += gyro->z * filt->dt;
+    imu->pitch += gyro->x * imu->comp.dt;
+    imu->roll += gyro->y * imu->comp.dt;
+    imu->yaw += gyro->z * imu->comp.dt;
     // apply bias
-    imu->pitch = filt->a * imu->pitch + (1 -filt->a) * pitchAcc;
-    imu->roll = filt->a * imu->roll + (1 -filt->a) * rollAcc;
+    imu->pitch = imu->comp.a * imu->pitch + (1 -imu->comp.a) * pitchAcc;
+    imu->roll = imu->comp.a * imu->roll + (1 -imu->comp.a) * rollAcc;
 }
 
-
+static void imuRunFusion(IMU *imu){
+    //@Brief: Run Sensor Fusion Algorithms 6-Axis IMU
+    mpu6050Read(&imu->sensor);
+    imuLPF(imu, &imu->sensor.accel, &imu->sensor.gyro);
+    imuCompFilt(imu); // sensor fuction euler angles
+}
 
 #endif // IMU_H
