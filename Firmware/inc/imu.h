@@ -69,7 +69,7 @@ static void imuCompFilt(IMU *imu){
     imu->roll = imu->comp.a * imu->roll + (1 -imu->comp.a) * rollAcc;
 }
 
-static void imuFusion(IMU *imu){
+static void imuRunFusion(IMU *imu){
     //@Brief: Run Sensor Fusion Algorithms 6-Axis IMU
     mpu6050Read(&imu->sensor);
     imuLPF(imu, &imu->sensor.accel, &imu->sensor.gyro);
