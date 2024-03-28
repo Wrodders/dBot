@@ -17,7 +17,7 @@ Software Prototyped in Python & Bash, ported to C/C++ when mature & performance 
 
 ## Electronics
 
-![pcb3D](./Docs/DesingImgs/pcb3D.png)
+![pcb3D](./Docs/DesingImgs/pcb3d.png)
 ![pcbLayout](./Docs/DesingImgs/pcbLayout.png)
 ![pcbSchematic](./Docs/DesingImgs/pcbSchematic.png)
 
