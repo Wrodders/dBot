@@ -45,10 +45,26 @@ int main(void){
     Coms coms = comsInit(pubMap, cmdMap);
     comsSendMsg(&coms, &ser1, PUB_INFO, "Hello PC");
     //***** Two Wheel Self Balancing Robot ************* //
-    DDMR ddmr = ddmrInit();
-    IMU imu =  imuInit(0.5f, 0.01f, 0.05f, (CTRL_PERIOD *MS_TO_S));
-    Controller cntrl = cntrlInit();    
-    delay(200);   
+
+    Encoder encL = encoderInit(ENC_L_TIM, UINT16_MAX, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT, ENC_L_AF);
+    Motor motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT);
+
+    Encoder encR = encoderInit(ENC_R_TIM, UINT16_MAX, ENC_R_A, ENC_R_PORT, ENC_R_B, ENC_R_PORT, ENC_R_AF);
+    Motor motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT);
+    Controller cntrl;
+    DDMR ddmr;
+    motorConfig(&motorL, &encL, VBAT_MAX, 1.2f, true, SPEED_BETA);
+    motorConfig(&motorR, &encR, VBAT_MAX, 1.1, false, SPEED_BETA);
+    motorDrvEn(&motorL);
+    motorDrvEn(&motorR);
+    
+    motorSetVel(&motorL, -0.5f);
+    motorSetVel(&motorR, 0.5f);
+
+
+
+
+
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
     FixedTimeTask comsTask = createTask(COMS_PERIOD); // PUB SUB RPC
@@ -66,10 +82,10 @@ int main(void){
             blinkTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
-            comsSendMsg(&coms, &ser1, PUB_ODOM, ddmr.motorL.angularVel, ddmr.motorR.angularVel,
-                                                ddmr.motorL.pi.ref, ddmr.motorR.pi.ref,
-                                                cntrl.balanceCtrl.out);
-            comsSendMsg(&coms, &ser1, PUB_IMU,imu.pitch, imu.roll);
+            comsSendMsg(&coms, &ser1, PUB_ODOM, motorL.angularVel, motorR.angularVel,
+                                                motorL.pi.ref, motorR.pi.ref,
+                                                motorL.pi.out);
+            //comsSendMsg(&coms, &ser1, PUB_IMU,imu.pitch, imu.roll);
             comsTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(ctrlTask, loopTick)){
@@ -77,24 +93,12 @@ int main(void){
             //@Description: Drives the mobile robot according to 
             // trgtVel -> Motion Ctrl -> refAngle -> Balance -> refVel -> DDMR --> refAngVel -> Speed Ctrl
             // trgtAngVel -> DDMR -> refAngVel
-            // Body Speed Controller
-            ddmrFwdK(&ddmr);            
-            pidRun(&cntrl.motionCtrl, ddmr.linVel); // outputs reference angle
-            cntrl.balanceCtrl.ref = cntrl.motionCtrl.out - cntrl.thetaOffset; // Cascade Motion to Angle Ctrl
-            // Balance Controller 
-            imuFusion(&imu);
-            float mTheta = _round(imu.roll, 3); // measured theta Quat Error Correction
 
-            if(_fabs(mTheta) > 1.3f){  // Fail Safe
-                motorSetSpeed(&ddmr.motorL, 0.0f);
-                motorSetSpeed(&ddmr.motorR, 0.0f);
-            }else{
-                pidRun(&cntrl.balanceCtrl, mTheta); // outputs reference linVel
-                ddmrInvK(&ddmr, cntrl.balanceCtrl.out, cntrl.trgtAngVel); // Convert linVel to wheel angVel
-            }
+
+
             // Motor Speed PI 
-            motorSpeedCtrl(&ddmr.motorL);
-            motorSpeedCtrl(&ddmr.motorR);
+            motorSpeedCtrl(&motorL);
+            motorSpeedCtrl(&motorR);
             ctrlTask.lastTick = loopTick;
         }
     }

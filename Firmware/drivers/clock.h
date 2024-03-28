@@ -38,12 +38,12 @@ static void clock_setup(void){
 	rcc_periph_clock_enable(RCC_GPIOC);
 
 	rcc_periph_clock_enable(RCC_USART1);
-    rcc_periph_clock_enable(RCC_USART2);
+
 
 	rcc_periph_clock_enable(RCC_I2C1); // MPU6050
     rcc_periph_clock_enable(RCC_TIM2); // Motor PWM
     rcc_periph_clock_enable(RCC_TIM3); // Encoder L Quaducore Input capture
-    rcc_periph_clock_enable(RCC_TIM1); // Encoder R Quaducore Mode
+    rcc_periph_clock_enable(RCC_TIM4); // Encoder R Quaducore Mode
 }
 
 #endif // SYSTICK_H

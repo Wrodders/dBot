@@ -50,14 +50,16 @@ static DDMR ddmrInit(void){
         .motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT),
         };
 
-    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 0.3f, true, BETA_SPEED);
-    motorConfig(&ddmr.motorR, &ddmr.encR, VBAT_MAX, 0.3f, false,  BETA_SPEED);
+    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 0.3f, true, SPEED_BETA);
+    motorConfig(&ddmr.motorR, &ddmr.encR, VBAT_MAX, 0.3f, false,  SPEED_BETA);
 
-    motorDrvEn(&ddmr.motorL); // enable DRV8833 & pwm
-    motorDrvEn(&ddmr.motorR); // enable DRV8833 & pwm
+    //motorSetVel(&ddmr.motorL, 0.0f);
+    //motorSetVel(&ddmr.motorR, 0.0f);
 
-    motorStop(&ddmr.motorL);
-    motorStop(&ddmr.motorR);
+    //motorDrvEn(&ddmr.motorL); // enable DRV8833 & pwm
+    //motorDrvEn(&ddmr.motorR); // enable DRV8833 & pwm
+
+    
     
     return ddmr;
 }
@@ -72,8 +74,8 @@ static void ddmrInvK(DDMR* ddmr, const float linVel, const float angVel){
     //@Description: Computes Inverse Kinematics of Robot Model. Applies Motor Speeds.
     float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * ddmr->wheelBase); // left wheel angular speed rad/s
     float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * ddmr->wheelBase); // right wheel angular speed rad/s
-    motorSetSpeed(&ddmr->motorL,wLTarget);
-    motorSetSpeed(&ddmr->motorR,wRTarget);
+    motorSetVel(&ddmr->motorL,wLTarget);
+    motorSetVel(&ddmr->motorR,wRTarget);
 }
 
 static void ddmrTankDrive(DDMR* ddmr, const float pwrL, const float pwrR){
@@ -82,8 +84,8 @@ static void ddmrTankDrive(DDMR* ddmr, const float pwrL, const float pwrR){
 
     float vL = _clamp(pwrL, -1, 1) * VBAT_MAX; // convert % to voltage
     float vR = _clamp(pwrR, -1, 1) * VBAT_MAX;
-    motorSetSpeed(&ddmr->motorL, vL);
-    motorSetSpeed(&ddmr->motorR, vR);
+    motorSetVel(&ddmr->motorL, vL);
+    motorSetVel(&ddmr->motorR, vR);
 }
 
 #endif // DDMR_H

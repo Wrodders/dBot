@@ -22,7 +22,6 @@
 // ******************** MACROS **************************** //
 #define ARR_SIZE(arr) (size_t)(sizeof(arr) / sizeof((arr)[0]))
 
-
 // **************** PIN DEFINITIONS ********************** //
 // Debug Led
 #define LED_PORT 		GPIOC
@@ -44,7 +43,7 @@
 #define IMU_SCL			GPIO8
 // DRV8833 2-CH PWM DC Motor Driver 
 #define M_L_TIM 	    TIM2    // Left Motor PWM Timer 
-#define M_L_PORT	    GPIOA   // Left Motor PWM Port
+#define M_L_PORT	    GPIOA   // Left M otor PWM Port
 #define M_L_PWMA        GPIO0   // Left Motor PWM CH1 Pin
 #define M_L_PWMB	    GPIO1   // Left Motor PWM CH2 Pin
 
@@ -68,41 +67,36 @@
 #define ENC_R_A         GPIO6   // TIM4 CH1
 #define ENC_R_B         GPIO7   // TIM4 CH2
 
-
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
 #define CTRL_PERIOD         10  // 100Hz
 #define BLINK_PERIOD        500 // 2Hz
-
-
-
 // *********** GLOBAL CONSTANTS *************************** //
-#define M_PI 3.14159265358979323846f
+#define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
 #define EDGE_NUM            4.00f
 
 #define WHEEL_BASE          0.07f   // m
 #define WHEEL_RADIUS        0.035f  // m
-#define VBAT_MAX            10.00f   // 2*4.2V
+#define VBAT_MAX            8.40f   // 
 #define BAT_CAPACITY        2300    // mAh
 
-const float MOTOR_CPR = ENC_CPR * GEAR_RATIO * EDGE_NUM;
-const float MS_TO_S = 0.001f;
-const float S_TO_MS = 1000;
-const float TO_INVERSE = 0.1f;
-const float TICKS_TO_RPS  = (float)(1/(MOTOR_CPR * (CTRL_PERIOD * MS_TO_S)));
-const float MPS_TO_RPS  = (float)1/(WHEEL_RADIUS*2*M_PI);
-const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
-
-#define RPS_MAX         8.00f  // rps
-#define VEL_MAX         RPS_MAX * RPS_TO_MPS
+const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
+const float MS_TO_S         = 0.001f;
+const float S_TO_MS         = 1000;
+const float TO_INVERSE      = 0.1f;
+const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (CTRL_PERIOD * MS_TO_S)));
+const float MPS_TO_RPS      = (float)1/(WHEEL_RADIUS*2*M_PI);
+const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
+const float RPS_MAX         = 8.00f;  // rps
+const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
 
 // Speed Control Parameters
-#define SPEED_KP  6.0f
-#define SPEED_KI  20.0f
-#define SPEED_KD  0.0f
-#define BETA_SPEED 0.9f
+#define SPEED_KP    6.0f
+#define SPEED_KI    20.0f
+#define SPEED_KD    0.0f
+#define SPEED_BETA  0.9f
 
 // Balance Control Parameters
 #define BAL_THETA   0.0f
@@ -115,7 +109,6 @@ const float RPS_TO_MPS  = (float) 2*M_PI*WHEEL_RADIUS;
 #define VEL_KD      0.0f
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
-
 
 #endif // COMMON_h
 
