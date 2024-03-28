@@ -50,7 +50,7 @@ static DDMR ddmrInit(void){
         .motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT),
         };
 
-    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 1.2f, true, SPEED_BETA);
+    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 1.0f, true, SPEED_BETA);
     motorConfig(&ddmr.motorR, &ddmr.encR, VBAT_MAX, 1.1f, false,  SPEED_BETA);
 
     motorSetVel(&ddmr.motorL, 0.0f);
