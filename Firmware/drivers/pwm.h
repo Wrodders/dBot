@@ -4,7 +4,6 @@
 #include "../common/common.h"
 #include <libopencm3/stm32/timer.h>
 
-
 static void pwmInit(uint32_t timPerif, uint16_t prescaler, uint32_t freq){
     //@Brief: Initializes a Timer peripheral for PWM mode
     timer_set_mode(timPerif,TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,TIM_CR1_DIR_UP);

@@ -6,9 +6,6 @@ DC MOTOR Configures and uses PWM Timers for DC Motor Voltage Control
 NOTE: TIMER PERIF RCC Must be initialized previously. 
 Motors Bind To Encoders. 
 All velocities are relative to the motors frame. 
-
-
-
 DC Motor Transfer Function
 wR = wL = V * Kt / (s^2(LaJm) + s(RaJm + BmLa) + KtKe + RaBm)    
 
@@ -34,12 +31,12 @@ typedef struct Driver{
 
 typedef struct Motor {
     Driver drv;
-    bool flipDir;
+    int flipDir; // 1  or -1
 
     Encoder *enc;
     PID pi;
     float angularVel; // angular speed rad/s
-    float beta; // speed lowpass filter parameter
+    float alpha; // speed lowpass filter parameter
 }Motor;
 
 static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort, 
@@ -72,26 +69,23 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
 }
 
 static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMin,
-                        const bool flipDir, float beta){
-    
+                        const int flipDir, float alpha){
     //@Brief: Configs Motor parameters
     m->enc = enc;
     m->drv.vPSU = vPSU;
     m->drv.vMin = vMin; 
-    m->flipDir = flipDir;
-    m->beta = beta;
+    m->flipDir = flipDir == false ? 1 : -1;
+    m->alpha = alpha;
 }
-
-
 
 static void motorDrvEn(Motor *motor){
     //@Brief: Starts Motor Driver PWM
     gpio_set(motor->drv.en.port, motor->drv.en.pin); // enable driver
 }
 
-static void motorSetUnipolar(const Motor* motor, const float duty, const bool dir){
+static void motorSetUnipolar(const Motor* motor, const float duty, const int dir){
     //@Brief: Sets the pwm on a Unipolar DC H bridge:
-   
+    
     if(dir == motor->flipDir){
         // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
         // DRIVE BACKWARDS
@@ -110,12 +104,12 @@ static void motorSetVoltage(const Motor* motor, const float voltage){
     //@Brief: Sets PWM Duty Cycle as voltage vector
     //@Description: Forwards == +ve => dir 1
     //              Backwards == -ve => dir 0
-    bool dir;
+    int dir;
     float v = voltage;
     float vAbs =  _fabs(v);
     if(vAbs < motor->drv.vMin){v = motor->drv.vMin;} // limit minium voltage
-    if(v >= 0.0f){ dir = 1;}
-    else{dir = 0;}
+    if(v >= 0.0f){ dir = 1;} // determine direction 
+    else{dir = -1;}
     float dc = _clamp(vAbs/motor->drv.vPSU, 0, 1); // convert to % of battery
     motorSetUnipolar(motor, dc, dir); // apply to unipolar H bridge
 }
@@ -138,25 +132,24 @@ static void motorCalSpeed(Motor* motor){
     uint16_t mCount = encoderRead(motor->enc);
     int16_t dCount = mCount - motor->enc->lastCount;
     motor->enc->lastCount = mCount;
-    float mSpeed = dCount * TICKS_TO_RPS; // rotations per second
+    float mSpeed = dCount * TICKS_TO_RPS * motor->flipDir ; // rotations per second
     // Apply Low pass filter to speed measurement (1 - b)speed[n] + b*speed[n-1] 
-    motor->angularVel = (motor->beta * mSpeed) + (1.00f - motor->beta) * motor->angularVel;
-    
+    motor->angularVel = (motor->alpha * mSpeed) + (1.00f - motor->alpha) * motor->angularVel;
 }
 
 
 static void motorSpeedCtrl(Motor* motor){
-    //@Brief: Regulates Estimated Speed to target speed
+    //@Brief: Regulates Estimated Speed to ref speed
     motorCalSpeed(motor);
     pidRun(&motor->pi, motor->angularVel);
-    motorSetVoltage(motor, motor->pi.out);
+   motorSetVoltage(motor, motor->pi.out);
 }
 
-static void motorSetSpeed(Motor *motor, const float vel){
+static void motorSetVel(Motor *motor, const float vel){
     //@Brief: Pushes Target speed through speedCurve buffer.
     //@Description: Applies Trapezium Ramp to velocities
     //              Ramps at increments of SPEED_CTRL_PERIOD 
     //              Based on max acceleration value
-    motor->pi.target = vel;
+    motor->pi.ref = vel;
 }
 #endif // DCMOTOR_H
