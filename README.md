@@ -1,31 +1,36 @@
-# dBot
-Robot Platform
+# Two Wheel Self Balancing Mobile Robot
 
-## Docs
-Desing Documnettion
+Self Balancing Robot using STM32 and PiZeroW
 
-## Firmware
-STM32 baremetal firmware for motor driver controler
+Firmware Written using BareMetal Registers, Abstracted by device Peripheral Drivers. 
 
-## Hardware
+Control & Dynamics Modeled in Matlab
 
-CAD & PCB files 
+Software Prototyped in Python & Bash, ported to C/C++ when mature & performance demands. 
 
-## Matlab
+[ComsTerm](https://github.com/Wrodders/ComsTerm) used as engineering UI. 
 
-Simualtion & controll algoroithms development
+## Design
+![botISO](./Docs/DesingImgs/BotISO.png)
+![botFront](./Docs/DesingImgs/BotFront.png)
+![botRight](./Docs/DesingImgs/BotRight.png)
 
-## modules
+## Electronics
 
-common code
+![pcb3D](./Docs/DesingImgs/pcb3D.png)
+![pcbLayout](./Docs/DesingImgs/pcbLayout.png)
+![pcbSchematic](./Docs/DesingImgs/pcbSchematic.png)
 
-## scripts
+## Control
 
-collection of bash.pyhton scritps used in development
 
-## Software
+### Cascaded PID Controller
+![Cascaded_Controller](Docs/Charts/CascadedPID.svg)
 
-Code to be deployed on pi and on Support PC (2 builds)
 
-# Tools
-Matrure(ish) developmetn tools
+
+
+
+
+
+
