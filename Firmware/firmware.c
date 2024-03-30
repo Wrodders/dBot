@@ -89,7 +89,7 @@ int main(void){
             float mSpeed = ddmr.linVel;
             pidRun(&cntrl.motionCtrl, mSpeed);
             float trgtTheta = cntrl.motionCtrl.out;
-            //cntrlTheta(&cntrl, trgtTheta);
+            cntrlTheta(&cntrl, trgtTheta);
         }
         if(CHECK_PERIOD(ctrlTask, loopTick)){
             //@Brief: DC Motor Speed Control Process 
