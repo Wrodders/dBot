@@ -14,6 +14,10 @@ uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
 
 int main(void){
+
+    enum STATE {INIT, PAUSED, RUN} state = INIT;
+
+
 	// ***** HARDWARE SETUP ********** //
 	clock_setup(); // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup(); // 1ms Tick
@@ -56,11 +60,16 @@ int main(void){
     FixedTimeTask comsTask = createTask(COMS_PERIOD); // PUB SUB RPC
     FixedTimeTask ctrlTask = createTask(CTRL_PERIOD); // Motor PI Loop
     FixedTimeTask mCtrlTask = createTask(MCTRL_PERIOD);
+
     // ****** Loop Parameters ******* // 
     // Define loop global variables
     uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
+
+
+
+
         // ********* FIXED TIME TASKS ************ // 
         //@Brief: Uses SysTick to execute periodic tasks
         //@Note: Tasks must be non blocking
@@ -81,15 +90,12 @@ int main(void){
             pidRun(&cntrl.motionCtrl, mSpeed);
             float trgtTheta = cntrl.motionCtrl.out;
             //cntrlTheta(&cntrl, trgtTheta);
-
         }
         if(CHECK_PERIOD(ctrlTask, loopTick)){
             //@Brief: DC Motor Speed Control Process 
             //@Description: Drives the mobile robot according to 
             // trgtVel -> Motion Ctrl -> refAngle -> Balance -> refVel -> DDMR --> refAngVel -> Speed Ctrl
             // trgtAngVel -> DDMR -> refAngVel
-
-
             imuRunFusion(&imu);
             imuKalFilt(&imu);
             float mTheta = imu.kalPitch;

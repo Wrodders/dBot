@@ -81,8 +81,9 @@ static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMi
     m->maxVel = maxVel;
 }
 
-static void motorDrvEn(Motor *motor){
-    //@Brief: Starts Motor Driver PWM
+static void motorEnable(Motor *motor){
+    //@Brief: Starts Motor Driver 
+    pidEnable(&motor->pi);
     gpio_set(motor->drv.en.port, motor->drv.en.pin); // enable driver
 }
 

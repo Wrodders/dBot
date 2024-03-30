@@ -108,9 +108,9 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
 #define BAL_THETA_OFSET   4.0f // deg
 #define BAL_MAX_RECOVERY   15
 #define BAL_CUTOFF         45
-#define BAL_KP      0.17f // 0.1475
-#define BAL_KI      0.00f // 0.085
-#define BAL_KD      0.000000f // 0.00015
+#define BAL_KP      0.20f // 0.1475
+#define BAL_KI      0.0050f // 0.085
+#define BAL_KD      0.0015f // 0.00015
 // Motion Control Parameters
 #define VEL_KP     0.0f // 14
 #define VEL_KI     0.00010000f // 0.0001
