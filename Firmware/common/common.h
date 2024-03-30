@@ -69,15 +69,16 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define CTRL_PERIOD         10  // 100Hz
+#define CTRL_PERIOD         20  // 100Hz
 #define BLINK_PERIOD        500 // 2Hz
+#define MCTRL_PERIOD        20 //
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
 #define EDGE_NUM            4.00f
 
-#define WHEEL_BASE          0.07f   // m
+#define WHEEL_BASE          0.06f   // m
 #define WHEEL_RADIUS        0.035f  // m
 #define VBAT_MAX            8.40f   // 
 #define BAT_CAPACITY        2300    // mAh
@@ -89,24 +90,32 @@ const float TO_INVERSE      = 0.1f;
 const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (CTRL_PERIOD * MS_TO_S)));
 const float MPS_TO_RPS      = (float)1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
-const float RPS_MAX         = 8.00f;  // rps
+const float RAD_TO_DEG      = (float)(180.0f / M_PI);
+const float RPS_MAX         = 4.00f;  // rps
 const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
+
+#define IMU_A_ACCEL 0.5f
+#define IMU_A_GYRO  0.01f
+#define IMU_A_COMP  0.05f
 
 // Speed Control Parameters
 #define SPEED_KP    6.0f
-#define SPEED_KI    20.0f
+#define SPEED_KI    15.0f
 #define SPEED_KD    0.0f
 #define SPEED_BETA  0.9f
 
 // Balance Control Parameters
-#define BAL_THETA   0.0f
-#define BAL_KP      3.0f
-#define BAL_KI      0.0f
-#define BAL_KD      0.0f
+#define BAL_THETA_OFSET   4.0f // deg
+#define BAL_MAX_RECOVERY   15
+#define BAL_CUTOFF         45
+#define BAL_KP      0.17f // 0.1475
+#define BAL_KI      0.00f // 0.085
+#define BAL_KD      0.000000f // 0.00015
 // Motion Control Parameters
-#define VEL_KP      1.0f
-#define VEL_KI      0.0f
-#define VEL_KD      0.0f
+#define VEL_KP     0.0f // 14
+#define VEL_KI     0.00010000f // 0.0001
+#define VEL_KD     000.f // 600
+#define VEL_ALPHA   0.3f
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
 

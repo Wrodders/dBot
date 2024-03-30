@@ -37,6 +37,8 @@ typedef struct Motor {
     PID pi;
     float angularVel; // angular speed rad/s
     float alpha; // speed lowpass filter parameter
+
+    float maxVel;
 }Motor;
 
 static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort, 
@@ -69,13 +71,14 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
 }
 
 static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMin,
-                        const int flipDir, float alpha){
+                        const int flipDir, float alpha, float maxVel){
     //@Brief: Configs Motor parameters
     m->enc = enc;
     m->drv.vPSU = vPSU;
     m->drv.vMin = vMin; 
     m->flipDir = flipDir == false ? 1 : -1;
     m->alpha = alpha;
+    m->maxVel = maxVel;
 }
 
 static void motorDrvEn(Motor *motor){
@@ -150,6 +153,7 @@ static void motorSetVel(Motor *motor, const float vel){
     //@Description: Applies Trapezium Ramp to velocities
     //              Ramps at increments of SPEED_CTRL_PERIOD 
     //              Based on max acceleration value
+    float v = _clamp(vel, -motor->maxVel, motor->maxVel);
     motor->pi.ref = vel;
 }
 #endif // DCMOTOR_H

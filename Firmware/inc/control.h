@@ -21,17 +21,18 @@ static Controller cntrlInit(void){
     //@Brief: Inittialaiizses controllers for Self Balancing 
 
     Controller bot = {
-        .balanceCtrl = pidInit(-VEL_MAX, VEL_MAX, BAL_KP, BAL_KI, BAL_KD, (CTRL_PERIOD * MS_TO_S)),
-        .motionCtrl = pidInit(-VBAT_MAX, VEL_MAX, VEL_KP, VEL_KI, VEL_KD, (CTRL_PERIOD * MS_TO_S)),
+        .balanceCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (CTRL_PERIOD * MS_TO_S)),
+        .motionCtrl = pidInit(-BAL_MAX_RECOVERY, BAL_MAX_RECOVERY, VEL_KP, VEL_KI, VEL_KD, (MCTRL_PERIOD * MS_TO_S)),
         .trgtAngVel = 0.0f,
-        .thetaOffset = BAL_THETA
+        .thetaOffset = BAL_THETA_OFSET
     };
 
     return bot;
 }
 
-static inline void cntrlLinVel(Controller *bot, float linVel){bot->motionCtrl.ref = linVel;}
-static inline void cntrlAngVel(Controller *bot, float angVel){bot->trgtAngVel = angVel;}
+static inline void cntrlTheta(Controller *cntrl, float theta){cntrl->balanceCtrl.ref = theta - cntrl->thetaOffset;}
+static inline void cntrlLinVel(Controller *cntrl, float linVel){cntrl->motionCtrl.ref = linVel;}
+static inline void cntrlAngVel(Controller *cntrl, float angVel){cntrl->trgtAngVel = angVel;}
 
 
 #endif // CONTROL_H

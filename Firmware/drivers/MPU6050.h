@@ -55,7 +55,7 @@ static void mpu6050Config(uint32_t i2c){
     // Set Config Registers for MPU6050
 
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_CONFIG , 0x03); // Enable low pass filter 10Hz
-    i2cWriteReg(i2c, MPU6050_ADDR, SMPLRT_DIV, 0x04); // Set sample rate to 200Hz
+    i2cWriteReg(i2c, MPU6050_ADDR, SMPLRT_DIV, 0x07); // Set sample rate to 1kHz
 
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_GYRO_CONFIG, 0x05); // full scale range +/- 500 deg/s
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_ACCEL_CONFIG, 0x10); // full scale range +/- 8g

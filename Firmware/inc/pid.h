@@ -6,7 +6,7 @@
 typedef struct PID{
     float ref;
     float error;
-    float lastIn;
+    float lastErr;
     float pTerm,iTerm,dTerm; 
     float kp,ki,kd;  // Preset with dt applied
     const float dt;
@@ -35,11 +35,11 @@ static void pidRun(PID* pid, float measurement){
     pid->pTerm = pid->error * pid->kp;
     pid->iTerm += pid->error * pid->ki;
     pid->iTerm = _clamp(pid->iTerm, pid->min, pid->max);
-    pid->dTerm = pid->kd*(measurement - pid->lastIn);
-    pid->lastIn = measurement;
+    pid->dTerm = pid->kd*(pid->error - pid->lastErr);
+    pid->lastErr = pid->error;
 
     // calculate correction signal 
-    pid->out = pid->pTerm + pid->iTerm - pid->dTerm;
+    pid->out = pid->pTerm + pid->iTerm + pid->dTerm;
     pid->out = _clamp(pid->out, pid->min, pid->max);
 }
 
