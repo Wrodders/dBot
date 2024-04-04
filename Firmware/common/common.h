@@ -80,7 +80,7 @@
 #define EDGE_NUM            4.00f
 #define WHEEL_BASE          0.06f   // m
 #define WHEEL_RADIUS        0.035f  // m
-#define VBAT_MAX            5.40f   // 
+#define VBAT_MAX            8.40f   // 
 #define BAT_CAPACITY        2300    // mAh
 
 const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;

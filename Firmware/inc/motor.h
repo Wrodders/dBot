@@ -115,7 +115,7 @@ static void motorSetVoltage(const Motor* motor, const float voltage){
     //              Backwards == -ve => dir -1
     int dir = _sign(voltage);
     float v = _minSat(voltage, motor->drv.vMin); // apply offset to remove jitter
-    float dc = _clamp(v/motor->drv.vPSU, 0, 1); // convert to % of battery
+    float dc = _clamp(v/motor->drv.vPSU, 0.0f, 1.0f); // convert to % of battery
     motorSetUnipolar(motor, dc, dir); // apply to unipolar H bridge
 }
 
