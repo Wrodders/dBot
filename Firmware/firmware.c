@@ -53,8 +53,11 @@ int main(void){
     IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (CTRL_PERIOD * MS_TO_S));
     
     Controller cntrl = cntrlInit();
-    cntrlTheta(&cntrl, 0.0f);
-    cntrlLinVel(&cntrl, 0.0f);
+    motorSetVel(&ddmr.motorL, 2.0f); 
+    motorSetVel(&ddmr.motorR, 2.0f);
+    
+
+
 
     // ***** Application Tasks ***** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
@@ -69,7 +72,7 @@ int main(void){
         loopTick = get_ticks();
         switch (state){
             case INIT:
-                  if(get_ticks() >= 5000){
+                  if(get_ticks() >= 3000){
                     comsSendMsg(&coms, &ser1, PUB_INFO, "INIT => PAUSED ");
                     systick_clear();
                     state = PAUSED;
@@ -104,7 +107,7 @@ int main(void){
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
             comsSendMsg(&coms, &ser1, PUB_ODOM, ddmr.motorL.angularVel, ddmr.motorR.angularVel,
-                                                ddmr.motorR.pi.ref, ddmr.linVel,
+                                                ddmr.motorL.pi.ref, ddmr.motorL.pi.out,
                                                 cntrl.motionCtrl.out,cntrl.balanceCtrl.out);
             comsSendMsg(&coms, &ser1, PUB_IMU,  imu.comp.pitch, imu.comp.roll, imu.kalPitch,imu.kalRoll );
             comsTask.lastTick = loopTick;
@@ -123,14 +126,8 @@ int main(void){
             // trgtAngVel -> DDMR -> refAngVel
             imuRunFusion(&imu);
             imuKalFilt(&imu);
-            float mTheta = imu.kalPitch;
-            // Balance Control
-            // Run Balance PID loop with reference angle from motion Control
-            // Compute Inverse DDMR Kinematics convert to wheel speeds rps.
-            pidRun(&cntrl.balanceCtrl, mTheta);
-            motorSetVel(&ddmr.motorL, cntrl.balanceCtrl.out);
-            motorSetVel(&ddmr.motorR, cntrl.balanceCtrl.out);
-            
+            ddmrOdometry(&ddmr);
+ 
             // Motor Speed PI 
             motorSpeedCtrl(&ddmr.motorL);
             motorSpeedCtrl(&ddmr.motorR);
