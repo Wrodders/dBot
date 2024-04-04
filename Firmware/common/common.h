@@ -106,8 +106,8 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
 #define IMU_A_COMP  0.05f
 
 // Motor Speed Control
-#define SPEED_KP    8.0f
-#define SPEED_KI    0.016f
+#define SPEED_KP    3.0f
+#define SPEED_KI    0.1f
 #define SPEED_KD    0.00f
 #define SPEED_BETA  0.9f
 // Balance Control 

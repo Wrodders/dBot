@@ -114,15 +114,8 @@ static void motorSetVoltage(const Motor* motor, const float voltage){
     //@Description: Forwards == +ve => dir 1
     //              Backwards == -ve => dir -1
     int dir = _sign(voltage);
-    float v = voltage;
- 
-    if(_fabs(v) < motor->drv.vMin){  
-        if(dir > 0){v = motor->drv.vMin;}
-        else{v = -motor->drv.vMin;}
-    }
-
-
-    float dc = _clamp(v/motor->drv.vPSU, 0.0f, 1.0f); // convert to % of battery
+    float v = _fabs(voltage);
+    float dc = _clamp(v/motor->drv.vPSU, motor->drv.vMin/motor->drv.vPSU, 1.0f); // convert to % of battery
     motorSetUnipolar(motor, dc, dir); // apply to unipolar H bridge
 }
 

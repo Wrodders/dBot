@@ -53,8 +53,8 @@ int main(void){
     IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (CTRL_PERIOD * MS_TO_S));
     
     Controller cntrl = cntrlInit();
-    motorSetVel(&ddmr.motorL, 2.0f); 
-    motorSetVel(&ddmr.motorR, 2.0f);
+    motorSetVel(&ddmr.motorL, -4.0f); 
+    motorSetVel(&ddmr.motorR, 4.0f);
     
 
 
