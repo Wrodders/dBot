@@ -29,6 +29,7 @@ static void systick_setup(void){
 	systick_counter_enable();
 }
 
+
 static void clock_setup(void){
 	// Black pill has 25mhz external crystal
 	rcc_clock_setup_pll(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_84MHZ]);

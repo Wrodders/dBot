@@ -57,8 +57,8 @@ static DDMR ddmrInit(void){
     motorSetVel(&ddmr.motorL, 0.0f);
     motorSetVel(&ddmr.motorR, 0.0f);
 
-    motorEnable(&ddmr.motorL); // enable DRV8833 & pwm
-    motorEnable(&ddmr.motorR); // enable DRV8833 & pwm
+    motorDisable(&ddmr.motorL); // enable DRV8833
+    motorDisable(&ddmr.motorR); // enable DRV8833
     return ddmr;
 }
 static void ddmrOdometry(DDMR *ddmr){

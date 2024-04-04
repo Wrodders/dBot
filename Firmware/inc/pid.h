@@ -47,8 +47,8 @@ static void pidRun(PID* pid, float measurement){
 
 static inline void pidEnable(PID *pid){pid->en = true;}
 static inline void pidDisable(PID *pid){pid->en = false;}
-static inline void pidSetKp(PID *pid, float kp){pid->kp = kp / pid->dt;}
-static inline void pidSetKi(PID *pid, float ki){pid->ki = ki / pid->dt;}
+static inline void pidSetKp(PID *pid, float kp){pid->kp = kp;}
+static inline void pidSetKi(PID *pid, float ki){pid->ki = ki * pid->dt;} // precompute save calculations 
 static inline void pidSetKd(PID *pid, float kd){pid->kd = kd / pid->dt;}
 static inline void pidSetMin(PID* pid, float min){pid->min = min;}
 static inline void pidSetMax(PID* pid, float max){pid->min = max;}

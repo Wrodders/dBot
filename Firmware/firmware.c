@@ -51,6 +51,7 @@ int main(void){
     //***** Two Wheel Self Balancing Robot ************* //
     DDMR ddmr = ddmrInit();
     IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (CTRL_PERIOD * MS_TO_S));
+    
     Controller cntrl = cntrlInit();
     cntrlTheta(&cntrl, 0.0f);
     cntrlLinVel(&cntrl, 0.0f);
@@ -66,9 +67,33 @@ int main(void){
     uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
-
-
-
+        switch (state){
+            case INIT:
+                  if(get_ticks() >= 5000){
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "INIT => PAUSED ");
+                    systick_clear();
+                    state = PAUSED;
+                  }
+                  break;
+            case PAUSED:
+                if(_fabs(imu.kalPitch) <= BAL_CUTOFF){
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "PAUSED => RUN ");
+                    motorEnable(&ddmr.motorL);
+                    motorEnable(&ddmr.motorR);
+                    state = RUN;
+                }
+                break;
+            case RUN:
+                if(_fabs(imu.kalPitch) >= BAL_CUTOFF){
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "RUN => PAUSED ");
+                    motorDisable(&ddmr.motorL);
+                    motorDisable(&ddmr.motorR);
+                    state = PAUSED;
+                }
+                break;
+            default:
+                break;  
+        };
 
         // ********* FIXED TIME TASKS ************ // 
         //@Brief: Uses SysTick to execute periodic tasks
@@ -81,7 +106,7 @@ int main(void){
             comsSendMsg(&coms, &ser1, PUB_ODOM, ddmr.motorL.angularVel, ddmr.motorR.angularVel,
                                                 ddmr.motorR.pi.ref, ddmr.linVel,
                                                 cntrl.motionCtrl.out,cntrl.balanceCtrl.out);
-            comsSendMsg(&coms, &ser1, PUB_IMU,  imu.comp.pitch, imu.comp.roll, imu.kalPitch, imu.kalRoll );
+            comsSendMsg(&coms, &ser1, PUB_IMU,  imu.comp.pitch, imu.comp.roll, imu.kalPitch,imu.kalRoll );
             comsTask.lastTick = loopTick;
         }
         if(CHECK_PERIOD(mCtrlTask, loopTick)){
@@ -99,15 +124,13 @@ int main(void){
             imuRunFusion(&imu);
             imuKalFilt(&imu);
             float mTheta = imu.kalPitch;
-            if(fabs(mTheta) >= BAL_CUTOFF){ddmrStop(&ddmr);} // Fail Safe
-            else{
-                // Balance Control
-                // Run Balance PID loop with reference angle from motion Control
-                // Compute Inverse DDMR Kinematics convert to wheel speeds rps.
-                pidRun(&cntrl.balanceCtrl, mTheta);
-                motorSetVel(&ddmr.motorL, cntrl.balanceCtrl.out);
-                motorSetVel(&ddmr.motorR, cntrl.balanceCtrl.out);
-            }
+            // Balance Control
+            // Run Balance PID loop with reference angle from motion Control
+            // Compute Inverse DDMR Kinematics convert to wheel speeds rps.
+            pidRun(&cntrl.balanceCtrl, mTheta);
+            motorSetVel(&ddmr.motorL, cntrl.balanceCtrl.out);
+            motorSetVel(&ddmr.motorR, cntrl.balanceCtrl.out);
+            
             // Motor Speed PI 
             motorSpeedCtrl(&ddmr.motorL);
             motorSpeedCtrl(&ddmr.motorR);

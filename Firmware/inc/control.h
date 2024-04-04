@@ -24,7 +24,7 @@ static Controller cntrlInit(void){
         .balanceCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (CTRL_PERIOD * MS_TO_S)),
         .motionCtrl = pidInit(-BAL_MAX_RECOVERY, BAL_MAX_RECOVERY, VEL_KP, VEL_KI, VEL_KD, (MCTRL_PERIOD * MS_TO_S)),
         .trgtAngVel = 0.0f,
-        .thetaOffset = BAL_THETA_OFSET
+        .thetaOffset = BAL_OFFSET
     };
 
     return bot;

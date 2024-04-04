@@ -87,6 +87,11 @@ static void motorEnable(Motor *motor){
     gpio_set(motor->drv.en.port, motor->drv.en.pin); // enable driver
 }
 
+static void motorDisable(Motor *motor){
+    //pidDisable(&motor->pi);
+    gpio_clear(motor->drv.en.port, motor->drv.en.pin);
+}
+
 static void motorSetUnipolar(const Motor* motor, const float duty, const int dir){
     //@Brief: Sets the pwm on a Unipolar DC H bridge:
     
@@ -107,14 +112,10 @@ static void motorSetUnipolar(const Motor* motor, const float duty, const int dir
 static void motorSetVoltage(const Motor* motor, const float voltage){
     //@Brief: Sets PWM Duty Cycle as voltage vector
     //@Description: Forwards == +ve => dir 1
-    //              Backwards == -ve => dir 0
-    int dir;
-    float v = voltage;
-    float vAbs =  _fabs(v);
-    if(vAbs < motor->drv.vMin){v = motor->drv.vMin;} // limit minium voltage
-    if(v >= 0.0f){ dir = 1;} // determine direction 
-    else{dir = -1;}
-    float dc = _clamp(vAbs/motor->drv.vPSU, 0, 1); // convert to % of battery
+    //              Backwards == -ve => dir -1
+    int dir = _sign(voltage);
+    float v = _minSat(voltage, motor->drv.vMin); // apply offset to remove jitter
+    float dc = _clamp(v/motor->drv.vPSU, 0, 1); // convert to % of battery
     motorSetUnipolar(motor, dc, dir); // apply to unipolar H bridge
 }
 
@@ -137,7 +138,7 @@ static void motorCalSpeed(Motor* motor){
     int16_t dCount = mCount - motor->enc->lastCount;
     motor->enc->lastCount = mCount;
     float mSpeed = dCount * TICKS_TO_RPS * motor->flipDir ; // rotations per second
-    // Apply Low pass filter to speed measurement (1 - b)speed[n] + b*speed[n-1] 
+    // Apply Low pass filter to speed measurement  b*speed[n] + (1-b)*speed[n-1] 
     motor->angularVel = (motor->alpha * mSpeed) + (1.00f - motor->alpha) * motor->angularVel;
 }
 
@@ -146,7 +147,7 @@ static void motorSpeedCtrl(Motor* motor){
     //@Brief: Regulates Estimated Speed to ref speed
     motorCalSpeed(motor);
     pidRun(&motor->pi, motor->angularVel);
-   motorSetVoltage(motor, motor->pi.out);
+    motorSetVoltage(motor, motor->pi.out);
 }
 
 static void motorSetVel(Motor *motor, const float vel){
