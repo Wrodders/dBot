@@ -30,7 +30,7 @@ static Controller cntrlInit(void){
     return bot;
 }
 
-static inline void cntrlTheta(Controller *cntrl, float theta){cntrl->balanceCtrl.ref = theta - cntrl->thetaOffset;}
+static inline void cntrlTheta(Controller *cntrl, float theta){cntrl->balanceCtrl.ref = theta + cntrl->thetaOffset;}
 static inline void cntrlLinVel(Controller *cntrl, float linVel){cntrl->motionCtrl.ref = linVel;}
 static inline void cntrlAngVel(Controller *cntrl, float angVel){cntrl->trgtAngVel = angVel;}
 

@@ -69,9 +69,9 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define CTRL_PERIOD         20  // 100Hz
+#define CTRL_PERIOD         5  // 100Hz
 #define BLINK_PERIOD        500 // 2Hz
-#define MCTRL_PERIOD        50 //
+#define MCTRL_PERIOD        10 //
 // *********** GLOBAL CONSTANTS *************************** //
 
 #define M_PI                3.14159265358979323846f
@@ -107,21 +107,21 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
 
 // Motor Speed Control
 #define SPEED_KP    3.0f
-#define SPEED_KI    0.1f
+#define SPEED_KI    12.0f
 #define SPEED_KD    0.00f
 #define SPEED_BETA  0.9f
 // Balance Control 
-#define BAL_OFFSET          2.0f    // deg
+#define BAL_OFFSET          -8.0f    // deg
 #define BAL_MAX_RECOVERY    30      //
 #define BAL_CUTOFF          45      // 
-#define BAL_KP              0.5f  
-#define BAL_KI              0.0f 
-#define BAL_KD              0.0f 
+#define BAL_KP              0.18  
+#define BAL_KI              1.0f 
+#define BAL_KD              0.0045f 
 // Motion Control 
-#define VEL_KP     0.0f
-#define VEL_KI     0.0f 
-#define VEL_KD     0.0f
-#define VEL_ALPHA  0.3f
+#define VEL_KP    2.0f
+#define VEL_KI     0.0005f
+#define VEL_KD     10.0f
+#define VEL_ALPHA  0.5f
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
 

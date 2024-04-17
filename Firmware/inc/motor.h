@@ -83,7 +83,6 @@ static void motorConfig(Motor *m,Encoder* enc, const float vPSU, const float vMi
 
 static void motorEnable(Motor *motor){
     //@Brief: Starts Motor Driver 
-    //pidEnable(&motor->pi);
     gpio_set(motor->drv.en.port, motor->drv.en.pin); // enable driver
 }
 
@@ -115,7 +114,8 @@ static void motorSetVoltage(const Motor* motor, const float voltage){
     //              Backwards == -ve => dir -1
     int dir = _sign(voltage);
     float v = _fabs(voltage);
-    float dc = _clamp(v/motor->drv.vPSU, motor->drv.vMin/motor->drv.vPSU, 1.0f); // convert to % of battery
+    v = v <= motor->drv.vMin ? motor->drv.vMin*dir : v;
+    float dc = _clamp(v/motor->drv.vPSU, 0, 1.0f); // convert to % of battery
     motorSetUnipolar(motor, dc, dir); // apply to unipolar H bridge
 }
 

@@ -53,8 +53,9 @@ int main(void){
     IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (CTRL_PERIOD * MS_TO_S));
     
     Controller cntrl = cntrlInit();
-    motorSetVel(&ddmr.motorL, -4.0f); 
-    motorSetVel(&ddmr.motorR, 4.0f);
+    cntrlAngVel(&cntrl, 0.0f);
+    cntrlLinVel(&cntrl, 0.0f);
+    cntrlTheta(&cntrl, 0.0f);
     
 
 
@@ -107,7 +108,7 @@ int main(void){
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
             comsSendMsg(&coms, &ser1, PUB_ODOM, ddmr.motorL.angularVel, ddmr.motorR.angularVel,
-                                                ddmr.motorL.pi.ref, ddmr.motorL.pi.out,
+                                                ddmr.motorL.pi.ref, ddmr.linVel,
                                                 cntrl.motionCtrl.out,cntrl.balanceCtrl.out);
             comsSendMsg(&coms, &ser1, PUB_IMU,  imu.comp.pitch, imu.comp.roll, imu.kalPitch,imu.kalRoll );
             comsTask.lastTick = loopTick;
@@ -117,7 +118,7 @@ int main(void){
             float mSpeed = ddmr.linVel;
             pidRun(&cntrl.motionCtrl, mSpeed);
             float trgtTheta = cntrl.motionCtrl.out;
-            //cntrlTheta(&cntrl, trgtTheta);
+            cntrlTheta(&cntrl, trgtTheta);
         }
         if(CHECK_PERIOD(ctrlTask, loopTick)){
             //@Brief: DC Motor Speed Control Process 
@@ -127,7 +128,10 @@ int main(void){
             imuRunFusion(&imu);
             imuKalFilt(&imu);
             ddmrOdometry(&ddmr);
- 
+            pidRun(&cntrl.balanceCtrl, imu.kalPitch);
+            motorSetVel(&ddmr.motorL, cntrl.balanceCtrl.out);
+            motorSetVel(&ddmr.motorR, cntrl.balanceCtrl.out);
+            
             // Motor Speed PI 
             motorSpeedCtrl(&ddmr.motorL);
             motorSpeedCtrl(&ddmr.motorR);

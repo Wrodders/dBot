@@ -64,7 +64,7 @@ static DDMR ddmrInit(void){
 static void ddmrOdometry(DDMR *ddmr){
     //@Brief: Compute Kinematic State of Mobile Robot using Odometry
     float mVel = (ddmr->motorL.angularVel * RPS_TO_MPS + ddmr->motorR.angularVel * RPS_TO_MPS ) * 0.5f; // convert to mps 
-    ddmr->linVel = (ddmr->aLinVel * ddmr->linVel) + (1.0f - ddmr->aLinVel) * mVel;  // lpf filter 
+    ddmr->linVel = (ddmr->aLinVel * mVel) + (1.0f - ddmr->aLinVel) * ddmr->linVel;  // lpf filter 
 }
 
 static void ddmrDiffDrive(DDMR* ddmr, float linVel, float angVel){
