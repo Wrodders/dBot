@@ -43,7 +43,7 @@
 #define IMU_SCL			GPIO8
 // DRV8833 2-CH PWM DC Motor Driver 
 #define M_L_TIM 	    TIM2    // Left Motor PWM Timer 
-#define M_L_PORT	    GPIOA   // Left M otor PWM Port
+#define M_L_PORT	    GPIOA   // Left Motor PWM Port
 #define M_L_PWMA        GPIO0   // Left Motor PWM CH1 Pin
 #define M_L_PWMB	    GPIO1   // Left Motor PWM CH2 Pin
 
@@ -69,44 +69,59 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define CTRL_PERIOD         10  // 100Hz
+#define CTRL_PERIOD         5  // 100Hz
 #define BLINK_PERIOD        500 // 2Hz
+#define MCTRL_PERIOD        10 //
 // *********** GLOBAL CONSTANTS *************************** //
+
 #define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
 #define EDGE_NUM            4.00f
-
-#define WHEEL_BASE          0.07f   // m
+#define WHEEL_BASE          0.06f   // m
 #define WHEEL_RADIUS        0.035f  // m
 #define VBAT_MAX            8.40f   // 
 #define BAT_CAPACITY        2300    // mAh
 
 const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
+
+
 const float MS_TO_S         = 0.001f;
 const float S_TO_MS         = 1000;
-const float TO_INVERSE      = 0.1f;
 const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (CTRL_PERIOD * MS_TO_S)));
-const float MPS_TO_RPS      = (float)1/(WHEEL_RADIUS*2*M_PI);
+const float MPS_TO_RPS      = (float) 1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
+const float RAD_TO_DEG      = (float)(180.0f / M_PI);
+
 const float RPS_MAX         = 8.00f;  // rps
 const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
 
-// Speed Control Parameters
-#define SPEED_KP    6.0f
-#define SPEED_KI    20.0f
-#define SPEED_KD    0.0f
-#define SPEED_BETA  0.9f
 
-// Balance Control Parameters
-#define BAL_THETA   0.0f
-#define BAL_KP      3.0f
-#define BAL_KI      0.0f
-#define BAL_KD      0.0f
-// Motion Control Parameters
-#define VEL_KP      1.0f
-#define VEL_KI      0.0f
-#define VEL_KD      0.0f
+
+
+// *********** Parameters ********************************** //
+// IMU Filtering
+#define IMU_A_ACCEL 0.5f
+#define IMU_A_GYRO  0.01f
+#define IMU_A_COMP  0.05f
+
+// Motor Speed Control
+#define SPEED_KP    3.0f
+#define SPEED_KI    12.0f
+#define SPEED_KD    0.00f
+#define SPEED_BETA  0.9f
+// Balance Control 
+#define BAL_OFFSET          -8.0f    // deg
+#define BAL_MAX_RECOVERY    30      //
+#define BAL_CUTOFF          45      // 
+#define BAL_KP              0.18  
+#define BAL_KI              1.0f 
+#define BAL_KD              0.0045f 
+// Motion Control 
+#define VEL_KP    2.0f
+#define VEL_KI     0.0005f
+#define VEL_KD     10.0f
+#define VEL_ALPHA  0.5f
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
 

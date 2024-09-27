@@ -23,7 +23,6 @@ Software Prototyped in Python & Bash, ported to C/C++ when mature & performance 
 
 ## Control
 
-
 ### Cascaded PID Controller
 ![Cascaded_Controller](Docs/Charts/CascadedPID.svg)
 

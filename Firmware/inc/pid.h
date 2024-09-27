@@ -4,9 +4,10 @@
 #include "../common/common.h"
 
 typedef struct PID{
+    bool en;
     float ref;
     float error;
-    float lastIn;
+    float lastErr;
     float pTerm,iTerm,dTerm; 
     float kp,ki,kd;  // Preset with dt applied
     const float dt;
@@ -22,29 +23,32 @@ static PID pidInit(float min, float max, float kp, float ki, float kd, float del
     pid.min = min;
     pid.max = max;
     pid.ref = 0.0f;
+    pid.en = true;
     return pid;
 }
 
 static void pidRun(PID* pid, float measurement){
     //@Brief: Steps through PID Algorithm at constant dt
     //@Description: Calculates correction signal from ref measurement error.  
-
+    if(pid->en == false){return;}
     // calculate error
     pid->error = pid->ref - measurement;
 
     pid->pTerm = pid->error * pid->kp;
     pid->iTerm += pid->error * pid->ki;
     pid->iTerm = _clamp(pid->iTerm, pid->min, pid->max);
-    pid->dTerm = pid->kd*(measurement - pid->lastIn);
-    pid->lastIn = measurement;
+    pid->dTerm = pid->kd*(pid->error - pid->lastErr);
+    pid->lastErr = pid->error;
 
     // calculate correction signal 
-    pid->out = pid->pTerm + pid->iTerm - pid->dTerm;
+    pid->out = pid->pTerm + pid->iTerm + pid->dTerm;
     pid->out = _clamp(pid->out, pid->min, pid->max);
 }
 
-static inline void pidSetKp(PID *pid, float kp){pid->kp = kp / pid->dt;}
-static inline void pidSetKi(PID *pid, float ki){pid->ki = ki / pid->dt;}
+static inline void pidEnable(PID *pid){pid->en = true;}
+static inline void pidDisable(PID *pid){pid->en = false;}
+static inline void pidSetKp(PID *pid, float kp){pid->kp = kp;}
+static inline void pidSetKi(PID *pid, float ki){pid->ki = ki * pid->dt;} // precompute save calculations 
 static inline void pidSetKd(PID *pid, float kd){pid->kd = kd / pid->dt;}
 static inline void pidSetMin(PID* pid, float min){pid->min = min;}
 static inline void pidSetMax(PID* pid, float max){pid->min = max;}

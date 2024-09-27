@@ -48,34 +48,32 @@ static DDMR ddmrInit(void){
             
         .encR = encoderInit(ENC_R_TIM, UINT16_MAX, ENC_R_A, ENC_R_PORT, ENC_R_B, ENC_R_PORT, ENC_R_AF),
         .motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT),
+        .aLinVel = VEL_ALPHA,
         };
 
-    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 1.0f, true, SPEED_BETA);
-    motorConfig(&ddmr.motorR, &ddmr.encR, VBAT_MAX, 1.1f, false,  SPEED_BETA);
+    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 1.3f, true, SPEED_BETA, RPS_MAX);
+    motorConfig(&ddmr.motorR, &ddmr.encR, VBAT_MAX, 1.3f, false,  SPEED_BETA, RPS_MAX);
 
     motorSetVel(&ddmr.motorL, 0.0f);
     motorSetVel(&ddmr.motorR, 0.0f);
 
-    motorDrvEn(&ddmr.motorL); // enable DRV8833 & pwm
-    motorDrvEn(&ddmr.motorR); // enable DRV8833 & pwm
-
-    
-    
+    motorDisable(&ddmr.motorL); // enable DRV8833
+    motorDisable(&ddmr.motorR); // enable DRV8833
     return ddmr;
 }
-static void ddmrFwdK(DDMR *ddmr){
+static void ddmrOdometry(DDMR *ddmr){
     //@Brief: Compute Kinematic State of Mobile Robot using Odometry
-    float mVel = (ddmr->motorL.angularVel * RPS_TO_MPS + ddmr->motorL.angularVel * RPS_TO_MPS ) * 0.5f; // avgVel
-    ddmr->linVel = (ddmr->aLinVel * ddmr->linVel) + (1.0f - ddmr->aLinVel) * mVel; 
+    float mVel = (ddmr->motorL.angularVel * RPS_TO_MPS + ddmr->motorR.angularVel * RPS_TO_MPS ) * 0.5f; // convert to mps 
+    ddmr->linVel = (ddmr->aLinVel * mVel) + (1.0f - ddmr->aLinVel) * ddmr->linVel;  // lpf filter 
 }
 
-static void ddmrInvK(DDMR* ddmr, const float linVel, const float angVel){
-    //@Brief: Drive Mobile robot in Differential Drive Configuration
-    //@Description: Computes Inverse Kinematics of Robot Model. Applies Motor Speeds.
-    float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * ddmr->wheelBase); // left wheel angular speed rad/s
-    float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * ddmr->wheelBase); // right wheel angular speed rad/s
-    motorSetVel(&ddmr->motorL,wLTarget);
-    motorSetVel(&ddmr->motorR,wRTarget);
+static void ddmrDiffDrive(DDMR* ddmr, float linVel, float angVel){
+        //@Brief: Computes Inverse DDMR Kinematics sets Motor Target velocities  
+            
+        float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * ddmr->wheelBase); //  // RPS
+        float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * ddmr->wheelBase); // // RPS
+        motorSetVel(&ddmr->motorL,wLTarget); // set target reference speed in rps
+        motorSetVel(&ddmr->motorR,wRTarget);
 }
 
 static void ddmrTankDrive(DDMR* ddmr, const float pwrL, const float pwrR){
@@ -87,5 +85,21 @@ static void ddmrTankDrive(DDMR* ddmr, const float pwrL, const float pwrR){
     motorSetVel(&ddmr->motorL, vL);
     motorSetVel(&ddmr->motorR, vR);
 }
+
+static void ddmrStop(DDMR *ddmr){
+    //@Brief: Stops Motors
+    motorSetVel(&ddmr->motorL, 0.0f);
+    motorSetVel(&ddmr->motorR, 0.0f);
+}
+
+static void ddmrEStop(DDMR *ddmr){
+    //@Brief: Imitalsy stopsn moters then sets targets to 0.
+    motorStop(&ddmr->motorL);
+    motorStop(&ddmr->motorR);
+    motorSetVel(&ddmr->motorL, 0.0f);
+    motorSetVel(&ddmr->motorR, 0.0f);
+}
+
+
 
 #endif // DDMR_H
