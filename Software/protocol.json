@@ -1,0 +1,81 @@
+{
+    "protocol": {
+      "frame": {
+        "SOF": "<",        // Start of Frame
+        "EOF": "\n",       // End of Frame
+        "DELIM": ":",      // Delimiter
+        "max_data_size": 64,
+        "overhead_size": 4 // SOF, LEN, ID, EOF
+      },
+      "topics": {
+        "publishers": [
+          {
+            "id": 0,
+            "name": "CMD_RET",
+            "format": "c",
+            "description": "Command return responses",
+            "data_type": "string"
+          },
+          {
+            "id": 1,
+            "name": "ERROR",
+            "format": "c",
+            "description": "Error messages",
+            "data_type": "string"
+          },
+          {
+            "id": 2,
+            "name": "INFO",
+            "format": "c",
+            "description": "Information messages",
+            "data_type": "string"
+          },
+          {
+            "id": 3,
+            "name": "DEBUG",
+            "format": "c",
+            "description": "Debug messages",
+            "data_type": "string"
+          },
+          {
+            "id": 4,
+            "name": "IMU",
+            "format": "f:f:f",
+            "description": "IMU data: Accelerometer readings (x, y, z)",
+            "data_type": "float[3]"
+          },
+          {
+            "id": 5,
+            "name": "ODOM",
+            "format": "f:f:f:f",
+            "description": "Odometry data: position (x, y), orientation (theta), velocity (v)",
+            "data_type": "float[4]"
+          }
+        ],
+        "commands": [
+          {
+            "id": 0,
+            "name": "ID",
+            "format": "c",
+            "description": "Retrieve list of commands and their formats",
+            "data_type": "string"
+          },
+          {
+            "id": 1,
+            "name": "RESET",
+            "format": "c",
+            "description": "Reset the device",
+            "data_type": "string"
+          },
+          {
+            "id": 2,
+            "name": "HELLO",
+            "format": "c",
+            "description": "Send a HELLO message",
+            "data_type": "string"
+          }
+        ]
+      }
+    }
+  }
+  

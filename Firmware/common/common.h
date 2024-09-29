@@ -70,7 +70,7 @@
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
 #define CTRL_PERIOD         5  // 100Hz
-#define BLINK_PERIOD        500 // 2Hz
+#define BLINK_PERIOD        100 // 10Hz
 #define MCTRL_PERIOD        10 //
 // *********** GLOBAL CONSTANTS *************************** //
 

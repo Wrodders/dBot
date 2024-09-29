@@ -9,7 +9,7 @@ static void i2cReset(uint32_t i2cPerif){
     I2C_CR1(i2cPerif) &= ~I2C_CR1_SWRST;
 }
 
-static uint32_t i2cInit(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin, uint32_t sdaPin){
+static void i2cInit(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin, uint32_t sdaPin){
     //@Brief: Configures I2C Peripheral on GPIO pins
     //@Note: Requires Clocks to be enabled for GPIO's & I2C
     // ENSURE PUPD_PULLUP IS ENABLED !!!!!!
@@ -27,7 +27,6 @@ static uint32_t i2cInit(uint32_t i2cPerif, uint32_t gpioPort, uint32_t sclPin, u
 
     i2c_set_trise(i2cPerif, 43); // Max Rise time
     i2c_peripheral_enable(i2cPerif);
-    return i2cPerif;
 }
 
 

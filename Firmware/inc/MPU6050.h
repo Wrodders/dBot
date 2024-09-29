@@ -3,7 +3,7 @@
 
 
 #include "../common/common.h"
-#include "i2c.h"
+#include "../drivers/i2c.h"
 #include <math.h>
 
 // MPU6050 Config Registers
@@ -37,7 +37,6 @@ typedef struct MPU6050{
     IMUCalib offset; // Calibration offset
     vector_t accel; //xyz
     vector_t gyro; // xyz
-    float pitch, roll;
 }MPU6050;
 
 
@@ -68,12 +67,12 @@ static void mpu6050Wake(uint32_t i2c){
     delay(300); // Wait for sensor to stabilize
 }
 
-static void gyroCalib(MPU6050 *imu, int samples){
+static void gyroCalib(MPU6050 *sensor, int samples){
     // calibrates gyro by taking samples and averaging
 
-    imu->offset.gyro.x = 0;
-    imu->offset.gyro.y = 0;
-    imu->offset.gyro.z = 0;
+    sensor->offset.gyro.x = 0;
+    sensor->offset.gyro.y = 0;
+    sensor->offset.gyro.z = 0;
 
     uint8_t rawData[6]; // 6 bytes of data
     int16_t gyroRaw[3]; // 3 axes of gyro data
@@ -81,30 +80,30 @@ static void gyroCalib(MPU6050 *imu, int samples){
     // Take samples
     for(int i = 0; i < samples; i++){
         // Read raw data
-        i2cReadSeq(imu->i2c, MPU6050_ADDR, MPU6050_GYRO_XOUT_H, rawData, 6); 
+        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_GYRO_XOUT_H, rawData, 6); 
         // convert to 16 bit signed integers
         gyroRaw[0] = (int16_t)((rawData[0] << 8) | rawData[1]); // Gyro X
         gyroRaw[1] = (int16_t)((rawData[2] << 8) | rawData[3]); // Gyro Y
         gyroRaw[2] = (int16_t)((rawData[4] << 8) | rawData[5]); // Gyro Z
         // Add to offset
-        imu->offset.gyro.x += (float)gyroRaw[0] / 65.5f;
-        imu->offset.gyro.y += (float)gyroRaw[1] / 65.5f;
-        imu->offset.gyro.z += (float)gyroRaw[2] / 65.5f;
+        sensor->offset.gyro.x += (float)gyroRaw[0] / 65.5f;
+        sensor->offset.gyro.y += (float)gyroRaw[1] / 65.5f;
+        sensor->offset.gyro.z += (float)gyroRaw[2] / 65.5f;
         delay(3);
     }
 
     // Average offset
-    imu->offset.gyro.x /= samples;
-    imu->offset.gyro.y /= samples;
-    imu->offset.gyro.z /= samples;
+    sensor->offset.gyro.x /= samples;
+    sensor->offset.gyro.y /= samples;
+    sensor->offset.gyro.z /= samples;
 }
 
-static void accelCalib(MPU6050 *imu, int samples){
+static void accelCalib(MPU6050 *sensor, int samples){
     // calibrates accel by taking samples and averaging
     // should callc offests to set gry to close to 1g on each axis
-    imu->offset.accel.x = 0;
-    imu->offset.accel.y = 0;
-    imu->offset.accel.z = 0;
+    sensor->offset.accel.x = 0;
+    sensor->offset.accel.y = 0;
+    sensor->offset.accel.z = 0;
 
     uint8_t rawData[2]; // 2 bytes of data
     int16_t accelRaw[3]; // 3 axes of accel data
@@ -114,11 +113,11 @@ static void accelCalib(MPU6050 *imu, int samples){
     delay(1000);
     for(int i = 0; i< samples; i++){
         // Read raw data
-        i2cReadSeq(imu->i2c, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 2);
+        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 2);
         // convert to 16 bit signed integers
         accelRaw[0] = (int16_t)((rawData[0] << 8) | rawData[1]); // Accel X
         // Add to offset
-        imu->offset.accel.x += (float)accelRaw[0] / 4096.0f;
+        sensor->offset.accel.x += (float)accelRaw[0] / 4096.0f;
         delay(3);
     }
     //printf("Calibrating AccelY: \n");
@@ -126,77 +125,77 @@ static void accelCalib(MPU6050 *imu, int samples){
 
     for(int i = 0; i < samples ; i++){
         // Read raw data
-        i2cReadSeq(imu->i2c, MPU6050_ADDR, MPU6050_ACCEL_YOUT_H, rawData, 2);
+        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_YOUT_H, rawData, 2);
         // convert to 16 bit signed integers
         accelRaw[1] = (int16_t)((rawData[0] << 8) | rawData[1]); // Accel Y
         // Add to offset
-        imu->offset.accel.y += (float)accelRaw[1] / 4096.0f;
+        sensor->offset.accel.y += (float)accelRaw[1] / 4096.0f;
         delay(3);
     }
     //printf("Calibrating AccelZ: \n");
     delay(1000);
     for(int i = 0; i < samples; i++){
         // Read raw data
-        i2cReadSeq(imu->i2c, MPU6050_ADDR, MPU6050_ACCEL_ZOUT_H, rawData, 2);
+        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_ZOUT_H, rawData, 2);
         // convert to 16 bit signed integers
         accelRaw[2] = (int16_t)((rawData[0] << 8) | rawData[1]); // Accel Z
         // Add to offset
-        imu->offset.accel.z += (float)accelRaw[2] / 4096.0f;
+        sensor->offset.accel.z += (float)accelRaw[2] / 4096.0f;
         delay(3);
     }
 
     //Callibration complete
 
     // Average offset
-    imu->offset.accel.x /= samples;
-    imu->offset.accel.y /= samples;
-    imu->offset.accel.z /= samples;
+    sensor->offset.accel.x /= samples;
+    sensor->offset.accel.y /= samples;
+    sensor->offset.accel.z /= samples;
 }
 
 
 // *** // **** // PUBLIC // **** // **** // 
 
 
-static MPU6050 mpu6050Init(uint32_t perif, uint32_t port, uint32_t scl, uint32_t sda){
+static MPU6050 mpu6050Init(uint32_t perif){
     // Initialize MPU6050 Sensor
-    MPU6050 imu;
-    imu.i2c = i2cInit(perif, port, scl, sda);
+    MPU6050 sensor;
+    sensor.i2c = perif;
     delay(100); 
 
-    mpu6505Reset(imu.i2c);
-    mpu6050Wake(imu.i2c);
+    mpu6505Reset(sensor.i2c);
+    mpu6050Wake(sensor.i2c);
 
     // Set Config Registers
     // Read WHO_AM_I register
-    uint8_t data = i2cReadReg(imu.i2c, MPU6050_ADDR, MPU6050_WHO_AM_I);
+    uint8_t data = i2cReadReg(sensor.i2c, MPU6050_ADDR, MPU6050_WHO_AM_I);
     if (data != MPU6050_ADDR){
         delay(100); // debug
-        imu.initalized = false;
-        imu.data = data;
-        //return imu;
+        sensor.initalized = false;
+        sensor.data = data;
+        //return sensor;
     }
-    mpu6050Config(imu.i2c);
-    mpu6050Wake(imu.i2c);
-    gyroCalib(&imu, 100);
-    //accelCalib(imu, 100);
-    imu.offset.accel.x = 0.036453f;
-    imu.offset.accel.y = -0.0021066f;
-    imu.offset.accel.z = 0.133658f;
+    mpu6050Config(sensor.i2c);
+    mpu6050Wake(sensor.i2c);
+    gyroCalib(&sensor, 100);
+    //accelCalib(sensor, 100);
+    sensor.offset.accel.x = 0.036453f;
+    sensor.offset.accel.y = -0.0021066f;
+    sensor.offset.accel.z = 0.133658f;
 
-    imu.initalized = true;
+    sensor.initalized = true;
 
-    return imu;
+    return sensor;
 }
 
 
-static void mpu6050Read(MPU6050 *imu){
+static void mpu6050Read(MPU6050 *sensor){
     // Read Data from IMU
     // Apply Offsets
     // Data stored in SI Units
 
     uint8_t rawData[14]; // 14 bytes of data
     // Read raw data
-    i2cReadSeq(imu->i2c, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 14);
+    i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 14);
 
     int16_t accelRaw[3]; // 3 axes of accel data
     int16_t gyroRaw[3]; // 3 axes of gyro data
@@ -210,21 +209,21 @@ static void mpu6050Read(MPU6050 *imu){
     gyroRaw[2] = (int16_t)((rawData[12] << 8) | rawData[13]); // Gyro Z
 
     // Convert to SI units
-    imu->accel.x = (float)accelRaw[0] / 4096.0f;
-    imu->accel.y = (float)accelRaw[1] / 4096.0f;
-    imu->accel.z = (float)accelRaw[2] / 4096.0f;
-    imu->gyro.x = (float)gyroRaw[0] / 65.5f;
-    imu->gyro.y = (float)gyroRaw[1] / 65.5f;
-    imu->gyro.z = (float)gyroRaw[2] / 65.5f; 
+    sensor->accel.x = (float)accelRaw[0] / 4096.0f;
+    sensor->accel.y = (float)accelRaw[1] / 4096.0f;
+    sensor->accel.z = (float)accelRaw[2] / 4096.0f;
+    sensor->gyro.x = (float)gyroRaw[0] / 65.5f;
+    sensor->gyro.y = (float)gyroRaw[1] / 65.5f;
+    sensor->gyro.z = (float)gyroRaw[2] / 65.5f; 
 
     // Apply calibration offsets
-    imu->accel.x -= imu->offset.accel.x;
-    imu->accel.y -= imu->offset.accel.y;
-    imu->accel.z -= imu->offset.accel.z;
+    sensor->accel.x -= sensor->offset.accel.x;
+    sensor->accel.y -= sensor->offset.accel.y;
+    sensor->accel.z -= sensor->offset.accel.z;
 
-    imu->gyro.x -= imu->offset.gyro.x;
-    imu->gyro.y -= imu->offset.gyro.y;
-    imu->gyro.z -= imu->offset.gyro.z;
+    sensor->gyro.x -= sensor->offset.gyro.x;
+    sensor->gyro.y -= sensor->offset.gyro.y;
+    sensor->gyro.z -= sensor->offset.gyro.z;
 }
 
 #endif // MPU6050_H
