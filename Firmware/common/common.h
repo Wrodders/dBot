@@ -7,9 +7,7 @@
 #include <libopencm3/cm3/vector.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/gpio.h>
-
 #include "../drivers/clock.h"
-
 #include "../../modules/cutils/ringbuffer.h"
 #include "../../modules/cutils/utils.h"
 #include "../../modules/cUtils/printf.h"
@@ -71,7 +69,7 @@
 #define COMS_PERIOD         100 // 10Hz
 #define CTRL_PERIOD         5  // 100Hz
 #define BLINK_PERIOD        100 // 10Hz
-#define MCTRL_PERIOD        10 //
+
 // *********** GLOBAL CONSTANTS *************************** //
 
 #define M_PI                3.14159265358979323846f
@@ -94,7 +92,7 @@ const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
 const float RAD_TO_DEG      = (float)(180.0f / M_PI);
 
 const float RPS_MAX         = 8.00f;  // rps
-const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
+const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 
 
 
@@ -109,19 +107,20 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS;
 #define SPEED_KP    3.0f
 #define SPEED_KI    12.0f
 #define SPEED_KD    0.00f
-#define SPEED_BETA  0.9f
+#define SPEED_ALPHA  0.9f
 // Balance Control 
-#define BAL_OFFSET          -8.0f    // deg
+#define BAL_OFFSET          -6.0f    // deg
 #define BAL_MAX_RECOVERY    30      //
 #define BAL_CUTOFF          45      // 
-#define BAL_KP              0.18  
-#define BAL_KI              1.0f 
-#define BAL_KD              0.0045f 
-// Motion Control 
-#define VEL_KP    2.0f
-#define VEL_KI     0.0005f
-#define VEL_KD     10.0f
-#define VEL_ALPHA  0.5f
+#define BAL_KP              0.18 
+#define BAL_KI              0.8f 
+#define BAL_KD              0.0045f
+
+#define VEL_P 10.0
+#define VEL_I 0.0
+#define VEL_D 1.0
+#define VEL_ALPHA 0.9
+
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
 

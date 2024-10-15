@@ -131,6 +131,15 @@ static void motorBreak(const Motor *motor){
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0);
 }
 
+static void motorSetTrgtVel(Motor *motor, const float vel){
+    //@Brief: Pushes Target speed through speedCurve buffer.
+    //@Description: Applies Trapezium Ramp to velocities
+    //              Ramps at increments of SPEED_CTRL_PERIOD 
+    //              Based on max acceleration value
+    float v = _clamp(vel, -motor->maxVel, motor->maxVel);
+    motor->pi.ref = v;
+}
+
 static void motorCalSpeed(Motor* motor){
     //@Brief: Calculate Angular Speed in Rotations per Second
     //@Description: Applies lowpass filter to smooth Quantization errors 
@@ -142,7 +151,6 @@ static void motorCalSpeed(Motor* motor){
     motor->angularVel = (motor->alpha * mSpeed) + (1.00f - motor->alpha) * motor->angularVel;
 }
 
-
 static void motorSpeedCtrl(Motor* motor){
     //@Brief: Regulates Estimated Speed to ref speed
     motorCalSpeed(motor);
@@ -150,12 +158,5 @@ static void motorSpeedCtrl(Motor* motor){
     motorSetVoltage(motor, motor->pi.out);
 }
 
-static void motorSetVel(Motor *motor, const float vel){
-    //@Brief: Pushes Target speed through speedCurve buffer.
-    //@Description: Applies Trapezium Ramp to velocities
-    //              Ramps at increments of SPEED_CTRL_PERIOD 
-    //              Based on max acceleration value
-    float v = _clamp(vel, -motor->maxVel, motor->maxVel);
-    motor->pi.ref = v;
-}
+
 #endif // DCMOTOR_H
