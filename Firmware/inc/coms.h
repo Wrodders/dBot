@@ -71,6 +71,7 @@ over error id identifiable by command id
 #define MAX_MSG_DATA_SIZE 64
 #define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
+
  
 
 typedef struct MsgFrame{
@@ -86,7 +87,6 @@ typedef enum {
     PUB_ERROR,
     PUB_INFO, 
     PUB_DEBUG, 
-
     // ADD Application Specific Publishers
     PUB_IMU,
     PUB_ODOM,
@@ -97,13 +97,19 @@ typedef enum {
 typedef enum {
     CMD_ID = 0,
     CMD_RESET,
-
     // ADD Application Specific Cmds 
     CMD_HELLO,
+    CMD_S_P,
 
     NUM_CMDS
 }CMD_ID_t; // Cmd Topic Ids
 
+typedef enum{
+    IDLE = 0, 
+    ID, 
+    DATA, 
+    ERROR
+}COMS_STATE_t;
 
 typedef struct {
     union {
@@ -111,12 +117,13 @@ typedef struct {
         PUB_ID_t pubId;
     }id;
     const char* name;
-    const char* format;
+    const char* format; 
+    const uint8_t nArgs;
 }Topic;
 
 
 typedef struct Coms{
-
+    COMS_STATE_t state;
     MsgFrame rxFrame;
     MsgFrame txFrame;
 
@@ -130,10 +137,10 @@ static Coms comsInit(const Topic* pubMap, const Topic* cmdMap){
 }
 
 
-static inline const char* comsGetPubFmt(Coms* coms, PUB_ID_t ID){return coms->pubMap[ID].format;}
-static inline const char* comsGetPubName(Coms* coms, PUB_ID_t ID){return coms->pubMap[ID].name;}
-static inline const char* comsGetCmdFmt(Coms* coms, CMD_ID_t ID){return coms->cmdMap[ID].format;}
-static inline const char* comsGetCmdName(Coms* coms, CMD_ID_t ID){return coms->cmdMap[ID].name;}
+static inline const char* comsGetPubFmt(Coms* coms, PUB_ID_t pubID){return coms->pubMap[pubID].format;}
+static inline const char* comsGetPubName(Coms* coms, PUB_ID_t pubID){return coms->pubMap[pubID].name;}
+static inline const char* comsGetCmdFmt(Coms* coms, CMD_ID_t pubID){return coms->cmdMap[pubID].format;}
+static inline const char* comsGetCmdName(Coms* coms, CMD_ID_t pubID){return coms->cmdMap[pubID].name;}
 
 //****** Message Tranmission packetization  ***************//
 /*
@@ -148,28 +155,58 @@ ID --  Topic Identifier
 DATA -- LEN bytes of data
 EOF - End of Frame 
 */
-static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t ID, ...){
+static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t pubID, ...){
     //@Brief: Formats and Packets a Message, sends over serial. 
     const uint8_t DATA_IDX = 2;
     uint8_t* msgBuf = coms->txFrame.buf; // readability
-    const char* pubFmt = comsGetPubFmt(coms, ID);
+    const char* pubFmt = comsGetPubFmt(coms, pubID);
 
     va_list args;
-    va_start(args, ID);
+    va_start(args, pubID);
     const size_t dataSize = vsnprintf((char*)&msgBuf[DATA_IDX],MAX_MSG_DATA_SIZE, pubFmt, args); 
     va_end(args);
     if(dataSize > MAX_MSG_DATA_SIZE - 1 ){return false;}
     size_t idx = 0;
     msgBuf[idx++] = SOF_BYTE;
-    msgBuf[idx++] = ID + 'a';
+    msgBuf[idx++] = pubID + 'a';
     idx += dataSize;
     msgBuf[idx++] = EOF_BYTE;
     serialSend(ser, msgBuf, idx);
-
-
     return true;
 }
 
+
+static bool comsGrabMsg(Coms* coms, Serial* ser){
+    uint8_t byte;
+    while(rbGet(&ser->rxRB,  &byte) == true){
+        switch(coms->state){
+            case IDLE:
+                if(byte == SOF_BYTE){
+                    coms->state=ID;
+                    coms->rxFrame.size = 0;
+                    memset(coms->rxFrame.buf, 0, MAX_MSG_DATA_SIZE);
+                }
+                break;
+            case ID:
+                coms->rxFrame.id = byte -'a';
+                coms->state = DATA;
+                break;
+            case DATA:
+                if(byte == SOF_BYTE){coms->state=ERROR;break;}
+                if(coms->rxFrame.size == MAX_MSG_DATA_SIZE){coms->state=ERROR;break;}
+                if(byte == EOF_BYTE){coms->state=IDLE;return true;}
+                coms->rxFrame.buf[coms->rxFrame.size++]=byte;
+                break;
+            case ERROR:
+                coms->state=IDLE;
+                break;
+            default:
+                coms->state=IDLE;
+                break;
+        }
+    }
+    return false;
+}
 
 
 

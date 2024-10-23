@@ -24,21 +24,22 @@ int main(void){
 
      // ***** COMMUNICATIONS *************************** // 
     const Topic pubMap[NUM_PUBS] = {
-        {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%c:%s"}, // CMD_ID : RET_VAL
-        {{.pubId = PUB_ERROR}, .name = "ERROR", .format = "%s"}, // Error Message
-        {{.pubId = PUB_INFO}, .name = "INFO", .format = "%s"}, // System INFO
-        {{.pubId = PUB_DEBUG}, .name = "DEBUG", .format = "%s"}, // Debug prints 
+        {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%c:%s", .nArgs=2}, // CMD_ID : RET_VAL
+        {{.pubId = PUB_ERROR}, .name = "ERROR", .format = "%s", .nArgs=1}, // Error Message
+        {{.pubId = PUB_INFO}, .name = "INFO", .format = "%s", .nArgs=1}, // System INFO
+        {{.pubId = PUB_DEBUG}, .name = "DEBUG", .format = "%s", .nArgs=1}, // Debug prints 
 
         // Application Publisher Topics 
-        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"}, // ROLL:PITCH:YAW
-        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"} // LSPEED:RSPEED:TL:TR
+        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=6}, // ROLL:PITCH:YAW
+        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=6} // LSPEED:RSPEED:TL:TR
     };
     const Topic cmdMap[NUM_CMDS] = {
-        {{.cmdId = CMD_ID }, .name = "IDENT", .format = "" },
-        {{.cmdId = CMD_RESET}, .name = "RESET", .format = ""},
+        {{.cmdId = CMD_ID }, .name = "IDENT", .format = "", .nArgs=0},
+        {{.cmdId = CMD_RESET}, .name = "RESET", .format = "", .nArgs=0},
 
         // Application Cmd Topics
-        {{.cmdId = CMD_HELLO}, .name = "HELLO", .format = ""}
+        {{.cmdId = CMD_HELLO}, .name = "HELLO", .format = "", .nArgs=0},
+        {{.cmdId = CMD_S_P}, .name = "SET_P", .format = "%f", .nArgs=1}
     };
 
 
@@ -86,7 +87,7 @@ int main(void){
     FixedTimeTask balanceCntrlTsk = createTask(BAL_CNTRL_PERIOD);    // Balance Theta Control
     FixedTimeTask velCntrlTask = createTask(VEL_CNTRL_PERIOD);        // State Control Loop
     // ****** Loop Parameters ******* // 
-    enum {IDLE, ID, DATA, COMPLETE, ERROR} comState = IDLE;
+   
     // Define loop global variables
     uint16_t loopTick = 0;
 	for(;;){
@@ -128,42 +129,22 @@ int main(void){
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
             //comsSendMsg(&coms, &ser1, PUB_IMU,  imu.raw.pitch, imu.comp.pitch,imu.kal.pitch, imu.raw.roll, imu.comp.roll ,imu.kal.roll );
-            uint8_t byte;
-            while(rbGet(&ser1.rxRB, &byte ) == true){
-                switch(comState){
-                    case IDLE:
-                        if(byte == SOF_BYTE){
-                            comState=ID;
-                            coms.rxFrame.size = 0;
-                            memset(coms.rxFrame.buf, 0, MAX_MSG_DATA_SIZE);
-                        }
+           
+            if(comsGrabMsg(&coms, &ser1)){
+                switch(coms.rxFrame.id){
+                    case CMD_ID:
                         break;
-                    case ID:
-                        coms.rxFrame.id = byte;
-                        comState = DATA;
+                    case CMD_RESET:
                         break;
-                    case DATA:
-                        if(byte == SOF_BYTE){comState=ERROR;break;}
-                        if(coms.rxFrame.size == MAX_MSG_DATA_SIZE){comState=ERROR;break;}
-                        if(byte != EOF_BYTE){coms.rxFrame.buf[coms.rxFrame.size++]=byte;break;}
-                        else{
-                            comState=COMPLETE;
-                        }
-                        
-                    case COMPLETE:
-                        comState=IDLE;
-                        comsSendMsg(&coms, &ser1, PUB_CMD_RET, coms.rxFrame.id, coms.rxFrame.buf);
+                    case CMD_HELLO:
                         break;
-                    case ERROR:
-                        comState=IDLE;
+                    case CMD_S_P:
                         break;
                     default:
-                        comState=IDLE;
+                        comsSendMsg(&coms, &ser1, PUB_ERROR, "CMD NOT VALID");
                         break;
-                }
+               }
             }
-            
-
             
             comsTask.lastTick = loopTick;
         }
@@ -185,7 +166,7 @@ int main(void){
 
         if(CHECK_PERIOD(balanceCntrlTsk, loopTick)){
             // Balance Control Inverted Pendulum PID
-            pidRun(&balanceCtrl, imu.kal.pitch); 
+            (&balanceCtrl, imu.kal.pitch); 
             motorSetTrgtVel(&motorL, balanceCtrl.out); // Run Both Motors Same Speed
             motorSetTrgtVel(&motorR, balanceCtrl.out);
             balanceCntrlTsk.lastTick = loopTick;
