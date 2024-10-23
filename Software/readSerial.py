@@ -11,8 +11,8 @@ pubMap = [
     Topic('b', "ERROR"),
     Topic('c', "INFO"),
     Topic('d', "DEBUG"),
-    Topic('e', "IMU"),  # ROLL:PITCH:YAW
-    Topic('f', "ODOM", )  # LSPEED:RSPEED:TL:TR
+    Topic('e', "IMU"),  
+    Topic('f', "ODOM", ) 
 ]
 
 def get_topic_by_id(pub_id):
@@ -25,7 +25,7 @@ def serial_reader(ser, zmq_socket):
     while True:
         if ser.readable():
             try:
-                msg_frame = ser.readline()
+                msg_frame = ser.readuntil(b'\n')
                 msg = msg_frame.decode('utf-8').rstrip("\n")
                 msg_id = msg[1]
                 msg_data = msg[2:]

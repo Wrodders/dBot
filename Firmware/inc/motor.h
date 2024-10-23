@@ -55,7 +55,7 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
         .drv.pwmB.pin = pwmB,
         .drv.pwmB.port = pwmPort,
         .drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE),
-        .pi = pidInit(-VBAT_MAX, VBAT_MAX, SPEED_KP, SPEED_KI, SPEED_KD, (CTRL_PERIOD * MS_TO_S))
+        .pi = pidInit(-VBAT_MAX, VBAT_MAX, SPEED_KP, SPEED_KI, SPEED_KD, (WSPEED_CNTRL_PERIOD * MS_TO_S))
     };
 
     gpio_clear(m.drv.en.port, m.drv.en.pin); // set off

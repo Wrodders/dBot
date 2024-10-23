@@ -58,7 +58,7 @@ int main(void){
     i2cInit(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
     comsSendMsg(&coms, &ser1, PUB_DEBUG, "I2C");
     MPU6050 mpu6050 = mpu6050Init(IMU_PERIF);
-    IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (CTRL_PERIOD * MS_TO_S));
+    IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (IMU_FUSION_PERIOD * MS_TO_S));
     comsSendMsg(&coms, &ser1, PUB_DEBUG, "IMU");
     // MOTORS 
     Encoder encL = encoderInit(ENC_L_TIM, UINT16_MAX, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT, ENC_L_AF);
@@ -70,18 +70,23 @@ int main(void){
     motorConfig(&motorL, &encL, VBAT_MAX, 1.3f, true, SPEED_ALPHA, RPS_MAX);
     motorConfig(&motorR, &encR, VBAT_MAX, 1.3f, false,  SPEED_ALPHA, RPS_MAX);
     // BALANCE CONTROLLER
-    PID balanceCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (CTRL_PERIOD * MS_TO_S));
+    PID balanceCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&balanceCtrl, BAL_OFFSET);
     DDMR ddmr = {0};
-    PID motionCtrl = pidInit(-VEL_MAX, VEL_MAX, VEL_P, VEL_I, VEL_D, (CTRL_PERIOD * MS_TO_S));
+    PID motionCtrl = pidInit(-VEL_MAX, VEL_MAX, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&motionCtrl, 0.0f);
 
 
     // ***** Application Tasks ***** // 
-    FixedTimeTask blinkTask = createTask(BLINK_PERIOD); // watchdog led
-    FixedTimeTask comsTask = createTask(COMS_PERIOD); // PUB SUB RPC
-    FixedTimeTask ctrlTask = createTask(CTRL_PERIOD); // State Control Loop
+    FixedTimeTask blinkTask = createTask(BLINK_PERIOD);              // watchdog led
+    FixedTimeTask comsTask = createTask(COMS_PERIOD);                // PUB SUB RPC
+    FixedTimeTask imuFusionTask = createTask(IMU_FUSION_PERIOD);     // Sensor Fusion 
+
+    FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD);  //wheel Speed Control (PI)
+    FixedTimeTask balanceCntrlTsk = createTask(BAL_CNTRL_PERIOD);    // Balance Theta Control
+    FixedTimeTask velCntrlTask = createTask(VEL_CNTRL_PERIOD);        // State Control Loop
     // ****** Loop Parameters ******* // 
+    enum {IDLE, ID, DATA, COMPLETE, ERROR} comState = IDLE;
     // Define loop global variables
     uint16_t loopTick = 0;
 	for(;;){
@@ -103,7 +108,7 @@ int main(void){
                 }
                 break;
             case RUN:
-                if(_fabs(imu.kal.pitch) >= BAL_CUTOFF){
+                if(_fabs(imu.kal.pitch) >= BAL_CUTOFF){  
                     comsSendMsg(&coms, &ser1, PUB_INFO, "RUN => PAUSED ");
                     motorDisable(&motorL);
                     motorDisable(&motorR);
@@ -119,31 +124,79 @@ int main(void){
         //@Note: Tasks must be non blocking
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
-            blinkTask.lastTick = loopTick;
+            blinkTask.lastTick = loopTick;  
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
-            comsSendMsg(&coms, &ser1, PUB_IMU,  imu.raw.pitch, imu.comp.pitch,imu.kal.pitch, imu.raw.roll, imu.comp.roll ,imu.kal.roll );
+            //comsSendMsg(&coms, &ser1, PUB_IMU,  imu.raw.pitch, imu.comp.pitch,imu.kal.pitch, imu.raw.roll, imu.comp.roll ,imu.kal.roll );
+            uint8_t byte;
+            while(rbGet(&ser1.rxRB, &byte ) == true){
+                switch(comState){
+                    case IDLE:
+                        if(byte == SOF_BYTE){
+                            comState=ID;
+                            coms.rxFrame.size = 0;
+                            memset(coms.rxFrame.buf, 0, MAX_MSG_DATA_SIZE);
+                        }
+                        break;
+                    case ID:
+                        coms.rxFrame.id = byte;
+                        comState = DATA;
+                        break;
+                    case DATA:
+                        if(byte == SOF_BYTE){comState=ERROR;break;}
+                        if(coms.rxFrame.size == MAX_MSG_DATA_SIZE){comState=ERROR;break;}
+                        if(byte != EOF_BYTE){coms.rxFrame.buf[coms.rxFrame.size++]=byte;break;}
+                        else{
+                            comState=COMPLETE;
+                        }
+                        
+                    case COMPLETE:
+                        comState=IDLE;
+                        comsSendMsg(&coms, &ser1, PUB_CMD_RET, coms.rxFrame.id, coms.rxFrame.buf);
+                        break;
+                    case ERROR:
+                        comState=IDLE;
+                        break;
+                    default:
+                        comState=IDLE;
+                        break;
+                }
+            }
+            
+
+            
             comsTask.lastTick = loopTick;
         }
-        if(CHECK_PERIOD(ctrlTask, loopTick)){
-            //@Brief: DC Motor Speed Control Process 
-            //@Description: Drives the mobile robot according to 
-            // refAngle -> Balance -> refVel -> DDMR --> refAngVel -> Speed Ctrl
-            // Balance Control PID
+
+        if(CHECK_PERIOD(imuFusionTask, loopTick)){
             mpu6050Read(&mpu6050); // Read Sensor
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // Apply Low pass filter
             imuCompFilt(&imu);  // Estimate Angle with  Complementary Filter
             imuKalUpdate(&imu); // Estimate Angle with Kalman Observer
-            ddmrOdometry(&ddmr, &motorL, &motorR);
-            pidRun(&motionCtrl, ddmr.linVel);
-            pidSetRef(&balanceCtrl, BAL_OFFSET - motionCtrl.out);
-            pidRun(&balanceCtrl, imu.kal.pitch); 
-            motorSetTrgtVel(&motorL, balanceCtrl.out); // Run Both Motors Same Speed
-            motorSetTrgtVel(&motorR, balanceCtrl.out);
+            imuFusionTask.lastTick = loopTick;
+        }
+
+        if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
             // Motor Speed Control PI 
             motorSpeedCtrl(&motorL);
             motorSpeedCtrl(&motorR);
-            ctrlTask.lastTick = loopTick;
+            wspeedCntlTask.lastTick = loopTick;
+        }
+
+        if(CHECK_PERIOD(balanceCntrlTsk, loopTick)){
+            // Balance Control Inverted Pendulum PID
+            pidRun(&balanceCtrl, imu.kal.pitch); 
+            motorSetTrgtVel(&motorL, balanceCtrl.out); // Run Both Motors Same Speed
+            motorSetTrgtVel(&motorR, balanceCtrl.out);
+            balanceCntrlTsk.lastTick = loopTick;
+        }
+
+        if(CHECK_PERIOD(velCntrlTask, loopTick)){
+            // Velocity Control Differential Drive Robot
+            ddmrOdometry(&ddmr, &motorL, &motorR);
+            pidRun(&motionCtrl, ddmr.linVel);
+            pidSetRef(&balanceCtrl, BAL_OFFSET - motionCtrl.out);
+            velCntrlTask.lastTick = loopTick;
         }
     }
 }

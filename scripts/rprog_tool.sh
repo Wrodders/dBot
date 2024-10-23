@@ -8,7 +8,7 @@ REMOTE_BIN_DIR="bin"
 
 # Function to display help message
 show_help() {
-    echo "Usage: $0 -c <command> -f <file>"
+    echo "Usage: $0 -c <command> -f <file>"domfree
     echo ""
     echo "Commands:"
     echo "  -c <command>       Specify command: 'upload', 'flash', or 'upload_flash'"

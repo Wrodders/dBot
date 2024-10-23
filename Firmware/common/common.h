@@ -67,8 +67,12 @@
 
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD         100 // 10Hz
-#define CTRL_PERIOD         5  // 100Hz
 #define BLINK_PERIOD        100 // 10Hz
+
+#define IMU_FUSION_PERIOD   2 //  500 Hz
+#define BAL_CNTRL_PERIOD    4  // 250 Hz
+#define WSPEED_CNTRL_PERIOD 5  // 200 Hz
+#define VEL_CNTRL_PERIOD    4  // 250 Hz
 
 // *********** GLOBAL CONSTANTS *************************** //
 
@@ -86,7 +90,7 @@ const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 
 const float MS_TO_S         = 0.001f;
 const float S_TO_MS         = 1000;
-const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (CTRL_PERIOD * MS_TO_S)));
+const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (WSPEED_CNTRL_PERIOD * MS_TO_S)));
 const float MPS_TO_RPS      = (float) 1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
 const float RAD_TO_DEG      = (float)(180.0f / M_PI);

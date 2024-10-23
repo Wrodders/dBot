@@ -74,9 +74,10 @@ over error id identifiable by command id
  
 
 typedef struct MsgFrame{
+    bool valid;
     uint8_t size; // current size of msg buffer
     uint8_t id; // id 
-    uint8_t buf[MAX_MSG_FRAME_SIZE]; 
+    uint8_t buf[MAX_MSG_DATA_SIZE]; 
 }MsgFrame;
 
 
@@ -115,6 +116,7 @@ typedef struct {
 
 
 typedef struct Coms{
+
     MsgFrame rxFrame;
     MsgFrame txFrame;
 
@@ -169,46 +171,6 @@ static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t ID, ...){
 }
 
 
-static bool comsGrabMsg(Serial *ser, MsgFrame *msg){
-    //@Brief: Grabs a message from the serial buffer is available
-    //@Note: Message Discarded if EOF received before declared msg len
-    //@Returns true Message Received
-    static enum {IDLE, SIZE, ID, DATA, COMPLETE, ERROR} state = IDLE;
-    while (rbEmpty(&ser->rxRB) == 0){
-        uint8_t dataIdx = 3; // start position of data
-        uint8_t byte;
-        rbGet(&ser->rxRB, &byte); // pop byte
-        switch (state){
-            case IDLE:
-                if(byte == SOF_BYTE){state=SIZE;}
-                msg->size = 0; 
-                break;
-            case SIZE:
-                msg->size = byte; 
-                state = ID;
-                break;
-            case ID:
-                msg->id = byte;
-                state = DATA;
-                break;
-            case DATA:
-                if(dataIdx > msg->size){state = ERROR; break;} // src overflow
-                if(byte == SOF_BYTE){state = IDLE; break;} // multiple start bytes detected 
-                if(byte == EOF_BYTE){state = COMPLETE; break;} // EOF
-                msg->buf[dataIdx++] = byte; 
-                break;
-            case COMPLETE:
-                USART_DR(USART1) = 'X' & USART_DR_MASK; // write byte test
-                state=IDLE; // reload 
-                return true; // exit   
-            case ERROR:
-                msg->buf[0] = '\0';
-                state=IDLE;
-                return false; // exit 
-        }
-    }
-    return false;
-}
 
 
 static void comsDeclarePubs(Coms* coms, Serial* ser){
