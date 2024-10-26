@@ -125,6 +125,14 @@ void usart2_isr(void){
     if(transmit_empty){usartTX_ISR(USART2);}
 }
 
+void usart6_isr(void){
+    const bool overrun_occurred = usart_get_flag(USART6, USART_FLAG_ORE) == 1;
+    const bool received_data = usart_get_flag(USART6, USART_FLAG_RXNE) == 1;
+    const bool transmit_empty = usart_get_flag(USART6, USART_FLAG_TXE) == 1;
+
+    if(received_data){usartRX_ISR(USART6);}
+    if(transmit_empty){usartTX_ISR(USART6);}
+}
 
 // ************ SETUP ***************************** // 
 

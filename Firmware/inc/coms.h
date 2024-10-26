@@ -20,11 +20,13 @@ gstThe Device may list the format & description of each id at start up and/or up
 Messages are framed inside a packet:
 
 |-------------Packet---------|
+|     |-------Frame-----|
+|           |
 |-----+-----+----+- - - +----|
-| SOF | LEN | ID | DATA | EOF|
+| SOF | ID  |TYPE| DATA | EOF|
 | 1   | 1   | 1  | ...  | 1  |
 |-----------+----+- - - +----|
-      |-------Frame-----|
+     
 
 
 SOF -- Start of Frame 
@@ -78,6 +80,7 @@ typedef struct MsgFrame{
     bool valid;
     uint8_t size; // current size of msg buffer
     uint8_t id; // id 
+    uint8_t cmdType;
     uint8_t buf[MAX_MSG_DATA_SIZE]; 
 }MsgFrame;
 
@@ -99,7 +102,7 @@ typedef enum {
     CMD_RESET,
     // ADD Application Specific Cmds 
     CMD_HELLO,
-    CMD_S_P,
+    CMD_WP,
 
     NUM_CMDS
 }CMD_ID_t; // Cmd Topic Ids
@@ -194,7 +197,11 @@ static bool comsGrabMsg(Coms* coms, Serial* ser){
             case DATA:
                 if(byte == SOF_BYTE){coms->state=ERROR;break;}
                 if(coms->rxFrame.size == MAX_MSG_DATA_SIZE){coms->state=ERROR;break;}
-                if(byte == EOF_BYTE){coms->state=IDLE;return true;}
+                if(byte == EOF_BYTE){
+                    coms->rxFrame.buf[coms->rxFrame.size++]='\0';
+                    coms->state=IDLE;
+                    return true;
+                }
                 coms->rxFrame.buf[coms->rxFrame.size++]=byte;
                 break;
             case ERROR:

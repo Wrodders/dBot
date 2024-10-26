@@ -12,26 +12,27 @@
 #include "inc/ddmr.h"
 
 
+
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
 #define RB_SIZE 128          // ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
 
+// ********* SUPER LOOP **************** // 
 int main(void){
 
     enum STATE {INIT, PAUSED, RUN} state = INIT;
 
-
-     // ***** COMMUNICATIONS *************************** // 
+    // ***************************** COMMUNICATIONS ******************************************************** // 
     const Topic pubMap[NUM_PUBS] = {
-        {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%c:%s", .nArgs=2}, // CMD_ID : RET_VAL
+        {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%s:%s", .nArgs=2}, // CMD_ID : RET_VAL
         {{.pubId = PUB_ERROR}, .name = "ERROR", .format = "%s", .nArgs=1}, // Error Message
         {{.pubId = PUB_INFO}, .name = "INFO", .format = "%s", .nArgs=1}, // System INFO
         {{.pubId = PUB_DEBUG}, .name = "DEBUG", .format = "%s", .nArgs=1}, // Debug prints 
 
         // Application Publisher Topics 
-        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=6}, // ROLL:PITCH:YAW
-        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=6} // LSPEED:RSPEED:TL:TR
+        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.3f:%0.3f", .nArgs=2}, // ROLL:PITCH:YAW
+        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%f:%f", .nArgs=2} // LSPEED:RSPEED:TL:TR
     };
     const Topic cmdMap[NUM_CMDS] = {
         {{.cmdId = CMD_ID }, .name = "IDENT", .format = "", .nArgs=0},
@@ -39,11 +40,9 @@ int main(void){
 
         // Application Cmd Topics
         {{.cmdId = CMD_HELLO}, .name = "HELLO", .format = "", .nArgs=0},
-        {{.cmdId = CMD_S_P}, .name = "SET_P", .format = "%f", .nArgs=1}
+        {{.cmdId = CMD_WP}, .name = "WP", .format = "%c:%f", .nArgs=2},
     };
-
-
-	// ***** HARDWARE SETUP ********** //
+	// ***************************** HARDWARE SETUP ******************************************************** //
 	clock_setup(); // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup(); // 1ms Tick
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
@@ -78,7 +77,7 @@ int main(void){
     pidSetRef(&motionCtrl, 0.0f);
 
 
-    // ***** Application Tasks ***** // 
+    // ***** Application Tasks **************************************************************************** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD);              // watchdog led
     FixedTimeTask comsTask = createTask(COMS_PERIOD);                // PUB SUB RPC
     FixedTimeTask imuFusionTask = createTask(IMU_FUSION_PERIOD);     // Sensor Fusion 
@@ -86,9 +85,7 @@ int main(void){
     FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD);  //wheel Speed Control (PI)
     FixedTimeTask balanceCntrlTsk = createTask(BAL_CNTRL_PERIOD);    // Balance Theta Control
     FixedTimeTask velCntrlTask = createTask(VEL_CNTRL_PERIOD);        // State Control Loop
-    // ****** Loop Parameters ******* // 
-   
-    // Define loop global variables
+    // ****** Loop Parameters **************************************************************************** // 
     uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
@@ -120,35 +117,57 @@ int main(void){
                 break;  
         };
 
-        // ********* FIXED TIME TASKS ************ // 
-        //@Brief: Uses SysTick to execute periodic tasks
-        //@Note: Tasks must be non blocking
+        // ********* FIXED TIME TASKS ******************************************************************* // 
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
             blinkTask.lastTick = loopTick;  
         }
         if(CHECK_PERIOD(comsTask, loopTick)){
-            //comsSendMsg(&coms, &ser1, PUB_IMU,  imu.raw.pitch, imu.comp.pitch,imu.kal.pitch, imu.raw.roll, imu.comp.roll ,imu.kal.roll );
-           
+            // TX
+            comsSendMsg(&coms, &ser1, PUB_IMU,imu.kal.pitch, imu.kal.roll);
             if(comsGrabMsg(&coms, &ser1)){
-                switch(coms.rxFrame.id){
-                    case CMD_ID:
+                switch(coms.rxFrame.buf[0]){
+                    case 'a': // GET CMDS
+                        switch(coms.rxFrame.id){
+                            case CMD_ID:
+                                comsSendMsg(&coms, &ser1, PUB_CMD_RET, "a", "STM");
+                                break;
+                            case CMD_RESET:
+                                comsSendMsg(&coms, &ser1, PUB_CMD_RET, "b", "RESET");
+                                break;
+                            case CMD_HELLO:
+                                comsSendMsg(&coms, &ser1, PUB_CMD_RET, "c", "HELLO");
+                                break;
+                            case CMD_WP:
+                                char valBuf[7]; 
+                                snprintf(valBuf, 10, "%0.3f", motorL.pi.kp);
+                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"d",valBuf);
+                                break;
+                            default:
+                                comsSendMsg(&coms, &ser1, PUB_ERROR, "INVALID RREF");
+                                break;
+                        }
                         break;
-                    case CMD_RESET:
-                        break;
-                    case CMD_HELLO:
-                        break;
-                    case CMD_S_P:
+                    case 'b': // SET CMDS
+                        float val;
+                        val = atof((char*)&coms.rxFrame.buf[1]); // read in paramater value 
+                        switch(coms.rxFrame.id){
+                            case CMD_WP:
+                                pidSetKp(&motorL.pi,val); 
+                                break;
+                            default:
+                                comsSendMsg(&coms, &ser1, PUB_ERROR, "INVALID WREG");
+                                break;
+                        }
                         break;
                     default:
-                        comsSendMsg(&coms, &ser1, PUB_ERROR, "CMD NOT VALID");
+                        comsSendMsg(&coms, &ser1, PUB_ERROR, "INVALID CMDTYPE");
                         break;
                }
             }
             
             comsTask.lastTick = loopTick;
         }
-
         if(CHECK_PERIOD(imuFusionTask, loopTick)){
             mpu6050Read(&mpu6050); // Read Sensor
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // Apply Low pass filter
@@ -156,22 +175,19 @@ int main(void){
             imuKalUpdate(&imu); // Estimate Angle with Kalman Observer
             imuFusionTask.lastTick = loopTick;
         }
-
         if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
             // Motor Speed Control PI 
             motorSpeedCtrl(&motorL);
             motorSpeedCtrl(&motorR);
             wspeedCntlTask.lastTick = loopTick;
         }
-
         if(CHECK_PERIOD(balanceCntrlTsk, loopTick)){
             // Balance Control Inverted Pendulum PID
-            (&balanceCtrl, imu.kal.pitch); 
+            pidRun(&balanceCtrl, imu.kal.pitch); 
             motorSetTrgtVel(&motorL, balanceCtrl.out); // Run Both Motors Same Speed
             motorSetTrgtVel(&motorR, balanceCtrl.out);
             balanceCntrlTsk.lastTick = loopTick;
         }
-
         if(CHECK_PERIOD(velCntrlTask, loopTick)){
             // Velocity Control Differential Drive Robot
             ddmrOdometry(&ddmr, &motorL, &motorR);

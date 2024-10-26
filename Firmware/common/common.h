@@ -30,10 +30,10 @@
 #define DEBUG_RX		GPIO10 
 #define DEBUG_TX		GPIO9
 // Bluetooth UART
-#define BT_USART		USART2
+#define BT_USART		USART6
 #define BT_PORT			GPIOA
-#define BT_TX			GPIO2
-#define BT_RX			GPIO3
+#define BT_TX			GPIO11
+#define BT_RX			GPIO12
 // MPU6050 IMU
 #define IMU_PERIF       I2C1
 #define IMU_PORT		GPIOB 
