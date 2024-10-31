@@ -30,7 +30,7 @@ static PID pidInit(float min, float max, float kp, float ki, float kd, float del
 static void pidRun(PID* pid, float measurement){
     //@Brief: Steps through PID Algorithm at constant dt
     //@Description: Calculates correction signal from ref measurement error.  
-    if(pid->en == false){return;}
+    if(pid->en == false){pid->out = 0; return;}
     // calculate error
     pid->error = pid->ref - measurement;
 

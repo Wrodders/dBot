@@ -14,7 +14,8 @@ static void pwmInit(uint32_t timPerif, uint16_t prescaler, uint32_t freq){
     timer_set_period(timPerif, period - 1); 
 }
 
-static void pwmConfig(uint32_t timPerif,enum tim_oc_id timCH, uint32_t gpioPort, uint32_t gpioPin, uint32_t gpioAF){
+static void pwmConfig(uint32_t timPerif, enum tim_oc_id timCH, 
+                    uint32_t gpioPort, uint32_t gpioPin, uint32_t gpioAF){
     //@Brief: Set Up GPIO and Output Compare for PWM
     timer_disable_oc_output(timPerif, timCH );
     timer_set_oc_mode(timPerif, timCH, TIM_OCM_PWM1); // Output Compare PWM Mode 1

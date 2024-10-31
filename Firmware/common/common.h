@@ -66,16 +66,15 @@
 #define ENC_R_B         GPIO7   // TIM4 CH2
 
 // ************* Task Execution Periods ******************** // 
-#define COMS_PERIOD         100 // 10Hz
+#define COMS_PERIOD         50 // 10Hz
 #define BLINK_PERIOD        100 // 10Hz
 
 #define IMU_FUSION_PERIOD   2 //  500 Hz
-#define BAL_CNTRL_PERIOD    4  // 250 Hz
-#define WSPEED_CNTRL_PERIOD 5  // 200 Hz
-#define VEL_CNTRL_PERIOD    4  // 250 Hz
+#define BAL_CNTRL_PERIOD    10  // 250 Hz
+#define WSPEED_CNTRL_PERIOD 2  // 500 Hz
+#define VEL_CNTRL_PERIOD   100  // 100 Hz
 
 // *********** GLOBAL CONSTANTS *************************** //
-
 #define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
@@ -86,8 +85,6 @@
 #define BAT_CAPACITY        2300    // mAh
 
 const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
-
-
 const float MS_TO_S         = 0.001f;
 const float S_TO_MS         = 1000;
 const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (WSPEED_CNTRL_PERIOD * MS_TO_S)));
@@ -97,9 +94,6 @@ const float RAD_TO_DEG      = (float)(180.0f / M_PI);
 
 const float RPS_MAX         = 8.00f;  // rps
 const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
-
-
-
 
 // *********** Parameters ********************************** //
 // IMU Filtering
@@ -116,18 +110,15 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 #define BAL_OFFSET          -6.0f    // deg
 #define BAL_MAX_RECOVERY    30      //
 #define BAL_CUTOFF          45      // 
-#define BAL_KP              0.18 
-#define BAL_KI              0.8f 
+#define BAL_KP              0.1
+#define BAL_KI             3.0f 
 #define BAL_KD              0.0045f
-
-#define VEL_P 10.0
+#define VEL_P 0.0
 #define VEL_I 0.0
-#define VEL_D 1.0
+#define VEL_D 0.0
 #define VEL_ALPHA 0.9
 
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MAX;     
 
 #endif // COMMON_h
-
-

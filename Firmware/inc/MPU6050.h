@@ -100,7 +100,7 @@ static void gyroCalib(MPU6050 *sensor, int samples){
 
 static void accelCalib(MPU6050 *sensor, int samples){
     // calibrates accel by taking samples and averaging
-    // should callc offests to set gry to close to 1g on each axis
+    // should calc offsets to set gry to close to 1g on each axis
     sensor->offset.accel.x = 0;
     sensor->offset.accel.y = 0;
     sensor->offset.accel.z = 0;
@@ -144,7 +144,7 @@ static void accelCalib(MPU6050 *sensor, int samples){
         delay(3);
     }
 
-    //Callibration complete
+    //Calibration complete
 
     // Average offset
     sensor->offset.accel.x /= samples;

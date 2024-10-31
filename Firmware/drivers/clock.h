@@ -13,14 +13,12 @@ void sys_tick_handler(void){
 	return;
 }
 
-static uint32_t get_ticks(void){
-	return _millis;
-}
+static uint32_t get_ticks(void){return _millis;}
 
 static void delay(uint32_t milliseconds) {
-	// @Brief Blocking delay
-  uint32_t end_time = get_ticks() + milliseconds;
-  while (get_ticks() < end_time) {};
+    // @Brief Blocking delay
+    uint32_t end_time = get_ticks() + milliseconds;
+    while (get_ticks() < end_time) {};
 }
 
 static void systick_setup(void){
@@ -29,7 +27,6 @@ static void systick_setup(void){
 	systick_counter_enable();
 }
 
-
 static void clock_setup(void){
 	// Black pill has 25mhz external crystal
 	rcc_clock_setup_pll(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_84MHZ]);
@@ -37,10 +34,7 @@ static void clock_setup(void){
 	rcc_periph_clock_enable(RCC_GPIOA);
 	rcc_periph_clock_enable(RCC_GPIOB);
 	rcc_periph_clock_enable(RCC_GPIOC);
-
-	rcc_periph_clock_enable(RCC_USART1);
-
-
+	rcc_periph_clock_enable(RCC_USART1); // serial
 	rcc_periph_clock_enable(RCC_I2C1); // MPU6050
     rcc_periph_clock_enable(RCC_TIM2); // Motor PWM
     rcc_periph_clock_enable(RCC_TIM3); // Encoder L Quaducore Input capture

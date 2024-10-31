@@ -27,13 +27,19 @@ typedef struct DDMR{
     const float wheelBase; // L
     // kinematic state
     float linVel;
+    float linX; 
+    float dt;
+
 }DDMR; // Deferential Drive Mobile Robot
+
 
 
 static void ddmrOdometry(DDMR *ddmr, Motor *mL, Motor *mR){
     //@Brief: Compute Kinematic State of Mobile Robot using Odometry
     float mVel = (mL->angularVel * RPS_TO_MPS + mR->angularVel * RPS_TO_MPS ) * 0.5f; // convert to mps 
     ddmr->linVel = (VEL_ALPHA * mVel) + (1.0f - VEL_ALPHA) * ddmr->linVel;  // lpf filter 
+    float dx  = ddmr->linVel * (ddmr->dt) ;
+    ddmr->linX += dx; 
 }
 
 

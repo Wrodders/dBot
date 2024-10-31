@@ -22,8 +22,6 @@ typedef struct Encoder {
     // Store the timer peripheral in the encoder structure
     e.timPerif = timPerif;
     e.lastCount = 0;
-
-
     // Configure pins for alternate function mode
     gpio_mode_setup(portA, GPIO_MODE_AF, GPIO_PUPD_NONE, pinA);
     gpio_set_af(portA, alternateFunction, pinA);
@@ -42,18 +40,11 @@ typedef struct Encoder {
     timer_enable_counter(e.timPerif);
     TIM_CNT(e.timPerif) = 0x0000; // reset counter
 
-   
-
-
     return e;
 }
-
 
 static inline uint32_t encoderRead(Encoder *enc){
     return timer_get_counter(enc->timPerif);
 }
-
-
-
 
 #endif // ENCODER_H

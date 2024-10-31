@@ -101,8 +101,19 @@ typedef enum {
     CMD_ID = 0,
     CMD_RESET,
     // ADD Application Specific Cmds 
-    CMD_HELLO,
+    CMD_MODE,
+    CMD_WT,
     CMD_WP,
+    CMD_WI,
+
+    CMD_BP,
+    CMD_BI,
+    CMD_BD,
+
+    CMD_MT,
+    CMD_MP,
+    CMD_MI,
+    CMD_MD,
 
     NUM_CMDS
 }CMD_ID_t; // Cmd Topic Ids
