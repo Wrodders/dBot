@@ -53,26 +53,31 @@
 #define DRV_EN_PIN      GPIO4   // DRV8833 Enable PIN
 #define DRV_EN_PORT     GPIOA   // DRV8833 Enable PORT
 // Quaducore Hall Effect Encoder
-#define ENC_L_TIM       TIM3
-#define ENC_L_AF        GPIO_AF2
-#define ENC_L_PORT      GPIOB
-#define ENC_L_A         GPIO4   // TIM3 CH1
-#define ENC_L_B         GPIO5   // TIM3 CH2
+#define ENC_1_TIM       TIM3
+#define ENC_1_AF        GPIO_AF2
+#define ENC_1_PORT      GPIOB
+#define ENC_1_A         GPIO4   // TIM3 CH1
+#define ENC_1_B         GPIO5   // TIM3 CH2
 
-#define ENC_R_TIM       TIM4
-#define ENC_R_AF        GPIO_AF2
-#define ENC_R_PORT      GPIOB
-#define ENC_R_A         GPIO6   // TIM4 CH1
-#define ENC_R_B         GPIO7   // TIM4 CH2
+#define ENC_2_TIM       TIM4
+#define ENC_2_AF        GPIO_AF2
+#define ENC_2_PORT      GPIOB
+#define ENC_2_A         GPIO6   // TIM4 CH1
+#define ENC_2_B         GPIO7   // TIM4 CH2
+// ADC Inputs
+#define IPROP_L         GPIO6
+#define IPROP_R         GPIO7
+#define VBAT_SENSE      GPIO5
+#define ADC_PORT        GPIOA
 
 // ************* Task Execution Periods ******************** // 
-#define COMS_PERIOD         50 // 10Hz
-#define BLINK_PERIOD        100 // 10Hz
+#define COMS_PERIOD             50  // 20Hz
+#define BLINK_PERIOD            100 // 10Hz
 
-#define IMU_FUSION_PERIOD   2 //  500 Hz
-#define BAL_CNTRL_PERIOD    10  // 250 Hz
-#define WSPEED_CNTRL_PERIOD 2  // 500 Hz
-#define VEL_CNTRL_PERIOD   100  // 100 Hz
+#define IMU_FUSION_PERIOD       2   //  500 Hz
+#define BAL_CNTRL_PERIOD        10  // 250 Hz
+#define WSPEED_CNTRL_PERIOD     5   // 200 Hz
+#define LINVEL_CNTRL_PERIOD     100 // 10 Hz
 
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI                3.14159265358979323846f
@@ -92,7 +97,7 @@ const float MPS_TO_RPS      = (float) 1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
 const float RAD_TO_DEG      = (float)(180.0f / M_PI);
 
-const float RPS_MAX         = 8.00f;  // rps
+const float RPS_MAX         = 10.00f;  // rps
 const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 
 // *********** Parameters ********************************** //
@@ -105,10 +110,10 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 #define SPEED_KP    3.0f
 #define SPEED_KI    12.0f
 #define SPEED_KD    0.00f
-#define SPEED_ALPHA  0.9f
+#define SPEED_ALPHA  0.95f
 // Balance Control 
-#define BAL_OFFSET          -6.0f    // deg
-#define BAL_MAX_RECOVERY    30      //
+#define BAL_OFFSET          3.0f    // deg
+#define BAL_MAX_RECOVERY   45      //
 #define BAL_CUTOFF          45      // 
 #define BAL_KP              0.1
 #define BAL_KI             3.0f 

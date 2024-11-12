@@ -10,8 +10,7 @@
 #include "inc/motor.h"
 
 #include "inc/ddmr.h"
-
-
+#include "drivers/analog.h"
 
 // ********** GLOBAL STATIC BUFFERS *************************************** // 
 #define RB_SIZE 128          // ACCESS THROUGH RING BUFFER 
@@ -72,30 +71,28 @@ int main(void){
     IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (IMU_FUSION_PERIOD * MS_TO_S));
     comsSendMsg(&coms, &ser1, PUB_DEBUG, "IMU");
     // MOTORS 
-    Encoder encL = encoderInit(ENC_L_TIM, UINT16_MAX, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT, ENC_L_AF);
-    Encoder encR = encoderInit(ENC_R_TIM, UINT16_MAX, ENC_R_A, ENC_R_PORT, ENC_R_B, ENC_R_PORT, ENC_R_AF);
+    Encoder encR = encoderInit(ENC_1_TIM, UINT16_MAX, ENC_1_A, ENC_1_PORT, ENC_1_B, ENC_1_PORT, ENC_1_AF);
+    Encoder encL = encoderInit(ENC_2_TIM, UINT16_MAX, ENC_2_A, ENC_2_PORT, ENC_2_B, ENC_2_PORT, ENC_2_AF);
     Motor motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT);
     Motor motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT);
-    motorDisable(&motorL); // Disable DRV8833
-    motorDisable(&motorR); // Disable DRV8833
+    motorDisable(&motorL); // Ensure Diver is Disabled Before Configuration
+    motorDisable(&motorR); 
     motorConfig(&motorL, &encL, VBAT_MAX, 1.3f, true, SPEED_ALPHA, RPS_MAX);
-    motorConfig(&motorR, &encR, VBAT_MAX, 1.3f, false,  SPEED_ALPHA, RPS_MAX);
-    // BALANCE CONTROLLER
+    motorConfig(&motorR, &encR, VBAT_MAX, 1.3f, true,  SPEED_ALPHA, RPS_MAX);
+    // BALANCE CONTROLLERS
     PID balanceCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&balanceCtrl, BAL_OFFSET);
-    DDMR ddmr = {.dt = VEL_CNTRL_PERIOD * MS_TO_S};
-    PID motionCtrl = pidInit(-12, 12, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));
-    pidSetRef(&motionCtrl, 0.0f);
-
-
+    // DIFFERENTIAL DRIVE (LinVel, AngVel)
+    PID linVelCtrl = pidInit(-12, 12, VEL_P, VEL_I, VEL_D, (LINVEL_CNTRL_PERIOD * MS_TO_S));
+    pidSetRef(&linVelCtrl, 0.0f);
+    DDMR ddmr = {.dt = LINVEL_CNTRL_PERIOD * MS_TO_S};
     // ***** Application Tasks **************************************************************************** // 
-    FixedTimeTask blinkTask = createTask(BLINK_PERIOD);              // watchdog led
-    FixedTimeTask comsTask = createTask(COMS_PERIOD);                // PUB SUB RPC
+    FixedTimeTask blinkTask = createTask(BLINK_PERIOD);              // Watchdog led
+    FixedTimeTask comsTask = createTask(COMS_PERIOD);                // PUB SUB RPC 
     FixedTimeTask imuFusionTask = createTask(IMU_FUSION_PERIOD);     // Sensor Fusion 
-
-    FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD);  //wheel Speed Control (PI)
+    FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD);  // DC Motor Speed Control (PI)
     FixedTimeTask balanceCntrlTsk = createTask(BAL_CNTRL_PERIOD);    // Balance Theta Control
-    FixedTimeTask velCntrlTask = createTask(VEL_CNTRL_PERIOD);        // State Control Loop
+    FixedTimeTask linVelCntrlTask = createTask(LINVEL_CNTRL_PERIOD);// DDMR LinVel Control & Odometry
     // ****** Loop Parameters **************************************************************************** // 
     uint16_t loopTick = 0;
 	for(;;){
@@ -112,7 +109,7 @@ int main(void){
                 if(_fabs(imu.kal.pitch) <= BAL_CUTOFF){
                     comsSendMsg(&coms, &ser1, PUB_INFO, "PAUSED => RUN ");
                     motorEnable(&motorL);
-                     motorEnable(&motorR);
+                    motorEnable(&motorR);
                     state = RUN;
                 }
                 break;
@@ -122,30 +119,24 @@ int main(void){
                     motorDisable(&motorL);
                     motorDisable(&motorR);
                     state = PARK;
+                    break;
                 }
                 switch(mode){
-                    case MCNTRL:
-                        // Controls Motor Target Speed (RPM)
-                        break;
                     case PIDCNTRL:
-                        // Controls Robot X Velocity from Odometry 
                         // Adjusts Target balance angle
-                        // Controls Wheel Voltage from balance angle
+                        // Controls Wheel RPS from balance angle
                         if(CHECK_PERIOD(balanceCntrlTsk, loopTick)){
                             // Balance Control Inverted Pendulum PID
-                            pidRun(&balanceCtrl, imu.kal.pitch); 
-                            motorSetTrgtVel(&motorL, balanceCtrl.out); // Run Both Motors Same Speed
+                            balanceCtrl.out = pidRun(&balanceCtrl, imu.kal.pitch); 
                             motorSetTrgtVel(&motorR, balanceCtrl.out);
+                            motorSetTrgtVel(&motorL, balanceCtrl.out);
                             balanceCntrlTsk.lastTick = loopTick;
                         }
-                        if(CHECK_PERIOD(velCntrlTask, loopTick)){
-                            ddmrOdometry(&ddmr, &motorL, &motorR);
-
-                            // Velocity Control Differential Drive Robot
-                            //pidRun(&motionCtrl, ddmr.linVel);
-                            //pidSetRef(&balanceCtrl, BAL_OFFSET - motionCtrl.out);
-                            velCntrlTask.lastTick = loopTick;
-
+                        if(CHECK_PERIOD(linVelCntrlTask, loopTick)){
+                            ddmrOdometry(&ddmr, &motorL, &motorR);// Observer Odometry
+                            // Velocity Control Differential Drive Robot 
+                            pidSetRef(&balanceCtrl, BAL_OFFSET - linVelCtrl.out);
+                            linVelCntrlTask.lastTick = loopTick;
                         }
                         break;
                     case LQRCNTRL:
@@ -164,30 +155,29 @@ int main(void){
             // Motor Speed Control PI 
             motorCalSpeed(&motorL);
             motorCalSpeed(&motorR);
-            pidRun(&motorL.pi, motorL.angularVel);
-            pidRun(&motorR.pi, motorR.angularVel);
+            motorL.pi.out = pidRun(&motorL.pi, motorL.angularVel);
+            motorR.pi.out = pidRun(&motorR.pi, motorR.angularVel);
             motorSetVoltage(&motorL, motorL.pi.out);
             motorSetVoltage(&motorR, motorR.pi.out);
             wspeedCntlTask.lastTick = loopTick;
         }
 
         if(CHECK_PERIOD(imuFusionTask, loopTick)){
-            mpu6050Read(&mpu6050); // Read Sensor
+            mpu6050Read(&mpu6050); // Read Sensor need to move this to Interrupt Based 
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // Apply Low pass filter
-            imuCompFilt(&imu);  // Estimate Angle with  Complementary Filter
             imuKalUpdate(&imu); // Estimate Angle with Kalman Observer
             imuFusionTask.lastTick = loopTick;
         }
-
 
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
             blinkTask.lastTick = loopTick;  
         }
+
         if(CHECK_PERIOD(comsTask, loopTick)){
             // TX
             comsSendMsg(&coms, &ser1, PUB_IMU,imu.kal.pitch, imu.kal.roll);
-            comsSendMsg(&coms, &ser1, PUB_ODOM,motorL.angularVel, motorR.angularVel, motorL.pi.ref, motorR.pi.ref, ddmr.linX, motionCtrl.out);
+            comsSendMsg(&coms, &ser1, PUB_ODOM,motorL.angularVel, motorR.angularVel,motorL.pi.ref, motorL.pi.out, ddmr.linX, ddmr.linVel);
             // RX
             if(comsGrabMsg(&coms, &ser1)){
                 switch(coms.rxFrame.buf[0]){
@@ -230,19 +220,19 @@ int main(void){
                                 comsSendMsg(&coms, &ser1, PUB_CMD_RET,"i",valBuf);
                                 break;
                             case CMD_MT:
-                                snprintf(valBuf, 7, "%0.3f", motionCtrl.ref);
+                                snprintf(valBuf, 7, "%0.3f", linVelCtrl.ref);
                                 comsSendMsg(&coms, &ser1, PUB_CMD_RET,"j",valBuf);
                                 break;
                             case CMD_MP:
-                                snprintf(valBuf, 7, "%0.3f", motionCtrl.kp);
+                                snprintf(valBuf, 7, "%0.3f", linVelCtrl.kp);
                                 comsSendMsg(&coms, &ser1, PUB_CMD_RET,"k",valBuf);
                                 break;
                             case CMD_MI:
-                                snprintf(valBuf, 7, "%0.3f",motionCtrl.ki);
+                                snprintf(valBuf, 7, "%0.3f",linVelCtrl.ki);
                                 comsSendMsg(&coms, &ser1, PUB_CMD_RET,"l",valBuf);
                                 break;
                             case CMD_MD:
-                                snprintf(valBuf, 7, "%0.3f",motionCtrl.kd);
+                                snprintf(valBuf, 7, "%0.3f",linVelCtrl.kd);
                                 comsSendMsg(&coms, &ser1, PUB_CMD_RET,"i",valBuf);
                                 break;
                             default:
@@ -261,14 +251,16 @@ int main(void){
                                     pidSetRef(&motorR.pi, 0.0f);
                                     mode = MCNTRL; 
                                 }else if (val == PIDCNTRL){
-                                    pidSetRef(&motionCtrl, 0.0f);
-                                    pidSetRef(&motionCtrl, 0.0f);
+                                    pidSetRef(&linVelCtrl, 0.0f);
+                                    pidSetRef(&linVelCtrl, 0.0f);
                                     mode = PIDCNTRL;
                                 }
                                 break;
                             case CMD_WT:
                                 pidSetRef(&motorL.pi, val);
                                 pidSetRef(&motorR.pi, val);
+                                //motorSetVoltage(&motorL, val);
+                                //motorSetVoltage(&motorR, val);
                                 break;
                             case CMD_WP:
                                 pidSetKp(&motorL.pi,val); 
@@ -288,16 +280,16 @@ int main(void){
                                 pidSetKd(&balanceCtrl,val); 
                                 break;
                             case CMD_MT:
-                                pidSetRef(&motionCtrl,val); 
+                                pidSetRef(&linVelCtrl,val); 
                                 break;
                             case CMD_MP:
-                                pidSetKp(&motionCtrl,val); 
+                                pidSetKp(&linVelCtrl,val); 
                                 break;
                             case CMD_MI:
-                                pidSetKi(&motionCtrl, val);
+                                pidSetKi(&linVelCtrl, val);
                                 break;
                             case CMD_MD:
-                                pidSetKd(&motionCtrl, val);
+                                pidSetKd(&linVelCtrl, val);
                                 break;
                             default:
                                 comsSendMsg(&coms, &ser1, PUB_ERROR, "INVALID WREG");

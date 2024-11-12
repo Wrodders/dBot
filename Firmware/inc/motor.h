@@ -37,6 +37,7 @@ typedef struct Motor {
     PID pi;
     float angularVel; // angular speed rad/s
     float alpha; // speed lowpass filter parameter
+    int16_t dCount;
 
     float maxVel;
 }Motor;
@@ -144,9 +145,9 @@ static void motorCalSpeed(Motor* motor){
     //@Brief: Calculate Angular Speed in Rotations per Second
     //@Description: Applies lowpass filter to smooth Quantization errors 
     uint16_t mCount = encoderRead(motor->enc);
-    int16_t dCount = mCount - motor->enc->lastCount;
+    motor->dCount = mCount - motor->enc->lastCount;
     motor->enc->lastCount = mCount;
-    float mSpeed = dCount * TICKS_TO_RPS * motor->flipDir ; // rotations per second
+    float mSpeed = motor->dCount * TICKS_TO_RPS * motor->flipDir ; // rotations per second
     // Apply Low pass filter to speed measurement  b*speed[n] + (1-b)*speed[n-1] 
     motor->angularVel = (motor->alpha * mSpeed) + (1.00f - motor->alpha) * motor->angularVel;
 }
