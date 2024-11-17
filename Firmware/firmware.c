@@ -27,7 +27,7 @@ int main(void){
 	systick_setup();    // 1ms Tick
 	struct GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
     // Serial
-    Serial ser1 = serialInit(DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, 
+    struct Serial ser1 = serialInit(DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, 
                             NVIC_USART1_IRQ, 
                             rx1_buf_, ARR_SIZE(rx1_buf_), 
                             tx1_buf_, ARR_SIZE(tx1_buf_));

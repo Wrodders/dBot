@@ -26,8 +26,8 @@ struct IMU{
     struct{
         float aAccel;       // LFP Alpha 
         float aGyro;        //    
-        vector_t accel;     // LPF output 
-        vector_t gyro;      //
+        struct vector_t accel;     // LPF output 
+        struct vector_t gyro;      //
     }lpf;
     struct{
         float pitch, roll;
@@ -57,7 +57,7 @@ static struct IMU imuInit(const float alphaAccel, const float alphaGyro, const f
     return imu;
 }
 
-static void imuLPF(struct IMU* imu, const vector_t* accel, const vector_t* gyro){
+static void imuLPF(struct IMU* imu, const struct vector_t* accel, const struct vector_t* gyro){
     // first order IIR filter
     // y[n] = a * y[n-1] + (1-a) * x[n]
     imu->lpf.accel.x = (imu->lpf.aAccel * imu->lpf.accel.x) + (1.0f - imu->lpf.aAccel) * accel->x;
