@@ -1,50 +1,38 @@
 #ifndef DDMR_H
 #define DDMR_H
 
-
 #include "motor.h"
 
-
 // ******* Differential Drive Mobile Robot ********* // 
-//@Brief: Controls Robot State in 2D plane
-//@Description: Implements Differential Drive Kinematic Model
-//              LinVel AngVel Control
-
-/*
-    Models and Controls the kinematics of the TWSB Robot in the 2D Plane 
-    Provides a DDMR Controllable Robot via cascaded PID 
-    Forward Kinematics:
-    Va = R * (wR + wL) / 2
-    Wa = 2R * (wR - wL) / L
-    Inverse Kinematics: 
-    wR = (Va - Wa) * L
-    wL = (Va + Wa) * L
-*/
-
-
 typedef struct DDMR{
-    const float wheelR; // R
-    const float wheelBase; // L
+    const float wheelR;     // R [m]
+    const float wheelBase;  // L [m]
+    const float linAlpha;   // LPF coeff
+    const float angAlpha;   // LPF coeff 
     // kinematic state
-    float linVel;
-    float linX; 
-    float dt;
-
+    float linVel;   // m/s    
+    float angVel;   // angular vel [rad/s]
 }DDMR; // Deferential Drive Mobile Robot
 
 
+static DDMR ddmrInit(const float wheelRadius, const float wheelBase, const float linAlpha, const float angAlpha){
+    DDMR ddmr =  {
+        .wheelR = wheelRadius,
+        .wheelBase = wheelBase,
+        .linAlpha = angAlpha,
+        .linVel = linAlpha
+    };
+    return ddmr;
+} 
 
-static void ddmrOdometry(DDMR *ddmr, Motor *mL, Motor *mR){
-    //@Brief: Compute Kinematic State of Mobile Robot using Odometry
-    float mVel = (mL->angularVel * RPS_TO_MPS + mR->angularVel * RPS_TO_MPS ) * 0.5f; // convert to mps 
-    ddmr->linVel = (VEL_ALPHA * mVel) + (1.0f - VEL_ALPHA) * ddmr->linVel;  // lpf filter 
-    float dx  = ddmr->linVel * (ddmr->dt) ;
-    ddmr->linX += dx; 
+//@Brief: Compute Kinematic State of Mobile Robot using WheelOdometry
+//@Description:  vel = R * (wR + wL) / 2
+//               angVel = 2R * (wR - wL) / L
+static void ddmrEstimateOdom(DDMR *const ddmr, const Motor *const mL, const Motor *const mR){
+    float vel = (mL->angularVel * RPS_TO_MPS + mR->angularVel * RPS_TO_MPS ) * 0.5f; // convert to mps 
+    ddmr->linVel = (ddmr->linAlpha * vel) + (1.0f - ddmr->linAlpha) * ddmr->linVel;  // lpf filter 
+    vel = 2*(ddmr->wheelR) * (mL->angularVel - mR->angularVel) *RPS_TO_RADS;         // ang vel in rad/s
+    ddmr->angVel = (ddmr->angAlpha * vel) + (1.0f - ddmr->angAlpha) * ddmr->angVel;  // lpf filter 
 }
-
-
-
-
-
 
 #endif // DDMR_H

@@ -5,10 +5,10 @@ show_help() {
     echo "Usage: $0 -u <username> -i <ip_address> -d <remote_directory> -f <file1> [<file2> ... <fileN>]"
     echo ""
     echo "  -f <file1> [<file2> ... <fileN>] Path(s) to binary file(s) or folder(s)"
-    echo "  -d <remote_directory> Specify the remote directory (relative to home)"
-    echo "  -u <username>      Specify the username for SSH"
-    echo "  -i <ip_address>    Specify the IP address of the Raspberry Pi"
-    echo "  --help             Show this help message"
+    echo "  -d|--directory <remote_directory> Specify the remote directory (relative to home)"
+    echo "  -u|--user <username>      Specify the username for SSH"
+    echo "  -i|--ip <ip_address>      Specify the IP address of the Raspberry Pi"
+    echo "  --help                    Show this help message"
     exit 0
 }
 
@@ -46,7 +46,7 @@ FILE_LIST=()
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -f|--file) shift; while [[ "$#" -gt 0 && "$1" != -* ]]; do FILE_LIST+=("$1"); shift; done ;;
+        -f|--file) shift; FILE_LIST+=("$1") ;;
         -d|--directory) REMOTE_BIN_DIR="$2"; shift ;;
         -u|--user) PI_USER="$2"; shift ;;
         -i|--ip) PI_IP="$2"; shift ;;
@@ -61,6 +61,9 @@ if [[ -z "$REMOTE_BIN_DIR" ]] || [[ -z "$PI_USER" ]] || [[ -z "$PI_IP" ]] || [[ 
     echo "Error: All parameters (username, IP, directory, and at least one file) must be specified."
     show_help
 fi
+
+# Create the full user@ip address
+PI_USER_IP="$PI_USER@$PI_IP"
 
 # Main logic to upload files
 for FILE in "${FILE_LIST[@]}"; do

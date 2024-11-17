@@ -77,7 +77,8 @@
 #define IMU_FUSION_PERIOD       2   //  500 Hz
 #define BAL_CNTRL_PERIOD        10  // 250 Hz
 #define WSPEED_CNTRL_PERIOD     5   // 200 Hz
-#define LINVEL_CNTRL_PERIOD     100 // 10 Hz
+#define VEL_CNTRL_PERIOD        20  // 50 Hz 
+
 
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI                3.14159265358979323846f
@@ -96,6 +97,7 @@ const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (WSPEED_CNTRL_PERIOD * MS_T
 const float MPS_TO_RPS      = (float) 1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
 const float RAD_TO_DEG      = (float)(180.0f / M_PI);
+const float RPS_TO_RADS     = (float)(2*M_PI);
 
 const float RPS_MAX         = 10.00f;  // rps
 const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
@@ -108,16 +110,15 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 
 // Motor Speed Control
 #define SPEED_KP    3.0f
-#define SPEED_KI    12.0f
+#define SPEED_KI    0.06f
 #define SPEED_KD    0.00f
-#define SPEED_ALPHA  0.95f
+#define SPEED_ALPHA 0.95f
 // Balance Control 
 #define BAL_OFFSET          3.0f    // deg
-#define BAL_MAX_RECOVERY   45      //
-#define BAL_CUTOFF          45      // 
-#define BAL_KP              0.1
-#define BAL_KI             3.0f 
-#define BAL_KD              0.0045f
+#define BAL_CUTOFF         35      // 
+#define BAL_KP             0.1
+#define BAL_KI             0.03f 
+#define BAL_KD             4.5f
 #define VEL_P 0.0
 #define VEL_I 0.0
 #define VEL_D 0.0

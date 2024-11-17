@@ -4,68 +4,19 @@
 #include "../common/common.h"
 #include "../drivers/serial.h"
 
-
-
 /*
-Communication Protocol:
-Tranmission and reception are handled separately.
-*************************************************
-Tranmission: 
-The Device; on which this firmware is executed, acts as a data publisher.
-Unique Topics are used in a Pub Sub model where another program acts as a Subscriber.
-It is the Subscribers responsibilty to correctly interpret the messages per id.
-The Device may only publish over a set list of topics, which can be activated/deactivated.
-gstThe Device may list the format & description of each id at start up and/or upon request.
-
-Messages are framed inside a packet:
-
-|-------------Packet---------|
-|     |-------Frame-----|
-|           |
-|-----+-----+----+- - - +----|
-| SOF | ID  |TYPE| DATA | EOF|
-| 1   | 1   | 1  | ...  | 1  |
-|-----------+----+- - - +----|
-     
-
-
-SOF -- Start of Frame 
-LEN -- Size of Data (bytes)
-ID -- Hashed Topic String Identifier 
+|-----------Packet---------|
+|-----+---+----+- - - +----|
+| SOF |CMD| ID | DATA | EOF|
+| 1   | 1 | 1  | .... | 1  |
+|-----+---+----+- - - +----|
+      |--------Frame-------|
+SOF -- Start of Frame
+CMD -- CMD Type Get Set Run
+ID --  Topic Identifier 
 DATA -- LEN bytes of data
 EOF - End of Frame 
-
-
-Message Frames Have a max size. 
-Topics must declare their message protocols in a format specifier string, e.g "f:c:d:d" using the same format as printf and sprintf ect. 
-This will be used to encode a message into the frame, and allows the subscriber to correctly decode it. 
-
-Subscribers will delimit messages based on receiving the start of frame byte, 
-If a SOF is received before LEN bytes message is aborted and new message begins. This acts as an escape/abort key. 
-
-Data Received Byte By Byte in USART ISR
-Put into Ringbuffer, serviced by Main through Non-Blocking GetMessage() returns a
-MsgFrame Struct used to Handle msgs by TopicIDs 
-
-Async messages passed to Queue of MessagesPackets
-Queue serviced by Main every 100ms and written to TX ring buffer for transmission via ISR
-
-*************************************************
-Reception
-In order ot solve the issue of dynamic discovery and possible miss match of commands and protocols between various systems
-a variant of AT Commands logic is used. Devices have a default set of commands that can be used to identify the devices commands and protocols. 
-ID command reports all commands available on device and format as single source of truth. 
-Commands consist of GET/SET/RUN modifiers which act on unique ids mapped to pointers in an ordered array. 
-Commands must register their input and response format.
-All Commands have a timeout. Error messages are transmitted back over the Error id. 
-Parameters to be passed to commands may be specified as required or optional with default values
-
-A successful command message will be parsed, executed, its responds over cmdResp id and its acknowledge over cmdRet id
-Error in any part of this process will result in a Failed cmdRet and an accompanying error message 
-over error id identifiable by command id
-
 */
-
 
 #define SOF_BYTE '<' // hex 0x3C 
 #define EOF_BYTE  '\n' // 
@@ -73,17 +24,22 @@ over error id identifiable by command id
 #define MAX_MSG_DATA_SIZE 64
 #define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
-
- 
+#define PROT_CMD_IDX 0 
+#define PROT_ID_IDX 1
 
 typedef struct MsgFrame{
-    bool valid;
     uint8_t size; // current size of msg buffer
-    uint8_t id; // id 
     uint8_t cmdType;
+    uint8_t id;  // id for map  
     uint8_t buf[MAX_MSG_DATA_SIZE]; 
 }MsgFrame;
 
+typedef enum {
+    CMD_GET = 0, // Get Parameter Value
+    CMD_SET,     // Set Parameter Value
+    CMD_RUN,      // Execute Function
+    NUM_CMDS
+}CMD_t; // Command Type
 
 typedef enum {
     PUB_CMD_RET = 0,
@@ -93,48 +49,70 @@ typedef enum {
     // ADD Application Specific Publishers
     PUB_IMU,
     PUB_ODOM,
+    PUB_CTRL,
 
     NUM_PUBS
 }PUB_ID_t; // Publish Topic IDs
 
 typedef enum {
-    CMD_ID = 0,
-    CMD_RESET,
-    // ADD Application Specific Cmds 
-    CMD_MODE,
-    CMD_WT,
-    CMD_WP,
-    CMD_WI,
+    PRM_ID = 0,
+    // Motor Speed PID 
+    PRM_LT, PRM_LP, PRM_LI,
+    PRM_RT, PRM_RP, PRM_RI,
+    // Balance PID
+    PRM_BT,
+    PRM_BP,
+    PRM_BI,
+    PRM_BD,
+    // AngVel Offset
+    PRM_VT,
+    PRM_VP,
+    PRM_VI,
+    PRM_VD,
+    PRM_VA,
+    PRM_AT,
+    PRM_AP,
+    PRM_AI,
+    PRM_AD,
+    PRM_AA,
+    NUM_PARAMS
+}PARAM_ID_t; // Parameter Ids
 
-    CMD_BP,
-    CMD_BI,
-    CMD_BD,
+typedef enum {
+    RUN_RESET = 0,
+    RUN_UPGRADE,
 
-    CMD_MT,
-    CMD_MP,
-    CMD_MI,
-    CMD_MD,
-
-    NUM_CMDS
-}CMD_ID_t; // Cmd Topic Ids
-
-typedef enum{
-    IDLE = 0, 
-    ID, 
-    DATA, 
-    ERROR
-}COMS_STATE_t;
+    NUM_RUN
+}RUN_ID_t; // Run Command Id
 
 typedef struct {
-    union {
-        CMD_ID_t cmdId;
-        PUB_ID_t pubId;
-    }id;
+    PUB_ID_t id;
     const char* name;
     const char* format; 
     const uint8_t nArgs;
 }Topic;
 
+typedef struct {
+    PARAM_ID_t id;
+    const char* name;
+    const char* format;
+    float *const param;
+}Param;
+
+typedef struct {
+    RUN_ID_t id;
+    const char* name;
+    const char* format;
+    const uint8_t nArgs;
+}RunFunc;
+
+typedef enum{
+    IDLE = 0, 
+    CMDTYPE,
+    ID, 
+    DATA, 
+    ERROR
+}COMS_STATE_t;
 
 typedef struct Coms{
     COMS_STATE_t state;
@@ -142,33 +120,21 @@ typedef struct Coms{
     MsgFrame txFrame;
 
     const Topic* pubMap;
-    const Topic* cmdMap;
+    const Param* paramMap;
 }Coms;
 
-static Coms comsInit(const Topic* pubMap, const Topic* cmdMap){
-    Coms c = { .pubMap = pubMap, .cmdMap = cmdMap};
+static Coms comsInit(const Topic* pubMap, const Param* paramMap){
+    Coms c = { .pubMap = pubMap, .paramMap = paramMap};
     return c;
 }
 
-
 static inline const char* comsGetPubFmt(Coms* coms, PUB_ID_t pubID){return coms->pubMap[pubID].format;}
 static inline const char* comsGetPubName(Coms* coms, PUB_ID_t pubID){return coms->pubMap[pubID].name;}
-static inline const char* comsGetCmdFmt(Coms* coms, CMD_ID_t pubID){return coms->cmdMap[pubID].format;}
-static inline const char* comsGetCmdName(Coms* coms, CMD_ID_t pubID){return coms->cmdMap[pubID].name;}
+static inline const char* comsGetCmdFmt(Coms* coms, PARAM_ID_t pubID){return coms->paramMap[pubID].format;}
+static inline const char* comsGetCmdName(Coms* coms, PARAM_ID_t pubID){return coms->paramMap[pubID].name;}
 
 //****** Message Tranmission packetization  ***************//
-/*
-|-------Packet---------|
-|-----+----+- - - +----|
-| SOF | ID | DATA | EOF|
-| 1   | 1  | .... | 1  |
-|-----+----+- - - +----|
-      |------Frame-----|
-SOF -- Start of Frame 
-ID --  Topic Identifier 
-DATA -- LEN bytes of data
-EOF - End of Frame 
-*/
+
 static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t pubID, ...){
     //@Brief: Formats and Packets a Message, sends over serial. 
     const uint8_t DATA_IDX = 2;
@@ -189,27 +155,32 @@ static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t pubID, ...){
     return true;
 }
 
-
+//@Brief: Processes Received Data Into Message Frame
 static bool comsGrabMsg(Coms* coms, Serial* ser){
     uint8_t byte;
     while(rbGet(&ser->rxRB,  &byte) == true){
         switch(coms->state){
             case IDLE:
                 if(byte == SOF_BYTE){
-                    coms->state=ID;
+                    coms->state=CMDTYPE;
                     coms->rxFrame.size = 0;
                     memset(coms->rxFrame.buf, 0, MAX_MSG_DATA_SIZE);
                 }
                 break;
+            case CMDTYPE:
+                if(byte - 'a' >= NUM_CMDS){coms->state=ERROR; break;} // Failed to match Command
+                coms->rxFrame.cmdType = byte - 'a';
+                coms->state=ID;
+                break;
             case ID:
-                coms->rxFrame.id = byte -'a';
+                coms->rxFrame.id = byte - 'a';
                 coms->state = DATA;
                 break;
             case DATA:
-                if(byte == SOF_BYTE){coms->state=ERROR;break;}
-                if(coms->rxFrame.size == MAX_MSG_DATA_SIZE){coms->state=ERROR;break;}
+                if(byte == SOF_BYTE){coms->state=ERROR;break;} // Early Escape
+                if(coms->rxFrame.size == MAX_MSG_DATA_SIZE){coms->state=ERROR;break;} 
                 if(byte == EOF_BYTE){
-                    coms->rxFrame.buf[coms->rxFrame.size++]='\0';
+                    coms->rxFrame.buf[coms->rxFrame.size++]='\0'; // null term char array!
                     coms->state=IDLE;
                     return true;
                 }
@@ -226,32 +197,34 @@ static bool comsGrabMsg(Coms* coms, Serial* ser){
     return false;
 }
 
-
-
-static void comsDeclarePubs(Coms* coms, Serial* ser){
-
-    const uint8_t DATA_IDX = 2;
-    uint8_t* msgBuf = coms->txFrame.buf; // readability
-    const Topic* pubMap = coms->pubMap;
-    const Topic* cmdMap = coms->cmdMap;
-    size_t idx;
-    // Pack Pub Topic Info: Name:Format
-    for(int i = 0; i < NUM_PUBS; i++){
-        idx = 0;
-        msgBuf[idx++] = SOF_BYTE;
-        msgBuf[idx++] = PUB_CMD_RET + 'a';
-        msgBuf[idx++] = CMD_ID; // Calling Cmd IDmake
-        msgBuf[idx++] = ':'; // delim
-
-        const char* pubName = comsGetPubName(coms, i);
-        idx += uCpy((char*)&msgBuf[idx],pubName, 0); 
-        msgBuf[idx++] = ':';
-        const char* pubFmt = comsGetPubFmt(coms, i);
-        idx += uCpy((char*)&msgBuf[idx], pubFmt, 0);
-        msgBuf[idx++] = EOF_BYTE;
-        serialSend(ser, msgBuf, idx);
+static void comsProcessMsg(Coms * coms,Serial *ser){
+    uint8_t paramIdx = coms->rxFrame.id;
+    if(paramIdx >= NUM_PARAMS){
+        comsSendMsg(coms, ser,PUB_ERROR, "INVALID PARAM");
+        return;
+    }
+    if(coms->paramMap[paramIdx].param == NULL){
+        comsSendMsg(coms, ser, PUB_ERROR, "INVALID ACCESS");
+        return;
+    }
+    switch(coms->rxFrame.cmdType){
+        case CMD_GET:
+            char valBuf[7]; // working buffer
+            snprintf(valBuf, sizeof(valBuf), "%0.3f", *coms->paramMap[paramIdx].param);
+            comsSendMsg(coms, ser, PUB_CMD_RET,(paramIdx + 'a'),valBuf);
+            break;
+        case CMD_SET:
+            float val; // working variable
+            val = atof((char*)coms->rxFrame.buf); // read in paramater value from start of data
+            *coms->paramMap[paramIdx].param = val; // lookup into param Map 
+            break;
+        case CMD_RUN:
+            comsSendMsg(coms, ser, PUB_DEBUG, "NotImp");
+            break;
+        default:
+            comsSendMsg(coms, ser, PUB_ERROR, "INVALID CMDTYPE");
+            break;
     }
 }
-
 
 #endif // COMS_H

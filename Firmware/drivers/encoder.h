@@ -14,7 +14,7 @@ typedef struct Encoder {
     uint32_t timPerif;
     uint16_t period; // counts per revolution
     
-    uint16_t lastCount; // encoder count
+    uint32_t lastCount; // encoder count
 }Encoder;
 
  static Encoder encoderInit(uint32_t timPerif, uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {

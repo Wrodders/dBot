@@ -16,83 +16,81 @@
 #define RB_SIZE 128          // ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[RB_SIZE] = {0};
 uint8_t tx1_buf_[RB_SIZE] = {0};
+float UUID = 3.14159;
 
 // ********* SUPER LOOP **************** // 
 int main(void){
-
     enum STATE {INIT = 0, PARK, RUN} state = INIT;
     enum MODE {MCNTRL = 0, PIDCNTRL,LQRCNTRL} mode = PIDCNTRL;
-
-    // ***************************** COMMUNICATIONS ******************************************************** // 
-    const Topic pubMap[NUM_PUBS] = {
-        {{.pubId = PUB_CMD_RET}, .name = "CMD_RET", .format ="%s:%s", .nArgs=2}, // CMD_ID : RET_VAL
-        {{.pubId = PUB_ERROR}, .name = "ERROR", .format = "%s", .nArgs=1}, // Error Message
-        {{.pubId = PUB_INFO}, .name = "INFO", .format = "%s", .nArgs=1}, // System INFO
-        {{.pubId = PUB_DEBUG}, .name = "DEBUG", .format = "%s", .nArgs=1}, // Debug prints 
-
-        // Application Publisher Topics 
-        {{.pubId = PUB_IMU}, .name = "IMU", .format = "%0.3f:%0.3f", .nArgs=2}, // ROLL:PITCH:YAW
-        {{.pubId = PUB_ODOM}, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=4} // LSPEED:RSPEED:TL:TR:LIN:BAL
-    };
-    const Topic cmdMap[NUM_CMDS] = {
-        {{.cmdId = CMD_ID }, .name = "IDENT", .format = "", .nArgs=0},
-        {{.cmdId = CMD_RESET}, .name = "RESET", .format = "", .nArgs=0},
-
-        // Application Cmd Topics
-        {{.cmdId = CMD_MODE}, .name = "MODE", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_WT}, .name = "WTRGT", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_WP}, .name = "WP", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_WI}, .name = "WI", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_BP}, .name = "BP", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_BI}, .name = "BI", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_BD}, .name = "BD", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_MT}, .name = "MTRGT", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_MP}, .name = "MP", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_MI}, .name = "MI", .format = "%f", .nArgs=1},
-        {{.cmdId = CMD_MI}, .name = "MD", .format = "%f", .nArgs=1}
-    };
-
 	// ***************************** HARDWARE SETUP ******************************************************** //
-	clock_setup(); // Main System external XTAL 25MHz Init Peripheral Clocks
-	systick_setup(); // 1ms Tick
+	clock_setup();      // Main System external XTAL 25MHz Init Peripheral Clocks
+	systick_setup();    // 1ms Tick
 	GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
-    // COMMUNICATIONS
+    // Serial
     Serial ser1 = serialInit(DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, 
                             NVIC_USART1_IRQ, 
                             rx1_buf_, ARR_SIZE(rx1_buf_), 
                             tx1_buf_, ARR_SIZE(tx1_buf_));
     serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-    Coms coms = comsInit(pubMap, cmdMap);
-    comsSendMsg(&coms, &ser1, PUB_DEBUG, "COMS");
     // IMU 
     i2cInit(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
-    comsSendMsg(&coms, &ser1, PUB_DEBUG, "I2C");
     MPU6050 mpu6050 = mpu6050Init(IMU_PERIF);
     IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (IMU_FUSION_PERIOD * MS_TO_S));
-    comsSendMsg(&coms, &ser1, PUB_DEBUG, "IMU");
     // MOTORS 
-    Encoder encR = encoderInit(ENC_1_TIM, UINT16_MAX, ENC_1_A, ENC_1_PORT, ENC_1_B, ENC_1_PORT, ENC_1_AF);
-    Encoder encL = encoderInit(ENC_2_TIM, UINT16_MAX, ENC_2_A, ENC_2_PORT, ENC_2_B, ENC_2_PORT, ENC_2_AF);
+    Encoder encR = encoderInit(ENC_2_TIM, UINT16_MAX, ENC_2_A, ENC_1_PORT, ENC_2_B, ENC_2_PORT, ENC_2_AF);
+    Encoder encL = encoderInit(ENC_1_TIM, UINT16_MAX, ENC_1_A, ENC_2_PORT, ENC_1_B, ENC_1_PORT, ENC_1_AF);
     Motor motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT);
     Motor motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT);
-    motorDisable(&motorL); // Ensure Diver is Disabled Before Configuration
-    motorDisable(&motorR); 
-    motorConfig(&motorL, &encL, VBAT_MAX, 1.3f, true, SPEED_ALPHA, RPS_MAX);
-    motorConfig(&motorR, &encR, VBAT_MAX, 1.3f, true,  SPEED_ALPHA, RPS_MAX);
-    // BALANCE CONTROLLERS
+    motorDisable(&motorL); // Ensure Driver is Disabled Before Configuration
+    motorDisable(&motorR); //
+    motorConfig(&motorL, &encL, VBAT_MAX, 1.2f, true, SPEED_ALPHA, RPS_MAX);
+    motorConfig(&motorR, &encR, VBAT_MAX, 1.2f, false,  SPEED_ALPHA, RPS_MAX);
+    motorEnable(&motorL);
+    motorEnable(&motorR);
+    // BALANCE CONTROLLER
     PID balanceCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
-    pidSetRef(&balanceCtrl, BAL_OFFSET);
-    // DIFFERENTIAL DRIVE (LinVel, AngVel)
-    PID linVelCtrl = pidInit(-12, 12, VEL_P, VEL_I, VEL_D, (LINVEL_CNTRL_PERIOD * MS_TO_S));
-    pidSetRef(&linVelCtrl, 0.0f);
-    DDMR ddmr = {.dt = LINVEL_CNTRL_PERIOD * MS_TO_S};
+    pidSetRef(&balanceCtrl, -7.5f);
+    // DIFFERENTIAL DRIVE MODEL (LinVel, AngVel)
+    DDMR ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, VEL_ALPHA);
+    PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
+
+    // ***************************** COMMUNICATIONS ******************************************************** // 
+    const Topic pubMap[NUM_PUBS] = {
+        {.id = PUB_CMD_RET, .name = "CMD_RET", .format ="%s:%s", .nArgs=2}, // CMD_ID : RET_VAL
+        {.id = PUB_ERROR,   .name = "ERROR",   .format = "%s",   .nArgs=1}, // Error Message
+        {.id = PUB_INFO,    .name = "INFO",    .format = "%s",   .nArgs=1}, // System INFO
+        {.id = PUB_DEBUG,   .name = "DEBUG",   .format = "%s",   .nArgs=1}, // Debug prints 
+        // Application Publisher Topics 
+        {.id = PUB_IMU, .name = "IMU", .format = "%0.3f:%0.3f", .nArgs=2}, // ROLL:PITCH:YAW
+        {.id = PUB_ODOM, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=6} // LSPEED:RSPEED:TL:UL:UR:LINVEL
+    };
+    const Param paramMap[NUM_PARAMS] = {
+        {.id = PRM_ID,   .name = "ID",    .param = &UUID,             .format = "%f"},
+        {.id = PRM_LT,   .name = "LT",    .param = &motorL.wCtrl.ref, .format = "%f"},
+        {.id = PRM_LP,   .name = "LP",    .param = &motorL.wCtrl.kp,  .format = "%f"},
+        {.id = PRM_LI,   .name = "LI",    .param = &motorL.wCtrl.ki,  .format = "%f"},
+        {.id = PRM_RT,   .name = "RT",    .param = &motorR.wCtrl.ref, .format = "%f"},
+        {.id = PRM_RP,   .name = "RP",    .param = &motorR.wCtrl.kp,  .format = "%f"},
+        {.id = PRM_RI,   .name = "RI",    .param = &motorR.wCtrl.ki,  .format = "%f"},
+        {.id = PRM_BP,   .name = "BT",    .param = &balanceCtrl.ref,  .format = "%f"},
+        {.id = PRM_BP,   .name = "BP",    .param = &balanceCtrl.kp,   .format = "%f"},
+        {.id = PRM_BI,   .name = "BI",    .param = &balanceCtrl.ki,   .format = "%f"},
+        {.id = PRM_BD,   .name = "BD",    .param = &balanceCtrl.kd,   .format = "%f"},
+        {.id = PRM_VT,   .name = "VT",    .param = &velCtrl.ref,        .format = "%f"},
+        {.id = PRM_VP,   .name = "VP",    .param = &velCtrl.kp,       .format = "%f"},
+        {.id = PRM_VI,   .name = "VI",    .param = &velCtrl.ki,       .format = "%f"},
+        {.id = PRM_VD,   .name = "VD",    .param = &velCtrl.kd,       .format = "%f"}
+    };
+    Coms coms = comsInit(pubMap, paramMap);
+    comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
+
     // ***** Application Tasks **************************************************************************** // 
     FixedTimeTask blinkTask = createTask(BLINK_PERIOD);              // Watchdog led
     FixedTimeTask comsTask = createTask(COMS_PERIOD);                // PUB SUB RPC 
     FixedTimeTask imuFusionTask = createTask(IMU_FUSION_PERIOD);     // Sensor Fusion 
     FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD);  // DC Motor Speed Control (PI)
-    FixedTimeTask balanceCntrlTsk = createTask(BAL_CNTRL_PERIOD);    // Balance Theta Control
-    FixedTimeTask linVelCntrlTask = createTask(LINVEL_CNTRL_PERIOD);// DDMR LinVel Control & Odometry
+    FixedTimeTask balanceCntrlTask = createTask(BAL_CNTRL_PERIOD);    // Balance Theta Control
+    FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);        // Linear Velocity Control 
     // ****** Loop Parameters **************************************************************************** // 
     uint16_t loopTick = 0;
 	for(;;){
@@ -121,189 +119,51 @@ int main(void){
                     state = PARK;
                     break;
                 }
-                switch(mode){
-                    case PIDCNTRL:
-                        // Adjusts Target balance angle
-                        // Controls Wheel RPS from balance angle
-                        if(CHECK_PERIOD(balanceCntrlTsk, loopTick)){
-                            // Balance Control Inverted Pendulum PID
-                            balanceCtrl.out = pidRun(&balanceCtrl, imu.kal.pitch); 
-                            motorSetTrgtVel(&motorR, balanceCtrl.out);
-                            motorSetTrgtVel(&motorL, balanceCtrl.out);
-                            balanceCntrlTsk.lastTick = loopTick;
-                        }
-                        if(CHECK_PERIOD(linVelCntrlTask, loopTick)){
-                            ddmrOdometry(&ddmr, &motorL, &motorR);// Observer Odometry
-                            // Velocity Control Differential Drive Robot 
-                            pidSetRef(&balanceCtrl, BAL_OFFSET - linVelCtrl.out);
-                            linVelCntrlTask.lastTick = loopTick;
-                        }
-                        break;
-                    case LQRCNTRL:
-                        break;
-                    default:
-                        break;
+                if(CHECK_PERIOD(balanceCntrlTask, loopTick)){
+                    // Balance Control Inverted Pendulum PID
+                    balanceCtrl.out = pidRun(&balanceCtrl, imu.kal.pitch); 
+                    motorSetTrgtSpeed(&motorR, balanceCtrl.out);
+                    motorSetTrgtSpeed(&motorL, balanceCtrl.out);
+                    balanceCntrlTask.lastTick = loopTick;
+                }
+                if(CHECK_PERIOD(velCtrlTask, loopTick)){
+                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
+                    velCtrl.out = pidRun(&velCtrl, ddmr.linVel);
+                    pidSetRef(&balanceCtrl, -7.5); // Sets Balance Reference point to reach desired velocity
                 }
                 break;
             default:
                 break;  
         };
-
         // ********* FIXED TIME TASKS ******************************************************************* // 
-
-        if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
-            // Motor Speed Control PI 
-            motorCalSpeed(&motorL);
-            motorCalSpeed(&motorR);
-            motorL.pi.out = pidRun(&motorL.pi, motorL.angularVel);
-            motorR.pi.out = pidRun(&motorR.pi, motorR.angularVel);
-            motorSetVoltage(&motorL, motorL.pi.out);
-            motorSetVoltage(&motorR, motorR.pi.out);
-            wspeedCntlTask.lastTick = loopTick;
-        }
-
         if(CHECK_PERIOD(imuFusionTask, loopTick)){
             mpu6050Read(&mpu6050); // Read Sensor need to move this to Interrupt Based 
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro); // Apply Low pass filter
             imuKalUpdate(&imu); // Estimate Angle with Kalman Observer
             imuFusionTask.lastTick = loopTick;
         }
-
+        if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
+            // Motor Speed Control ISR 
+            motorSpeedCtrl(&motorL);
+            motorSpeedCtrl(&motorR);
+            wspeedCntlTask.lastTick = loopTick;
+        }
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
             blinkTask.lastTick = loopTick;  
         }
-
+        // ********** Communications ********************************************************************** //
         if(CHECK_PERIOD(comsTask, loopTick)){
-            // TX
+            // TX Publishing Topics
             comsSendMsg(&coms, &ser1, PUB_IMU,imu.kal.pitch, imu.kal.roll);
-            comsSendMsg(&coms, &ser1, PUB_ODOM,motorL.angularVel, motorR.angularVel,motorL.pi.ref, motorL.pi.out, ddmr.linX, ddmr.linVel);
-            // RX
+            comsSendMsg(&coms, &ser1, PUB_ODOM, motorL.angularVel, motorR.angularVel, 
+                                                motorL.wCtrl.ref, motorL.wCtrl.out,
+                                                motorR.wCtrl.out, ddmr.linVel);
+            // Handle RX Messages 
             if(comsGrabMsg(&coms, &ser1)){
-                switch(coms.rxFrame.buf[0]){
-                    case 'a': // GET CMDS
-                        char valBuf[7]; 
-                        switch(coms.rxFrame.id){
-                            case CMD_ID:
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET, "a", "STM");
-                                break;
-                            case CMD_RESET:
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET, "b", "RESET");
-                                break;
-                            case CMD_MODE:
-                                if(mode == MCNTRL){ comsSendMsg(&coms, &ser1, PUB_CMD_RET, "c", "MCNTRL");}
-                                else if(mode == PIDCNTRL){ comsSendMsg(&coms, &ser1, PUB_CMD_RET, "c", "PIDCNTRL");}
-                                else if(mode == LQRCNTRL){ comsSendMsg(&coms, &ser1, PUB_CMD_RET, "c", "LQRCNTRL");}
-                                break;
-                            case CMD_WT:
-                                snprintf(valBuf, 7, "%0.3f", motorL.pi.ref);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"d",valBuf);
-                                break;
-                            case CMD_WP:
-                                snprintf(valBuf, 7, "%0.3f", motorL.pi.kp);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"e",valBuf);
-                                break;
-                            case CMD_WI:
-                                snprintf(valBuf, 7, "%0.3f", motorL.pi.ki);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"f",valBuf);
-                                break;
-                            case CMD_BP:
-                                snprintf(valBuf, 7, "%0.3f", balanceCtrl.kp);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"g",valBuf);
-                                break;
-                            case CMD_BI:
-                                snprintf(valBuf, 7, "%0.3f", balanceCtrl.ki);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"h",valBuf);
-                                break;
-                            case CMD_BD:
-                                snprintf(valBuf, 7, "%0.3f", balanceCtrl.kd);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"i",valBuf);
-                                break;
-                            case CMD_MT:
-                                snprintf(valBuf, 7, "%0.3f", linVelCtrl.ref);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"j",valBuf);
-                                break;
-                            case CMD_MP:
-                                snprintf(valBuf, 7, "%0.3f", linVelCtrl.kp);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"k",valBuf);
-                                break;
-                            case CMD_MI:
-                                snprintf(valBuf, 7, "%0.3f",linVelCtrl.ki);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"l",valBuf);
-                                break;
-                            case CMD_MD:
-                                snprintf(valBuf, 7, "%0.3f",linVelCtrl.kd);
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET,"i",valBuf);
-                                break;
-                            default:
-                                comsSendMsg(&coms, &ser1, PUB_ERROR, "INVALID RREF");
-                                break;
-                        }
-                        break;
-                    case 'b': // SET CMDS
-                        float val;
-                        val = atof((char*)&coms.rxFrame.buf[1]); // read in paramater value 
-                        switch(coms.rxFrame.id){
-                            case CMD_MODE:
-                                comsSendMsg(&coms, &ser1, PUB_CMD_RET, "c", &coms.rxFrame.buf[1]);
-                                if(val == MCNTRL) { // Reset Top Level Controller Target
-                                    pidSetRef(&motorL.pi, 0.0f);
-                                    pidSetRef(&motorR.pi, 0.0f);
-                                    mode = MCNTRL; 
-                                }else if (val == PIDCNTRL){
-                                    pidSetRef(&linVelCtrl, 0.0f);
-                                    pidSetRef(&linVelCtrl, 0.0f);
-                                    mode = PIDCNTRL;
-                                }
-                                break;
-                            case CMD_WT:
-                                pidSetRef(&motorL.pi, val);
-                                pidSetRef(&motorR.pi, val);
-                                //motorSetVoltage(&motorL, val);
-                                //motorSetVoltage(&motorR, val);
-                                break;
-                            case CMD_WP:
-                                pidSetKp(&motorL.pi,val); 
-                                pidSetKp(&motorR.pi,val); 
-                                break;
-                            case CMD_WI:
-                                pidSetKi(&motorL.pi,val); 
-                                pidSetKi(&motorR.pi,val); 
-                                break;
-                            case CMD_BP:
-                                pidSetKp(&balanceCtrl,val); 
-                                break;
-                            case CMD_BI:
-                                pidSetKi(&balanceCtrl,val); 
-                                break;
-                            case CMD_BD:
-                                pidSetKd(&balanceCtrl,val); 
-                                break;
-                            case CMD_MT:
-                                pidSetRef(&linVelCtrl,val); 
-                                break;
-                            case CMD_MP:
-                                pidSetKp(&linVelCtrl,val); 
-                                break;
-                            case CMD_MI:
-                                pidSetKi(&linVelCtrl, val);
-                                break;
-                            case CMD_MD:
-                                pidSetKd(&linVelCtrl, val);
-                                break;
-                            default:
-                                comsSendMsg(&coms, &ser1, PUB_ERROR, "INVALID WREG");
-                                break;
-                        }
-                        break;
-                    default:
-                        comsSendMsg(&coms, &ser1, PUB_ERROR, "INVALID CMDTYPE");
-                        break;
-               }
+                comsProcessMsg(&coms, &ser1);
             }
             comsTask.lastTick = loopTick;
         }
-
-        
     }
 }
