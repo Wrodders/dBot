@@ -27,21 +27,21 @@ EOF - End of Frame
 #define PROT_CMD_IDX 0 
 #define PROT_ID_IDX 1
 
-typedef struct MsgFrame{
+struct MsgFrame{
     uint8_t size; // current size of msg buffer
     uint8_t cmdType;
     uint8_t id;  // id for map  
     uint8_t buf[MAX_MSG_DATA_SIZE]; 
 }MsgFrame;
 
-typedef enum {
+enum CMD_t{
     CMD_GET = 0, // Get Parameter Value
     CMD_SET,     // Set Parameter Value
     CMD_RUN,      // Execute Function
     NUM_CMDS
 }CMD_t; // Command Type
 
-typedef enum {
+enum PUB_ID_t {
     PUB_CMD_RET = 0,
     PUB_ERROR,
     PUB_INFO, 
@@ -54,7 +54,7 @@ typedef enum {
     NUM_PUBS
 }PUB_ID_t; // Publish Topic IDs
 
-typedef enum {
+enum PARAM_ID_t{
     PRM_ID = 0,
     // Motor Speed PID 
     PRM_LT, PRM_LP, PRM_LI,
@@ -78,35 +78,35 @@ typedef enum {
     NUM_PARAMS
 }PARAM_ID_t; // Parameter Ids
 
-typedef enum {
+enum RUN_ID_t {
     RUN_RESET = 0,
     RUN_UPGRADE,
 
     NUM_RUN
 }RUN_ID_t; // Run Command Id
 
-typedef struct {
-    PUB_ID_t id;
+struct Topic {
+    enum PUB_ID_t id;
     const char* name;
     const char* format; 
     const uint8_t nArgs;
 }Topic;
 
-typedef struct {
-    PARAM_ID_t id;
+struct Param {
+    enum PARAM_ID_t id;
     const char* name;
     const char* format;
     float *const param;
 }Param;
 
-typedef struct {
-    RUN_ID_t id;
+struct RunFunc{
+    enum RUN_ID_t id;
     const char* name;
     const char* format;
     const uint8_t nArgs;
 }RunFunc;
 
-typedef enum{
+enum COMS_STATE_t{
     IDLE = 0, 
     CMDTYPE,
     ID, 
@@ -114,28 +114,28 @@ typedef enum{
     ERROR
 }COMS_STATE_t;
 
-typedef struct Coms{
-    COMS_STATE_t state;
-    MsgFrame rxFrame;
-    MsgFrame txFrame;
+struct Coms{
+    enum COMS_STATE_t state;
+    struct MsgFrame rxFrame;
+    struct MsgFrame txFrame;
 
-    const Topic* pubMap;
-    const Param* paramMap;
+    const struct Topic* pubMap;
+    const struct Param* paramMap;
 }Coms;
 
-static Coms comsInit(const Topic* pubMap, const Param* paramMap){
-    Coms c = { .pubMap = pubMap, .paramMap = paramMap};
+static struct Coms comsInit(const struct Topic* pubMap, const struct Param* paramMap){
+    struct Coms c = { .pubMap = pubMap, .paramMap = paramMap};
     return c;
 }
 
-static inline const char* comsGetPubFmt(Coms* coms, PUB_ID_t pubID){return coms->pubMap[pubID].format;}
-static inline const char* comsGetPubName(Coms* coms, PUB_ID_t pubID){return coms->pubMap[pubID].name;}
-static inline const char* comsGetCmdFmt(Coms* coms, PARAM_ID_t pubID){return coms->paramMap[pubID].format;}
-static inline const char* comsGetCmdName(Coms* coms, PARAM_ID_t pubID){return coms->paramMap[pubID].name;}
+static inline const char* comsGetPubFmt(struct Coms* coms, enum PUB_ID_t pubID){return coms->pubMap[pubID].format;}
+static inline const char* comsGetPubName(struct Coms* coms, enum PUB_ID_t pubID){return coms->pubMap[pubID].name;}
+static inline const char* comsGetCmdFmt(struct Coms* coms, enum PARAM_ID_t pubID){return coms->paramMap[pubID].format;}
+static inline const char* comsGetCmdName(struct Coms* coms, enum PARAM_ID_t pubID){return coms->paramMap[pubID].name;}
 
 //****** Message Tranmission packetization  ***************//
 
-static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t pubID, ...){
+static bool comsSendMsg(struct Coms* coms, struct Serial* ser, enum PUB_ID_t pubID, ...){
     //@Brief: Formats and Packets a Message, sends over serial. 
     const uint8_t DATA_IDX = 2;
     uint8_t* msgBuf = coms->txFrame.buf; // readability
@@ -156,7 +156,7 @@ static bool comsSendMsg(Coms* coms, Serial* ser, PUB_ID_t pubID, ...){
 }
 
 //@Brief: Processes Received Data Into Message Frame
-static bool comsGrabMsg(Coms* coms, Serial* ser){
+static bool comsGrabMsg(struct Coms* coms, struct Serial* ser){
     uint8_t byte;
     while(rbGet(&ser->rxRB,  &byte) == true){
         switch(coms->state){
@@ -197,7 +197,7 @@ static bool comsGrabMsg(Coms* coms, Serial* ser){
     return false;
 }
 
-static void comsProcessMsg(Coms * coms,Serial *ser){
+static void comsProcessMsg(struct Coms * coms, struct Serial *ser){
     uint8_t paramIdx = coms->rxFrame.id;
     if(paramIdx >= NUM_PARAMS){
         comsSendMsg(coms, ser,PUB_ERROR, "INVALID PARAM");

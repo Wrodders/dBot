@@ -8,17 +8,17 @@
 
 #define TIM_MODE_ENC 0x3
 
-typedef struct Encoder {
-    GPIO chA;
-    GPIO chB;
+struct Encoder {
+    struct GPIO chA;
+    struct GPIO chB;
     uint32_t timPerif;
     uint16_t period; // counts per revolution
     
     uint32_t lastCount; // encoder count
 }Encoder;
 
- static Encoder encoderInit(uint32_t timPerif, uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
-    Encoder e;
+ static struct Encoder encoderInit(uint32_t timPerif, uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
+    struct Encoder e;
     // Store the timer peripheral in the encoder structure
     e.timPerif = timPerif;
     e.lastCount = 0;
@@ -43,7 +43,7 @@ typedef struct Encoder {
     return e;
 }
 
-static inline uint32_t encoderRead(Encoder *enc){
+static inline uint32_t encoderRead(struct Encoder *enc){
     return timer_get_counter(enc->timPerif);
 }
 

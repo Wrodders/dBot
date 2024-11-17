@@ -11,7 +11,7 @@ Roll == X
 Pitch == Y
 */
 
-typedef struct Kalman{
+struct Kalman{
     float Q_angle;
     float Q_bias;
     float R_measure;
@@ -20,7 +20,7 @@ typedef struct Kalman{
     float P[2][2];
 }Kalman;
 
-typedef struct IMU{
+struct IMU{
     const float dt;         // Sample Period [s]
     // Low Pass IIR Filter 
     struct{
@@ -38,14 +38,14 @@ typedef struct IMU{
         float pitch, roll;
     }comp;
     struct {
-        Kalman X;
-        Kalman Y;
+        struct Kalman X;
+        struct Kalman Y;
         float pitch, roll;
     }kal;
 }IMU; 
 
-static IMU imuInit(const float alphaAccel, const float alphaGyro, const float alphaComp, const float dt){
-    IMU imu = {
+static struct IMU imuInit(const float alphaAccel, const float alphaGyro, const float alphaComp, const float dt){
+    struct IMU imu = {
         .dt = dt,
         .lpf = {.aAccel = alphaAccel, .aGyro = alphaGyro},
         .comp = {.a = alphaComp},
@@ -57,7 +57,7 @@ static IMU imuInit(const float alphaAccel, const float alphaGyro, const float al
     return imu;
 }
 
-static void imuLPF(IMU* imu, const vector_t* accel, const vector_t* gyro){
+static void imuLPF(struct IMU* imu, const vector_t* accel, const vector_t* gyro){
     // first order IIR filter
     // y[n] = a * y[n-1] + (1-a) * x[n]
     imu->lpf.accel.x = (imu->lpf.aAccel * imu->lpf.accel.x) + (1.0f - imu->lpf.aAccel) * accel->x;
@@ -69,7 +69,7 @@ static void imuLPF(IMU* imu, const vector_t* accel, const vector_t* gyro){
     imu->lpf.gyro.z = (imu->lpf.aGyro * imu->lpf.gyro.z) + (1.0f - imu->lpf.aGyro) * gyro->z;
 }
 
-static void imuCalcRawAngle(IMU* imu){
+static void imuCalcRawAngle(struct IMU* imu){
     //@Brief: Computes Euler from raw accelerometer data
     // roll (x-axis rotation)
     float ax2 = imu->lpf.accel.x * imu->lpf.accel.x;
@@ -79,7 +79,7 @@ static void imuCalcRawAngle(IMU* imu){
     imu->raw.roll = atan(imu->lpf.accel.y * invSqrt(ax2 + az2)) * RAD_TO_DEG;
 }
 
-static void imuCompFilt(IMU* imu){
+static void imuCompFilt(struct IMU* imu){
     //@Brief: Complementary Filter Converts imu data into Euler Angles
     imuCalcRawAngle(imu);
     // Pitch
@@ -91,7 +91,7 @@ static void imuCompFilt(IMU* imu){
 
 }
 
-static float imuKalPredict(Kalman* kal, const float newAngle, const float newRate, float const dt) {
+static float imuKalPredict(struct Kalman* kal, const float newAngle, const float newRate, float const dt) {
     // Predicts an angle via kalman filter algorithm from angle[n] and dy/dt angle[n]
     //
     float rate = newRate - kal->bias;
@@ -122,7 +122,7 @@ static float imuKalPredict(Kalman* kal, const float newAngle, const float newRat
     return kal->angle;
 }
 
-static void imuKalUpdate(IMU* imu){
+static void imuKalUpdate(struct IMU* imu){
     float xRate = imu->lpf.gyro.x;
     float yRate = imu->lpf.gyro.y;
     float ax = imu->lpf.accel.x;
@@ -136,8 +136,7 @@ static void imuKalUpdate(IMU* imu){
     float rollsqrt = sqrt(ax2 + az2);
     if(rollsqrt != 0.0f){roll = atan(ay / rollsqrt) * RAD_TO_DEG;} // Fix -180=180
     else{roll = 0.0f;}
-
-  
+      
     if (fabs(imu->kal.pitch) > 90){
         xRate *= -1;
     }   

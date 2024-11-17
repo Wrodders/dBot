@@ -7,7 +7,7 @@
 Proportional Integral Derivative Algorithm
 */
 
-typedef struct PID{
+struct PID{
     float ref;                   // u
     float error;                 // e
     float lastErr;               // ze
@@ -19,18 +19,18 @@ typedef struct PID{
     bool en;                    // Enable PID Computation   
 }PID;
 
-static inline void pidEnable(PID *pid){pid->en = true;}                  
-static inline void pidDisable(PID *pid){pid->en = false;}
-static inline void pidClear(PID *pid){pid->iTerm=0;} 
-static inline void pidSetKp(PID *pid, float kp){pid->kp = kp;}  
-static inline void pidSetKi(PID *pid, float ki){pid->ki = ki * pid->dt;} // precompute save calculations 
-static inline void pidSetKd(PID *pid, float kd){pid->kd = kd / pid->dt;} //
-static inline void pidSetMin(PID* pid, float min){pid->min = min;}
-static inline void pidSetMax(PID* pid, float max){pid->min = max;}
-static inline void pidSetRef(PID* pid, float ref){pid->ref = ref;} 
+static inline void pidEnable(struct PID *pid){pid->en = true;}                  
+static inline void pidDisable(struct PID *pid){pid->en = false;}
+static inline void pidClear(struct PID *pid){pid->iTerm=0;} 
+static inline void pidSetKp(struct PID *pid, float kp){pid->kp = kp;}  
+static inline void pidSetKi(struct PID *pid, float ki){pid->ki = ki * pid->dt;} // precompute save calculations 
+static inline void pidSetKd(struct PID *pid, float kd){pid->kd = kd / pid->dt;} //
+static inline void pidSetMin(struct PID* pid, float min){pid->min = min;}
+static inline void pidSetMax(struct PID* pid, float max){pid->min = max;}
+static inline void pidSetRef(struct PID* pid, float ref){pid->ref = ref;} 
 
-static PID pidInit(float min, float max, float kp, float ki, float kd, float deltaT){
-    PID pid = {
+static struct PID pidInit(float min, float max, float kp, float ki, float kd, float deltaT){
+    struct PID pid = {
         .dt = deltaT,
         .kp = kp,
         .ki = ki,
@@ -43,7 +43,7 @@ static PID pidInit(float min, float max, float kp, float ki, float kd, float del
     return pid;
 }
 
-static float pidRun(PID* pid, const float measurement){
+static float pidRun(struct PID* pid, const float measurement){
     //@Brief: Steps through PID Algorithm at constant dt
     //@Description: Calculates correction signal from ref measurement error.  
     if(pid->en == false){return 0;}

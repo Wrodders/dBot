@@ -22,7 +22,11 @@
         "utils.h": "c",
         "pwm.h": "c",
         "stdint.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "bit": "c",
+        "compare": "c",
+        "limits": "c",
+        "new": "c"
     },
     "cSpell.words": [
         "acklogalged",

@@ -25,18 +25,18 @@
 
 // MPU6050 Functions
 
-typedef struct IMUCalib{
-    vector_t accel;
-    vector_t gyro;
+struct IMUCalib{
+    struct vector_t accel;
+    struct vector_t gyro;
 }IMUCalib;
 
-typedef struct MPU6050{
+struct MPU6050{
     uint32_t i2c; //STM32 I2C Device handler
     bool initalized;
     uint8_t data; // read data byte
-    IMUCalib offset; // Calibration offset
-    vector_t accel; //xyz
-    vector_t gyro; // xyz
+    struct IMUCalib offset; // Calibration offset
+    struct vector_t accel; //xyz
+    struct vector_t gyro; // xyz
 }MPU6050;
 
 
@@ -67,7 +67,7 @@ static void mpu6050Wake(uint32_t i2c){
     delay(300); // Wait for sensor to stabilize
 }
 
-static void gyroCalib(MPU6050 *sensor, int samples){
+static void gyroCalib(struct MPU6050 *sensor, int samples){
     // calibrates gyro by taking samples and averaging
 
     sensor->offset.gyro.x = 0;
@@ -98,7 +98,7 @@ static void gyroCalib(MPU6050 *sensor, int samples){
     sensor->offset.gyro.z /= samples;
 }
 
-static void accelCalib(MPU6050 *sensor, int samples){
+static void accelCalib(struct MPU6050 *sensor, int samples){
     // calibrates accel by taking samples and averaging
     // should calc offsets to set gry to close to 1g on each axis
     sensor->offset.accel.x = 0;
@@ -156,9 +156,9 @@ static void accelCalib(MPU6050 *sensor, int samples){
 // *** // **** // PUBLIC // **** // **** // 
 
 
-static MPU6050 mpu6050Init(uint32_t perif){
+static struct MPU6050 mpu6050Init(uint32_t perif){
     // Initialize MPU6050 Sensor
-    MPU6050 sensor;
+    struct MPU6050 sensor;
     sensor.i2c = perif;
     delay(100); 
 
@@ -188,7 +188,7 @@ static MPU6050 mpu6050Init(uint32_t perif){
 }
 
 
-static void mpu6050Read(MPU6050 *sensor){
+static void mpu6050Read(struct MPU6050 *sensor){
     // Read Data from IMU
     // Apply Offsets
     // Data stored in SI Units

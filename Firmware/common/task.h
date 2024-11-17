@@ -8,21 +8,21 @@
 
 #define CHECK_PERIOD(TASK, LOOPTICK) 	((LOOPTICK - TASK.lastTick >= TASK.period) && (TASK.enable))
 
-typedef struct FixedTimeTask{
+struct FixedTimeTask{
     uint32_t lastTick;
     uint32_t period;	 // ms
 	bool enable;
 }FixedTimeTask;
 
-static FixedTimeTask createTask(uint32_t period){
-	FixedTimeTask task;
+static struct FixedTimeTask createTask(uint32_t period){
+	struct FixedTimeTask task;
 	task.lastTick = 0;
 	task.period = period;
 	task.enable = true;
 	return task;
 }
 
-static inline void disableTask(FixedTimeTask *t){t->enable = false;}
-static inline void enableTask(FixedTimeTask *t){t->enable = true;}
+static inline void disableTask(struct FixedTimeTask *t){t->enable = false;}
+static inline void enableTask(struct FixedTimeTask *t){t->enable = true;}
 
 #endif // TASK_H
