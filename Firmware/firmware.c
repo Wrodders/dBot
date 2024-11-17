@@ -43,17 +43,17 @@ int main(void){
     Motor motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT);
     motorDisable(&motorL); // Ensure Driver is Disabled Before Configuration
     motorDisable(&motorR); //
-    motorConfig(&motorL, &encL, VBAT_MAX, 1.2f, true, SPEED_ALPHA, RPS_MAX);
-    motorConfig(&motorR, &encR, VBAT_MAX, 1.2f, false,  SPEED_ALPHA, RPS_MAX);
+    motorConfig(&motorL, &encL, VBAT_MIN, 1.2f, true, SPEED_ALPHA, RPS_MAX);
+    motorConfig(&motorR, &encR, VBAT_MIN, 1.2f, false,  SPEED_ALPHA, RPS_MAX);
     motorEnable(&motorL);
     motorEnable(&motorR);
     // BALANCE CONTROLLER
     PID balanceCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&balanceCtrl, -7.5f);
     // DIFFERENTIAL DRIVE MODEL (LinVel, AngVel)
-    DDMR ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, VEL_ALPHA);
+    DDMR ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, AA);
     PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
-
+    PID steerCtrl = pidInit(-5,5, AP, AI, AD, VEL_CNTRL_PERIOD * MS_TO_S);
     // ***************************** COMMUNICATIONS ******************************************************** // 
     const Topic pubMap[NUM_PUBS] = {
         {.id = PUB_CMD_RET, .name = "CMD_RET", .format ="%s:%s", .nArgs=2}, // CMD_ID : RET_VAL
@@ -61,8 +61,9 @@ int main(void){
         {.id = PUB_INFO,    .name = "INFO",    .format = "%s",   .nArgs=1}, // System INFO
         {.id = PUB_DEBUG,   .name = "DEBUG",   .format = "%s",   .nArgs=1}, // Debug prints 
         // Application Publisher Topics 
-        {.id = PUB_IMU, .name = "IMU", .format = "%0.3f:%0.3f", .nArgs=2}, // ROLL:PITCH:YAW
-        {.id = PUB_ODOM, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=6} // LSPEED:RSPEED:TL:UL:UR:LINVEL
+        {.id = PUB_IMU,  .name = "IMU",  .format = "%0.3f:%0.3f", .nArgs=2}, // PITCH:ROLL
+        {.id = PUB_ODOM, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=4}, //LSPEED:RSPEED:LINVEL:ANGVEL
+        {.id = PUB_CTRL, .name = "CTRL", .format = "%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=4} //TL:TR:UL:UR:UB:UA:UV
     };
     const Param paramMap[NUM_PARAMS] = {
         {.id = PRM_ID,   .name = "ID",    .param = &UUID,             .format = "%f"},
@@ -76,10 +77,16 @@ int main(void){
         {.id = PRM_BP,   .name = "BP",    .param = &balanceCtrl.kp,   .format = "%f"},
         {.id = PRM_BI,   .name = "BI",    .param = &balanceCtrl.ki,   .format = "%f"},
         {.id = PRM_BD,   .name = "BD",    .param = &balanceCtrl.kd,   .format = "%f"},
-        {.id = PRM_VT,   .name = "VT",    .param = &velCtrl.ref,        .format = "%f"},
+        {.id = PRM_VT,   .name = "VT",    .param = &velCtrl.ref,      .format = "%f"},
         {.id = PRM_VP,   .name = "VP",    .param = &velCtrl.kp,       .format = "%f"},
         {.id = PRM_VI,   .name = "VI",    .param = &velCtrl.ki,       .format = "%f"},
-        {.id = PRM_VD,   .name = "VD",    .param = &velCtrl.kd,       .format = "%f"}
+        {.id = PRM_VD,   .name = "VD",    .param = &velCtrl.kd,       .format = "%f"},
+        {.id = PRM_VA,   .name = "VA",    .param = &ddmr.linAlpha,    .format = "%f"},
+        {.id = PRM_AT,   .name = "AT",    .param = &steerCtrl.ref,    .format = "%f"},
+        {.id = PRM_AP,   .name = "AP",    .param = &steerCtrl.kp,     .format = "%f"},
+        {.id = PRM_AI,   .name = "AI",    .param = &steerCtrl.ki,     .format = "%f"},
+        {.id = PRM_AD,   .name = "AD",    .param = &steerCtrl.kd,     .format = "%f"},
+        {.id = PRM_AA,   .name = "AA",    .param = &ddmr.angAlpha,    .format = "%f"},
     };
     Coms coms = comsInit(pubMap, paramMap);
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
@@ -89,7 +96,7 @@ int main(void){
     FixedTimeTask comsTask = createTask(COMS_PERIOD);                // PUB SUB RPC 
     FixedTimeTask imuFusionTask = createTask(IMU_FUSION_PERIOD);     // Sensor Fusion 
     FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD);  // DC Motor Speed Control (PI)
-    FixedTimeTask balanceCntrlTask = createTask(BAL_CNTRL_PERIOD);    // Balance Theta Control
+    FixedTimeTask balanceCntrlTask = createTask(BAL_CNTRL_PERIOD);   // Balance Theta Control
     FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);        // Linear Velocity Control 
     // ****** Loop Parameters **************************************************************************** // 
     uint16_t loopTick = 0;
@@ -122,14 +129,16 @@ int main(void){
                 if(CHECK_PERIOD(balanceCntrlTask, loopTick)){
                     // Balance Control Inverted Pendulum PID
                     balanceCtrl.out = pidRun(&balanceCtrl, imu.kal.pitch); 
-                    motorSetTrgtSpeed(&motorR, balanceCtrl.out);
-                    motorSetTrgtSpeed(&motorL, balanceCtrl.out);
+                    motorSetTrgtSpeed(&motorR, balanceCtrl.out - steerCtrl.out);
+                    motorSetTrgtSpeed(&motorL, balanceCtrl.out + steerCtrl.out);
                     balanceCntrlTask.lastTick = loopTick;
                 }
                 if(CHECK_PERIOD(velCtrlTask, loopTick)){
                     ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     velCtrl.out = pidRun(&velCtrl, ddmr.linVel);
-                    pidSetRef(&balanceCtrl, -7.5); // Sets Balance Reference point to reach desired velocity
+                    steerCtrl.out = pidRun(&steerCtrl,ddmr.angVel);
+                    pidSetRef(&balanceCtrl, -7.5 -velCtrl.out); // Sets Balance Reference point to reach desired velocity
+                    velCtrlTask.lastTick= loopTick;
                 }
                 break;
             default:
@@ -157,8 +166,10 @@ int main(void){
             // TX Publishing Topics
             comsSendMsg(&coms, &ser1, PUB_IMU,imu.kal.pitch, imu.kal.roll);
             comsSendMsg(&coms, &ser1, PUB_ODOM, motorL.angularVel, motorR.angularVel, 
-                                                motorL.wCtrl.ref, motorL.wCtrl.out,
-                                                motorR.wCtrl.out, ddmr.linVel);
+                                               ddmr.linVel, ddmr.angVel);
+            comsSendMsg(&coms,&ser1, PUB_CTRL, motorL.wCtrl.ref, motorR.wCtrl.ref,
+                                                motorL.wCtrl.out,motorR.wCtrl.out,
+                                                balanceCtrl.out, steerCtrl.out, velCtrl.out); //TL:TR:UL:UR:UB:UA:UV
             // Handle RX Messages 
             if(comsGrabMsg(&coms, &ser1)){
                 comsProcessMsg(&coms, &ser1);

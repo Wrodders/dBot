@@ -85,9 +85,9 @@
 #define ENC_CPR             12.00f
 #define GEAR_RATIO          20.00f
 #define EDGE_NUM            4.00f
-#define WHEEL_BASE          0.06f   // m
-#define WHEEL_RADIUS        0.035f  // m
-#define VBAT_MAX            8.40f   // 
+#define WHEEL_BASE          0.12f   // m
+#define WHEEL_RADIUS        0.04f   // m
+#define VBAT_MIN            7.40f   // 
 #define BAT_CAPACITY        2300    // mAh
 
 const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
@@ -98,6 +98,7 @@ const float MPS_TO_RPS      = (float) 1/(WHEEL_RADIUS*2*M_PI);
 const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
 const float RAD_TO_DEG      = (float)(180.0f / M_PI);
 const float RPS_TO_RADS     = (float)(2*M_PI);
+const float RPS_TO_CMPS     = RPS_TO_MPS*100;
 
 const float RPS_MAX         = 10.00f;  // rps
 const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
@@ -110,21 +111,26 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 
 // Motor Speed Control
 #define SPEED_KP    3.0f
-#define SPEED_KI    0.06f
+#define SPEED_KI    0.4f
 #define SPEED_KD    0.00f
 #define SPEED_ALPHA 0.95f
 // Balance Control 
-#define BAL_OFFSET          3.0f    // deg
+#define BAL_OFFSET         -7.50f    // deg
 #define BAL_CUTOFF         35      // 
 #define BAL_KP             0.1
-#define BAL_KI             0.03f 
-#define BAL_KD             4.5f
-#define VEL_P 0.0
-#define VEL_I 0.0
-#define VEL_D 0.0
-#define VEL_ALPHA 0.9
+#define BAL_KI             2.2f 
+#define BAL_KD             0.0034f
+#define VEL_P 18  
+#define VEL_I 18
+#define VEL_D 0.2
+#define VEL_ALPHA 1.0
+
+#define AP 0
+#define AI 0 
+#define AD 0
+#define AA 0
 
 // *********** GLOBAL VARIABLES **************************** //
-static float VBAT_VAL_ = VBAT_MAX;     
+static float VBAT_VAL_ = VBAT_MIN;     
 
 #endif // COMMON_h

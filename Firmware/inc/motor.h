@@ -37,7 +37,7 @@ typedef struct Motor {
     float angularVel;  // angular speed rps
     float alpha;       // speed lowpass filter parameter
     float maxVel;      // Saturation
-    float dCount;
+
 }Motor;
 
 static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort, 
@@ -54,7 +54,7 @@ static Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
         .drv.pwmB.pin = pwmB,
         .drv.pwmB.port = pwmPort,
         .drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE),
-        .wCtrl = pidInit(-VBAT_MAX, VBAT_MAX, SPEED_KP, SPEED_KI, SPEED_KD, (WSPEED_CNTRL_PERIOD * MS_TO_S))
+        .wCtrl = pidInit(-VBAT_MIN, VBAT_MIN, SPEED_KP, SPEED_KI, SPEED_KD, (WSPEED_CNTRL_PERIOD * MS_TO_S))
     };
 
     // Initialize Timer PWM
@@ -133,16 +133,19 @@ static void motorSetTrgtSpeed(Motor *motor, const float vel){
     motor->wCtrl.ref = v;
 }
 
-static void motorEstSpeed(Motor* motor){
+static void motorEstSpeed(Motor* motor) {
     //@Brief: Calculate Angular Speed in Rotations per Second
-    //@Description: Applies lowpass filter to smooth Quantization errors 
-    //@Note: Speed Is Relative to Motor Shaft (after Gearbox)
+    //@Description: Applies low-pass filter to smooth quantization errors 
+    //@Note: Speed is relative to motor shaft (after gearbox)
     uint32_t mCount = encoderRead(motor->enc);
-    motor->dCount = (float)(mCount - motor->enc->lastCount);
+    int32_t dCount = (int32_t)(mCount - motor->enc->lastCount);
+    // Handle overflow and underflow
+    dCount = (dCount + (UINT16_MAX + 1)) % (UINT16_MAX + 1);
+    // Convert to signed range [-32768, 32767]
+    if (dCount > (UINT16_MAX / 2)) { dCount -= (UINT16_MAX + 1);}
     motor->enc->lastCount = mCount;
-    float mSpeed = motor->dCount * TICKS_TO_RPS * motor->flipDir ; // rotations per second
-    // Apply Low pass filter to speed measurement  b*speed[n] + (1-b)*speed[n-1] 
-    motor->angularVel = (motor->alpha * mSpeed) + (1.00f - motor->alpha) * motor->angularVel;
+    float mSpeed = (float)dCount * TICKS_TO_RPS * motor->flipDir;
+    motor->angularVel = (motor->alpha * mSpeed) + (1.0f - motor->alpha) * motor->angularVel;
 }
 
 static void motorSpeedCtrl(Motor *m){
