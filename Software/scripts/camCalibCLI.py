@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import argparse
+import subprocess
 
 def parse_args():
     """Parse command-line arguments."""
@@ -17,45 +18,38 @@ def parse_args():
     parser.add_argument(
         "--udp_address",
         type=str,
-        default="192.168.1.122",
-        help="UDP stream address (default: 192.168.1.122). Only used if --source is udp."
-    )
-    parser.add_argument(
-        "--udp_port",
-        type=int,
-        default=5000,
-        help="UDP stream port (default: 5000). Only used if --source is udp."
+        default="udp://0.0.0.0:5000",
+        help="UDP stream address (default: udp://0.0.0.0:5005). Only used if --source is udp."
     )
     return parser.parse_args()
+
+def ffmpeg_stream_reader(udp_address):
+    """
+    Use FFmpeg to read UDP stream, convert it to grayscale, and pipe it to OpenCV.
+    Includes low-latency options with frame dropping enabled.
+    """
+    ffmpeg_command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",           # Suppress logs for clarity
+        "-fflags", "nobuffer",          # Disable buffering for low latency
+        "-flags", "low_delay",          # Enable low-latency decoding
+        "-i", udp_address,              # Input from UDP stream
+        "-vf", "format=gray",           # Convert to grayscale
+        "-f", "rawvideo",               # Output raw video data
+        "-pix_fmt", "gray",             # Pixel format: grayscale
+        "-an",                          # No audio
+        "pipe:1"                        # Output to stdout
+    ]
+
+    # Start FFmpeg process
+    process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**8)
+    return process
+
 
 def main():
     # Parse command-line arguments
     args = parse_args()
-
-    # Determine video source
-    if args.source == "udp":
-        video_source = f'udp://{args.udp_address}:{args.udp_port}'
-    else:  # Default to camera
-        video_source = 1
-
-    # Create a video capture object
-    cap = cv2.VideoCapture(video_source)
-
-    # Check if the video stream is successfully opened
-    if not cap.isOpened():
-        print("Error: Couldn't open the video stream or camera.")
-        exit()
-
-    # Set the desired resolution
-  
-    desired_height = 240  # Height in pixels
-
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, desired_height)
-
-    # Confirm the actual resolution set by the camera
-    actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    print(f"Camera resolution set to: {actual_width}x{actual_height}")
 
     # Global variables for ROI selection
     roi_selected = False
@@ -79,32 +73,57 @@ def main():
     cv2.namedWindow("Original Video", cv2.WINDOW_NORMAL)
     cv2.setMouseCallback("Original Video", select_roi)
 
-    while True:
-        # Read a frame from the video stream
-        ret, frame = cap.read()
+    if args.source == "udp":
+        # Use FFmpeg to handle the UDP stream
+        process = ffmpeg_stream_reader(args.udp_address)
 
-        # If the frame is not successfully read, break the loop
-        if not ret:
-            print("Error: Couldn't read frame.")
+        # Define the video frame dimensions (change as per your stream settings)
+        width, height = 640, 480  # Adjust based on your stream resolution
+        frame_size = width * height  # Grayscale: 1 byte per pixel
+
+        def get_frame():
+            """Read a frame from the FFmpeg process."""
+            raw_frame = process.stdout.read(frame_size)
+            if len(raw_frame) != frame_size:
+                return None
+            frame = np.frombuffer(raw_frame, dtype=np.uint8).reshape((height, width))
+            return frame
+
+    else:  # Default to camera input
+        cap = cv2.VideoCapture(0)
+
+        if not cap.isOpened():
+            print("Error: Couldn't open the camera.")
+            exit()
+
+        def get_frame():
+            """Read a frame from the camera."""
+            ret, frame = cap.read()
+            if not ret:
+                print("Error: Couldn't read frame from the camera.")
+                return None
+            return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
+
+    while True:
+        frame = get_frame()
+        if frame is None:
             break
 
         # Draw the ROI rectangle on the original frame
         if roi_selected or drawing:
             x1, y1, x2, y2 = roi
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
 
         # Display the original frame with the drawn ROI
         cv2.imshow("Original Video", frame)
 
         if roi_selected:
-            # Extract the ROI and convert it to grayscale
+            # Extract the ROI
             x1, y1, x2, y2 = roi
             roi_frame = frame[min(y1, y2):max(y1, y2), min(x1, x2):max(x1, x2)]
             if roi_frame.size > 0:
-                gray_roi = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
-
                 # Apply threshold to the ROI
-                _, thresholded_roi = cv2.threshold(gray_roi, 127, 255, cv2.THRESH_BINARY)
+                _, thresholded_roi = cv2.threshold(roi_frame, 127, 255, cv2.THRESH_BINARY)
 
                 # Display the thresholded ROI
                 cv2.imshow("Thresholded ROI", thresholded_roi)
@@ -113,8 +132,11 @@ def main():
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    # Release the video capture object and close the windows
-    cap.release()
+    # Cleanup
+    if args.source == "udp":
+        process.terminate()
+    else:
+        cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
