@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <thread>
+#include <zmq.hpp> // Include the ZeroMQ header
 
 #include "../inc/roi_selector.h"
 #include "../inc/utils.h"
@@ -30,7 +31,6 @@ const int frameHeight = 480; // Adjust to the stream's height (e.g., 640x480)
 
 // Open FFmpeg process to pipe video (with proper command)
 bool openFFmpegProcess(const std::string& streamUrl) {
-    // Construct FFmpeg command for raw video stream in bgr24 pixel format
     std::string command = "ffmpeg -i " + streamUrl + " -f rawvideo -pix_fmt bgr24 -vsync 0 -an -sn -fflags nobuffer -flags low_delay pipe:1";
 
     // Open the FFmpeg process for reading its output
@@ -70,11 +70,30 @@ bool readFFmpegFrame(cv::Mat& frameMat) {
     return true;
 }
 
-// Apply thresholding and process ROI
-void method1(cv::Mat& frame, cv::Mat& result, ROIData roiData) {
+
+void setupZMQPublisher(zmq::context_t &context, zmq::socket_t &publisher) {
+    publisher.bind("tcp://*:5556");  // Binding to TCP socket on port 5556
+    std::cout << "Publisher bound to tcp://*:5556\n";
+}
+
+// Function to send the message
+// Function to send the message
+void sendZMQMessage(zmq::socket_t &publisher, double val) {
+    // Format the message: <bm value>
+    std::string message = "<bm" + std::to_string(val) + "\n";
+
+    // Create a ZMQ message (multipart message with one part)
+    zmq::message_t zmqMessage(message.size());
+    memcpy(zmqMessage.data(), message.c_str(), message.size());
+
+    // Send the message as a multipart message (one part for this case)
+    publisher.send(zmqMessage, zmq::send_flags::none);
+    std::cout << "Sent message: " << message << std::endl;
+}
+// Update method1 to include ZMQ publisher for sending brightness difference
+void method1(cv::Mat& frame, cv::Mat& result, ROIData roiData, zmq::socket_t &publisher) {
     if (roiData.roiSelected && roiData.pointCount == 4) {
         cv::Mat roi;
-        // Assuming applyROIToFrameWithPadding is a function that applies ROI on the frame
         applyROIToFrameWithPadding(frame, roiData.points, roi, 10);
         cv::cvtColor(roi, roi, cv::COLOR_BGR2GRAY);
         cv::threshold(roi, result, threshold_value, 255, 0);
@@ -82,8 +101,21 @@ void method1(cv::Mat& frame, cv::Mat& result, ROIData roiData) {
         cv::morphologyEx(result, result, cv::MORPH_CLOSE,
             cv::getStructuringElement(cv::MORPH_RECT, cv::Size(25, 25)), cv::Point(-1, -1), morphIterations);
         cv::cvtColor(result, result, cv::COLOR_GRAY2BGR);
-        fitLine(result, 1, numSegments, kernelSize, threshold_value, 10);  // Assuming fitLine is defined
-        cv::imshow("ROI Video", roi);
+
+        // Process and analyze lines
+        int halfWidth = roi.cols / 2;
+        cv::Mat leftHalf = roi(cv::Rect(0, 0, halfWidth, roi.rows));
+        cv::Mat rightHalf = roi(cv::Rect(halfWidth, 0, roi.cols - halfWidth, roi.rows));
+
+        double leftAvgBrightness = cv::mean(leftHalf)[0];
+        double rightAvgBrightness = cv::mean(rightHalf)[0];
+
+        double brightnessDifference = (leftAvgBrightness - rightAvgBrightness) / (leftAvgBrightness + rightAvgBrightness);
+
+        std::cout << "Brightness difference between left and right halves: " << brightnessDifference << std::endl;
+
+        // Send the message with brightness difference using ZMQ
+        sendZMQMessage(publisher, brightnessDifference);
     }
 }
 
@@ -126,8 +158,16 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    std::string udpAddress = "udp://localhost:5000";  // Example UDP stream address
 
+
+    std::string tcpAddress = "tcp://*:5556";  // Example UDP stream address
+    // ZMQ: Send the message with brightness difference
+    // Create a ZeroMQ context and socket (publisher)
+    zmq::context_t context(1);
+    zmq::socket_t publisher(context, ZMQ_PUB);
+    setupZMQPublisher(context, publisher);
+
+    std::string udpAddress = "udp://localhost:5000";  // Example UDP stream address
     // Open FFmpeg process to stream video
     if (!openFFmpegProcess(udpAddress)) {
         return -1;
@@ -140,12 +180,14 @@ int main(int argc, char* argv[]) {
     cv::Mat frame, resultFrame;
 
     std::thread readThread(readFramesAsync, std::ref(frame));
-
     while (!stopFlag) {
+        // Process at 50Hz (i.e., every 20ms)
         if (frameReady) {
             // Process the frame with ROI and other methods
-            method1(frame, resultFrame, roiData);
+            method1(frame, resultFrame, roiData, publisher);
             updateROI(frame, roiData);
+ 
+
 
             if (!resultFrame.empty()) {
                 cv::imshow("Processed Video", resultFrame);
@@ -154,7 +196,7 @@ int main(int argc, char* argv[]) {
 
             frameReady = false;  // Reset frame flag
         }
-
+     
         int key = cv::waitKey(1);
         if (key == 'q' || key == 27) {
             stopFlag = true;

@@ -94,12 +94,13 @@ void fitLine(cv::Mat& image, int dir, int numDivisions, int regionSize, int brig
     }
 
     // Print the angles as a table
+    /*
     std::cout << "Line Segment | Angle (°)" << std::endl;
     std::cout << "------------------------" << std::endl;
     for (size_t i = 0; i < angles.size(); ++i) {
         std::cout << "Segment " << i + 1 << " | " << angles[i] << std::endl;
     }
-
+    */
     // Connect the original points (optional, if you want to visualize the original points as well)
     connectPoints(image, points);
 }
