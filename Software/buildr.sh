@@ -31,6 +31,6 @@ fi
 # Navigate back to the project root
 cd ..
 
-# Run the executable with default parameters
-echo "Running the program..."
-./"$BUILD_DIR"/"$EXECUTABLE_NAME" --source camera
+# Run the executable with the arguments passed to the script
+echo "Running the program with arguments: $@"
+./"$BUILD_DIR"/"$EXECUTABLE_NAME" "$@"

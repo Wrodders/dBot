@@ -6,10 +6,14 @@
 #include <chrono>
 #include <thread>
 #include <zmq.hpp> // Include the ZeroMQ header
+#include <getopt.h>  // For command-line argument parsing
+
 
 #include "../inc/roi_selector.h"
 #include "../inc/utils.h"
 #include "../inc/fitline.h"
+
+
 
 // Global flags and variables
 bool stopFlag = false;
@@ -28,6 +32,10 @@ ROIData roiData;
 // Set the correct resolution based on the stream
 const int frameWidth = 640;  // Adjust to the stream's width (e.g., 640x480)
 const int frameHeight = 480; // Adjust to the stream's height (e.g., 640x480)
+
+// Default values
+std::string udpAddress = "udp://localhost:5000";
+std::string outputFile = "output.mp4";
 
 // Open FFmpeg process to pipe video (with proper command)
 bool openFFmpegProcess(const std::string& streamUrl) {
@@ -57,7 +65,7 @@ bool readFFmpegFrame(cv::Mat& frameMat) {
     size_t bytesRead = fread(frameMat.data, 1, frameSize, ffmpegProcess);
 
     if (bytesRead == 0) {
-        std::cerr << "Error: No data received from FFmpeg process.\n";
+        //std::cerr << "Error: No data received from FFmpeg process.\n";
         return false;
     }
 
@@ -76,22 +84,42 @@ void setupZMQPublisher(zmq::context_t &context, zmq::socket_t &publisher) {
     std::cout << "Publisher bound to tcp://*:5556\n";
 }
 
-// Function to send the message
-// Function to send the message
+// Function to send the message under the topic SERIAL
 void sendZMQMessage(zmq::socket_t &publisher, double val) {
-    // Format the message: <bm value>
-    std::string message = "<bm" + std::to_string(val) + "\n";
+    // Define the topic
+    std::string topic = "SERIAL";
 
-    // Create a ZMQ message (multipart message with one part)
+    // Format the message: <bm value>
+    std::string message = "<br" + std::to_string(val*kernelSize/10) + "\n";
+
+    // Create a ZMQ message for the topic
+    zmq::message_t topicMessage(topic.c_str(), topic.size());
+
+    // Create a ZMQ message for the message content
     zmq::message_t zmqMessage(message.size());
     memcpy(zmqMessage.data(), message.c_str(), message.size());
 
-    // Send the message as a multipart message (one part for this case)
-    publisher.send(zmqMessage, zmq::send_flags::none);
-    std::cout << "Sent message: " << message << std::endl;
+    // Send the topic message first, followed by the actual message
+    publisher.send(topicMessage, zmq::send_flags::sndmore);  // Topic with `sndmore` flag
+    publisher.send(zmqMessage, zmq::send_flags::none);       // Message with `none` flag
+
+    // Print the message sent (for debugging)
+    //td::cout << "Sent topic: " << topic << " message: " << message << std::endl;
 }
-// Update method1 to include ZMQ publisher for sending brightness difference
-void method1(cv::Mat& frame, cv::Mat& result, ROIData roiData, zmq::socket_t &publisher) {
+
+// Global variable to store the estimated angle
+std::atomic<float> globalEstimatedAngle(0.0f);
+
+// Function to send ZMQ messages at 10 Hz
+void zmqSender(zmq::socket_t& publisher) {
+    while (true) {
+        float angle = globalEstimatedAngle.load();
+        sendZMQMessage(publisher, angle);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 10 Hz
+    }
+}
+
+void method1(cv::Mat& frame, cv::Mat& result, ROIData roiData, zmq::socket_t& publisher) {
     if (roiData.roiSelected && roiData.pointCount == 4) {
         cv::Mat roi;
         applyROIToFrameWithPadding(frame, roiData.points, roi, 10);
@@ -102,20 +130,27 @@ void method1(cv::Mat& frame, cv::Mat& result, ROIData roiData, zmq::socket_t &pu
             cv::getStructuringElement(cv::MORPH_RECT, cv::Size(25, 25)), cv::Point(-1, -1), morphIterations);
         cv::cvtColor(result, result, cv::COLOR_GRAY2BGR);
 
-        // Process and analyze lines
-        int halfWidth = roi.cols / 2;
-        cv::Mat leftHalf = roi(cv::Rect(0, 0, halfWidth, roi.rows));
-        cv::Mat rightHalf = roi(cv::Rect(halfWidth, 0, roi.cols - halfWidth, roi.rows));
+        // Fit lines to the points
+        std::vector<cv::Point> points;
+        fitLine(result, points, 1, numSegments, 10, 200, 0);
 
-        double leftAvgBrightness = cv::mean(leftHalf)[0];
-        double rightAvgBrightness = cv::mean(rightHalf)[0];
+        // Compute the angle of the lines for each segment into an array 
+        std::vector<float> angles;
+        for (size_t i = 1; i < points.size(); ++i) {
+            float angle = calculateAngle(points[i - 1], points[i]);
+            angles.push_back(angle);
+        }
 
-        double brightnessDifference = (leftAvgBrightness - rightAvgBrightness) / (leftAvgBrightness + rightAvgBrightness);
+        // Compute average angle of the line. Normalize this to -1 and 1 for issuing angular velocity commands to the robot 
+        float estimatedAngle = 0;
+        for (size_t i = 0; i < angles.size(); ++i) {
+            estimatedAngle += angles[i];
+        }
+        estimatedAngle = estimatedAngle / angles.size();
 
-        std::cout << "Brightness difference between left and right halves: " << brightnessDifference << std::endl;
 
-        // Send the message with brightness difference using ZMQ
-        sendZMQMessage(publisher, brightnessDifference);
+        // Update the global estimated angle
+        globalEstimatedAngle.store(estimatedAngle);
     }
 }
 
@@ -143,7 +178,7 @@ void setupTrackBars() {
 void readFramesAsync(cv::Mat& frame) {
     while (!stopFlag) {
         if (!readFFmpegFrame(frame)) {
-            std::cerr << "Error reading frame\n";
+            //std::cerr << "Error reading frame\n";
             continue;
         }
 
@@ -151,52 +186,72 @@ void readFramesAsync(cv::Mat& frame) {
     }
 }
 
-// Main function
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " --source <udp> [--udp_address <address>] [--udp_port <port>]\n";
-        return -1;
+
+// Function to display help text
+void displayHelp() {
+    std::cout << "Usage: program_name [options]\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help           Display this help message\n";
+    std::cout << "  --source <path>  Specify the source file (default: videoData.mp4)\n";
+}
+
+// Function to parse the arguments
+std::string handleCLI(int argc, char* argv[]) {
+    std::string source = "videoData.mp4";  // Default value for source file
+    
+    // Check for --help flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help") {
+            displayHelp();
+            exit(0);  // Exit after showing help
+        }
     }
 
+    // Parse --source flag and its argument
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--source" && i + 1 < argc) {
+            source = argv[i + 1];
+            i++;  // Skip next argument, it's the source file path
+        }
+    }
+    
+    return source;
+}
 
-
-    std::string tcpAddress = "tcp://*:5556";  // Example UDP stream address
-    // ZMQ: Send the message with brightness difference
-    // Create a ZeroMQ context and socket (publisher)
+int main(int argc, char* argv[]) {
+    // Parse the command-line arguments
+    udpAddress = handleCLI(argc, argv);
+    // ZMQ publisher setup
     zmq::context_t context(1);
     zmq::socket_t publisher(context, ZMQ_PUB);
     setupZMQPublisher(context, publisher);
 
-    std::string udpAddress = "udp://localhost:5000";  // Example UDP stream address
-    // Open FFmpeg process to stream video
+    std::thread zmqThread(zmqSender, std::ref(publisher));
+
     if (!openFFmpegProcess(udpAddress)) {
-        return -1;
-    }
+            std::cerr << "Error: Could not open UDP stream.\n";
+            return -1;
+        }
 
     cv::namedWindow("Original Video", cv::WINDOW_NORMAL);
-    cv::setMouseCallback("Original Video", selectROI, &roiData);  // Assuming selectROI is defined
+    cv::setMouseCallback("Original Video", selectROI, &roiData);
     setupTrackBars();
 
     cv::Mat frame, resultFrame;
-
     std::thread readThread(readFramesAsync, std::ref(frame));
+
     while (!stopFlag) {
-        // Process at 50Hz (i.e., every 20ms)
         if (frameReady) {
-            // Process the frame with ROI and other methods
             method1(frame, resultFrame, roiData, publisher);
-            updateROI(frame, roiData);
- 
-
-
             if (!resultFrame.empty()) {
                 cv::imshow("Processed Video", resultFrame);
             }
             cv::imshow("Original Video", frame);
-
-            frameReady = false;  // Reset frame flag
+            frameReady = false; // Reset the frame flag
         }
-     
+
         int key = cv::waitKey(1);
         if (key == 'q' || key == 27) {
             stopFlag = true;
@@ -204,13 +259,14 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Cleanup and close FFmpeg process
+    // Clean up
     if (ffmpegProcess) {
         fclose(ffmpegProcess);
     }
 
     cv::destroyAllWindows();
-    readThread.join();  // Wait for the reading thread to finish
+    readThread.join();
+    zmqThread.join();
 
     return 0;
 }

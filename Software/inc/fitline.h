@@ -64,7 +64,7 @@ void connectPoints(cv::Mat& image, const std::vector<cv::Point>& points) {
         cv::line(image, points[i - 1], points[i], cv::Scalar(255, 0, 0), 2);  // Red lines between points
     }
 }
-void fitLine(cv::Mat& image, int dir, int numDivisions, int regionSize, int brightnessThreshold, float angleDegrees) {
+void fitLine(cv::Mat& image, std::vector<cv::Point>& points,  int dir, int numDivisions, int regionSize, int brightnessThreshold, float angleDegrees) {
     int rows = image.rows;
     int cols = image.cols;
     int divisionHeight = rows / numDivisions;
@@ -72,7 +72,7 @@ void fitLine(cv::Mat& image, int dir, int numDivisions, int regionSize, int brig
     drawGridLines(image, numDivisions, divisionHeight);  // Draw grid lines
     
     // Process the regions to find the brightest points
-    std::vector<cv::Point> points = processRegions(image,  dir, numDivisions, regionSize, brightnessThreshold);
+    points = processRegions(image,  dir, numDivisions, regionSize, brightnessThreshold);
 
     // Draw the points on the image
     for (const cv::Point& point : points) {

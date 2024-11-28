@@ -13,11 +13,17 @@ void drawGridLines(cv::Mat& image, int numDivisions, int divisionHeight) {
 
 
 // Function to calculate the angle of a line between two points
+// Function to calculate the angle of a line between two points with reference at 90 degrees
 float calculateAngle(cv::Point p1, cv::Point p2) {
-    float angle = atan2(p2.y - p1.y, p2.x - p1.x) * 180 / CV_PI;  // Convert from radians to degrees
-    return angle;
-}
+    // Calculate the angle in degrees from the positive X-axis
+    float angle = atan2(p2.y - p1.y, p2.x - p1.x) * 180 / CV_PI;
 
+    // Adjust so that 90 degrees is the reference, and angles are relative to 90 degrees
+    float adjustedAngle = angle+25;
+
+    // Return the adjusted angle
+    return -adjustedAngle/50;
+}
 
 // Update ROI (Region of Interest) display
 
