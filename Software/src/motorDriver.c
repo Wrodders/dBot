@@ -20,7 +20,7 @@ void* read_serial_worker(void *arg) {
                 switch(buffer[1]-'a'){
                     case PUB_STATE:
                         sscanf(&buffer[2], 
-                        "%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f",
+                        "%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f:%f\n",
                         &motorState.imu.pitch, &motorState.imu.roll,
                         &motorState.odom.lw, &motorState.odom.rw,
                         &motorState.odom.linVel, &motorState.odom.angVel,
@@ -31,16 +31,16 @@ void* read_serial_worker(void *arg) {
                         motorState.timestamp = time(NULL);
                         break;   
                     case PUB_INFO:
-                        sscanf(&buffer[2], "%s", motorState.info);
+                        sscanf(&buffer[2],"%s\n", motorState.info);
                         break;
                     case PUB_DEBUG:
-                        sscanf(&buffer[2], "%s", motorState.debug);
+                        sscanf(&buffer[2],"%s\n", motorState.debug);
                         break;
                     case PUB_ERROR:
-                        sscanf(&buffer[2], "%s", motorState.error);
+                        sscanf(&buffer[2], "%s\n", motorState.error);
                         break;
                     case PUB_CMD_RET:
-                        sscanf(&buffer[2], "%f", &motorState.cmdRet);
+                        sscanf(&buffer[2], "%f\n", &motorState.cmdRet);
                         break;                        
                     default:
                         printf("Received message: %s", buffer);
@@ -53,7 +53,28 @@ void* read_serial_worker(void *arg) {
     return NULL;
 }
 
-#define MAX_STRING_LENGTH 20  // Maximum string length for INFO, DEBUG, ERROR
+void *write_serial_worker(void *arg) {
+    int fd = *((int *)arg);
+    FILE *fp = fdopen(fd, "w");  // Open file stream for writing
+    if (fp == NULL) {
+        perror("Failed to associate file stream");
+        return NULL;
+    }
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);  // Asynchronous cancellation
+    uint8_t id = 'a';
+    while (!stop) {
+        // Write to serial port
+        if(id > 22 + 'a') id = 'a';
+        fprintf(fp, "<a%c\n", id++);
+        fflush(fp);  // Flush the stream
+        usleep(0.8e6);  // Sleep for 1 second
+    }
+    fclose(fp);
+    return NULL;
+}
+
+#define MAX_STRING_LENGTH 30  // Maximum string length for INFO, DEBUG, ERROR
 
 void printMotorStateTable() {
     // ANSI escape code to clear the screen
@@ -66,22 +87,22 @@ void printMotorStateTable() {
     printf("+-----------------------+------------------------+\n");
 
     // Table Rows (Formatted for fixed column width)
-    printf("| %-21s | %-22.2f |\n", "IMU Pitch", motorState.imu.pitch);
-    printf("| %-21s | %-22.2f |\n", "IMU Roll", motorState.imu.roll);
-    printf("| %-21s | %-22.2f |\n", "Odometry Left Wheel", motorState.odom.lw);
+    printf("| %-21s | %-22.2f |\n", "IMU Pitch",            motorState.imu.pitch);
+    printf("| %-21s | %-22.2f |\n", "IMU Roll",             motorState.imu.roll);
+    printf("| %-21s | %-22.2f |\n", "Odometry Left Wheel",  motorState.odom.lw);
     printf("| %-21s | %-22.2f |\n", "Odometry Right Wheel", motorState.odom.rw);
-    printf("| %-21s | %-22.2f |\n", "Odometry Linear Vel", motorState.odom.linVel);
+    printf("| %-21s | %-22.2f |\n", "Odometry Linear Vel",  motorState.odom.linVel);
     printf("| %-21s | %-22.2f |\n", "Odometry Angular Vel", motorState.odom.angVel);
-    printf("| %-21s | %-22.2f |\n", "Odometry X Position", motorState.odom.xPos);
-    printf("| %-21s | %-22.2f |\n", "Odometry Y Position", motorState.odom.yPos);
-    printf("| %-21s | %-22.2f |\n", "Odometry Theta", motorState.odom.theta);
-    printf("| %-21s | %-22.2f |\n", "Control TL", motorState.cntrl.tl);
-    printf("| %-21s | %-22.2f |\n", "Control TR", motorState.cntrl.tr);
-    printf("| %-21s | %-22.2f |\n", "Control UL", motorState.cntrl.ul);
-    printf("| %-21s | %-22.2f |\n", "Control UR", motorState.cntrl.ur);
-    printf("| %-21s | %-22.2f |\n", "Control UB", motorState.cntrl.ub);
-    printf("| %-21s | %-22.2f |\n", "Control UA", motorState.cntrl.ua);
-    printf("| %-21s | %-22.2f |\n", "Control UV", motorState.cntrl.uv);
+    printf("| %-21s | %-22.2f |\n", "Odometry X Position",  motorState.odom.xPos);
+    printf("| %-21s | %-22.2f |\n", "Odometry Y Position",  motorState.odom.yPos);
+    printf("| %-21s | %-22.2f |\n", "Odometry Theta",       motorState.odom.theta);
+    printf("| %-21s | %-22.2f |\n", "Control TL",           motorState.cntrl.tl);
+    printf("| %-21s | %-22.2f |\n", "Control TR",           motorState.cntrl.tr);
+    printf("| %-21s | %-22.2f |\n", "Control UL",           motorState.cntrl.ul);
+    printf("| %-21s | %-22.2f |\n", "Control UR",           motorState.cntrl.ur);
+    printf("| %-21s | %-22.2f |\n", "Control UB",           motorState.cntrl.ub);
+    printf("| %-21s | %-22.2f |\n", "Control UA",           motorState.cntrl.ua);
+    printf("| %-21s | %-22.2f |\n", "Control UV",           motorState.cntrl.uv);
 
     // Handle timestamp formatting
     char timeBuffer[26];
@@ -120,6 +141,16 @@ int main() {
         exit(1);
     }
 
+    pthread_t write_threadID;
+
+    if (pthread_create(&write_threadID, NULL, write_serial_worker, &fd) != 0) {
+        perror("Failed to create write thread");
+        close(fd);
+        exit(1);
+    }
+
+
+
     // Main loop to keep the program running
     while (!stop) {
         printf("IMU: %.2f, %.2f\n", motorState.imu.pitch, motorState.imu.roll);
@@ -128,6 +159,7 @@ int main() {
     }
     // Wait for threads to finish (join them) before exiting
     pthread_cancel(read_threadID);
+    pthread_cancel(write_threadID);
     //pthread_join(read_threadID, NULL);
     close(fd);  //
 }

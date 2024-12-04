@@ -6,9 +6,10 @@
 
 enum PUBS{
     PUB_CMD_RET = 0,
+    PUB_ERROR,
     PUB_INFO,
     PUB_DEBUG,
-    PUB_ERROR,
+
     PUB_STATE,
     PUB_NUMS
 };
@@ -28,7 +29,7 @@ struct MotorState{
 
     time_t timestamp;
     float cmdRet;
-    char info[256], debug[256], error[256];
+    char info[64], debug[64], error[64];
 };
 
 
