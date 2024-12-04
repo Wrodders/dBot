@@ -1,0 +1,23 @@
+Register,Access,Data Format,Description
+IDENT,R,%f,Device Id
+MD,W,%f,Mode
+LT,W,%f,Target Left  Wheel RPM
+LP,W,%f,Left Wheel Speed KP
+LI,W,%f,Left Wheel Speed KI
+RT,W,%f,Target Right Wheel RPM
+RP,W,%f,Right Wheel Speed KP
+RI,W,%f,Right Wheel Speed KI
+BT,W,%f,Balance Trgt
+BP,W,%f,Balance KP
+BI,W,%f,Balance KI
+BD,W,%f,Balance KD
+VT,W,%f,Target LinVel mps
+VP,W,%f,LinVel KP
+VI,W,%f,LinVel KI
+VD,W,%f,LinVel KD
+VA,W,%f,LinVel Alpha
+AT,W,%f,Steer T
+AP,W,%f,Steer KP
+AI,W,%f,Steer KI
+AD,W,%f,Steer KD
+AA,W,%f,Steer Alpha

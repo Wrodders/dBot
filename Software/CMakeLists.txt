@@ -30,7 +30,7 @@ include_directories(${CPPZMQ_INCLUDE_DIR})
 # Include directories
 include_directories(
     ${OpenCV_INCLUDE_DIRS}  # OpenCV headers
-    ../inc                  # Custom headers (if any, adjust the path as needed)
+    ../inc/                  # Custom headers (if any, adjust the path as needed)
 )
 
 # Source files

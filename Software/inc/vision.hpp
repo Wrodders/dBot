@@ -1,3 +1,6 @@
+#ifndef VISION_H
+#define VISION_H
+
 #include <iostream>
 #include <cstdio>
 #include <cstdlib>
@@ -5,15 +8,85 @@
 #include <atomic>
 #include <chrono>
 
-
-#include "../inc/roi_selector.h"
-#include "../inc/utils.h"
-#include "../inc/fitline.h"
-
 #include <thread>
 #include <zmq.hpp> // Include the ZeroMQ header
 #include <getopt.h>  // For command-line argument parsing
 
+
+void drawGridLines(cv::Mat& image, int numDivisions, int divisionHeight) {
+    int cols = image.cols;
+    for (int i = 1; i < numDivisions; ++i) {
+        int y = i * divisionHeight;
+        cv::line(image, cv::Point(0, y), cv::Point(cols, y), cv::Scalar(0, 255, 0), 2);  // Green grid lines
+    }
+}
+
+// Function to calculate the angle of a line between two points
+// Function to calculate the angle of a line between two points with reference at 90 degrees
+float calculateAngle(cv::Point p1, cv::Point p2) {
+    // Calculate the angle in degrees from the positive X-axis
+    float angle = atan2(p2.y - p1.y, p2.x - p1.x) * 180 / CV_PI;
+
+    // Adjust so that 90 degrees is the reference, and angles are relative to 90 degrees
+    float adjustedAngle = angle+25;
+
+    // Return the adjusted angle
+    return -adjustedAngle/50;
+}
+
+void removeEdgeAreasFromROI(cv::Mat& roiImage, const std::vector<cv::Point>& roiPoints) {
+    // Create a mask with the same size as the ROI image
+    cv::Mat mask = cv::Mat::zeros(roiImage.size(), CV_8UC1);  // Same size as the ROI image, black by default
+
+    // Fill the polygon (ROI boundary) with white on the mask (representing the region)
+    std::vector<std::vector<cv::Point>> contours = {roiPoints};
+    cv::fillPoly(mask, contours, cv::Scalar(255));
+
+    // Set the areas along the edge (the polygon) to black
+
+    roiImage.setTo(cv::Scalar(255), mask);  // Black out the areas defined by the mask
+}
+
+struct ROIData {
+    std::vector<cv::Point> points;  // Store selected points for the trapezium
+    bool drawing = false;
+    bool roiSelected = false;
+    int pointCount = 0;  // Counter to track the number of points selected
+};
+void selectROI(int event, int x, int y, int flags, void* param) {
+    auto* data = static_cast<ROIData*>(param);
+
+    switch (event) {
+        case cv::EVENT_LBUTTONDOWN:
+            // If 4 points are selected, reset the points and start over
+            if (data->pointCount == 4) {
+                data->points.clear();  // Clear previous points
+                data->pointCount = 0;  // Reset point counter
+                data->roiSelected = false;  // Reset ROI selection
+            }
+
+            if (data->pointCount < 4) {  // Allow selecting up to 4 points
+                data->points.push_back(cv::Point(x, y));
+                data->pointCount++;
+            }
+
+            // If 4 points are selected, mark the ROI as selected
+            if (data->pointCount == 4) {
+                data->roiSelected = true;
+            }
+            break;
+
+        case cv::EVENT_MOUSEMOVE:
+            // Optional: Visual feedback for drawing (if needed)
+            break;
+
+        case cv::EVENT_LBUTTONUP:
+            break;
+
+        default:
+            break;
+    }
+}
 
 // Update ROI (Region of Interest) display
 void applyROIToFrameWithPadding(cv::Mat& frame, const std::vector<cv::Point>& roiPoints, cv::Mat& result, int padding) {
@@ -307,87 +380,103 @@ void readFramesAsync(cv::Mat& frame) {
 }
 
 
-// Function to display help text
-void displayHelp() {
-    std::cout << "Usage: program_name [options]\n";
-    std::cout << "Options:\n";
-    std::cout << "  --help           Display this help message\n";
-    std::cout << "  --source <path>  Specify the source file (default: videoData.mp4)\n";
-}
 
-// Function to parse the arguments
-std::string handleCLI(int argc, char* argv[]) {
-    std::string source = "videoData.mp4";  // Default value for source file
-    
-    // Check for --help flag
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--help") {
-            displayHelp();
-            exit(0);  // Exit after showing help
-        }
-    }
+cv::Point findBrightestPointInRegion(const cv::Mat& image, int dir, int regionStart, int regionEnd, int regionSize, int width, int brightnessThreshold) {
+    double maxBrightness = 0;
+    cv::Point brightestPoint(-1, -1);
 
-    // Parse --source flag and its argument
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--source" && i + 1 < argc) {
-            source = argv[i + 1];
-            i++;  // Skip next argument, it's the source file path
-        }
-    }
-    
-    return source;
-}
+    // Define the iteration direction based on the dir parameter
+    int xStart = (dir == 1) ? 0 : width - regionSize + 1;
+    int xEnd = (dir == 1) ? width - regionSize + 1 : -1;
+    int xStep = (dir == 1) ? 1 : -1;
 
-int main(int argc, char* argv[]) {
-    // Parse the command-line arguments
-    udpAddress = handleCLI(argc, argv);
-    // ZMQ publisher setup
-    zmq::context_t context(1);
-    zmq::socket_t publisher(context, ZMQ_PUB);
-    //setupZMQPublisher(context, publisher);
+    // Iterate over the vertical region (y-direction)
+    for (int y = regionStart; y < regionEnd - regionSize + 1; ++y) {
+        // Iterate over the horizontal region (x-direction) based on dir
+        for (int x = xStart; (dir == 1) ? x < xEnd : x > xEnd; x += xStep) {
+            cv::Rect regionRect(x, y, regionSize, regionSize);
+            cv::Mat region = image(regionRect);
+            double avgBrightness = cv::mean(region)[0];
 
-    std::thread zmqThread(zmqSender, std::ref(publisher));
-
-    if (!openFFmpegProcess(udpAddress)) {
-            std::cerr << "Error: Could not open UDP stream.\n";
-            return -1;
-        }
-
-    cv::namedWindow("Original Video", cv::WINDOW_NORMAL);
-    cv::setMouseCallback("Original Video", selectROI, &roiData);
-    setupTrackBars();
-
-    cv::Mat frame, resultFrame;
-    std::thread readThread(readFramesAsync, std::ref(frame));
-
-    while (!stopFlag) {
-        if (frameReady) {
-            method2(frame, resultFrame, roiData);
-            updateROI(frame, roiData);
-            if (!resultFrame.empty()) {
-                cv::imshow("Processed Video", resultFrame);
+            if (avgBrightness > maxBrightness) {
+                maxBrightness = avgBrightness;
+                brightestPoint = cv::Point(x + regionSize / 2, y + regionSize / 2);
             }
-            cv::imshow("Original Video", frame);
-            frameReady = false; // Reset the frame flag
-        }
-
-        int key = cv::waitKey(1);
-        if (key == 'q' || key == 27) {
-            stopFlag = true;
-            break;
         }
     }
 
-    // Clean up
-    if (ffmpegProcess) {
-        fclose(ffmpegProcess);
-    }
-
-    cv::destroyAllWindows();
-    readThread.join();
-    zmqThread.join();
-
-    return 0;
+    // Return the brightest point if it exceeds the brightness threshold
+    return (maxBrightness > brightnessThreshold && brightestPoint.x != -1 && brightestPoint.y != -1) ? brightestPoint : cv::Point(-1, -1);
 }
+
+
+
+
+std::vector<cv::Point> processRegions(const cv::Mat& image, int dir, int numDivisions, int regionSize, int brightnessThreshold) {
+    int rows = image.rows;
+    int cols = image.cols;
+    int divisionHeight = rows / numDivisions;
+    std::vector<cv::Point> points;
+    for (int i = 0; i < numDivisions; ++i) {
+            int regionStart = i * divisionHeight;
+            int regionEnd = std::min(regionStart + divisionHeight, rows);
+
+            cv::Point brightestPoint = findBrightestPointInRegion(image, dir, regionStart, regionEnd, regionSize, cols, brightnessThreshold);
+
+            if (brightestPoint.x != -1 && brightestPoint.y != -1) {
+                points.push_back(brightestPoint);
+            }
+        }
+
+
+    return points;
+}
+
+
+void connectPoints(cv::Mat& image, const std::vector<cv::Point>& points) {
+    for (size_t i = 1; i < points.size(); ++i) {
+        cv::line(image, points[i - 1], points[i], cv::Scalar(255, 0, 0), 2);  // Red lines between points
+    }
+}
+void fitLine(cv::Mat& image, std::vector<cv::Point>& points,  int dir, int numDivisions, int regionSize, int brightnessThreshold, float angleDegrees) {
+    int rows = image.rows;
+    int cols = image.cols;
+    int divisionHeight = rows / numDivisions;
+
+    drawGridLines(image, numDivisions, divisionHeight);  // Draw grid lines
+    
+    // Process the regions to find the brightest points
+    points = processRegions(image,  dir, numDivisions, regionSize, brightnessThreshold);
+
+    // Draw the points on the image
+    for (const cv::Point& point : points) {
+        cv::circle(image, point, 2, cv::Scalar(0, 255, 0), -1);  // Swollen green point
+    }
+
+    // Vector to store the angles of each line segment
+    std::vector<float> angles;
+
+    // Draw the lines, angles, and store angles
+    for (size_t i = 1; i < points.size(); ++i) {
+        cv::line(image, points[i - 1], points[i], cv::Scalar(255, 0, 0), 2);  // Red lines for spline
+
+        // Calculate the angle of the current line
+        float angle = calculateAngle(points[i - 1], points[i]);
+
+        // Store the angle in the array
+        angles.push_back(angle);
+    }
+
+    // Print the angles as a table
+    /*
+    std::cout << "Line Segment | Angle (°)" << std::endl;
+    std::cout << "------------------------" << std::endl;
+    for (size_t i = 0; i < angles.size(); ++i) {
+        std::cout << "Segment " << i + 1 << " | " << angles[i] << std::endl;
+    }
+    */
+    // Connect the original points (optional, if you want to visualize the original points as well)
+    connectPoints(image, points);
+}
+
+#endif // VISION_H
