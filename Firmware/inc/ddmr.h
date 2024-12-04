@@ -12,6 +12,9 @@ struct DDMR{
     // kinematic state
     float linVel;   // m/s    
     float angVel;   // angular vel [rad/s]
+    float xpos, ypos, theta; // position and orientation
+    float dt;
+
 }DDMR; // Deferential Drive Mobile Robot
 
 
@@ -29,10 +32,12 @@ static struct DDMR ddmrInit(const float wheelRadius, const float wheelBase, cons
 //@Description:  vel = R * (wR + wL) / 2
 //               angVel = 2R * (wR - wL) / L
 static void ddmrEstimateOdom(struct DDMR *const ddmr, const struct Motor *const mL, const struct Motor *const mR){
-    float vel = (mL->angularVel * RPS_TO_MPS + mR->angularVel * RPS_TO_MPS ) * 0.5f; // convert to mps 
-    ddmr->linVel = (ddmr->linAlpha * vel) + (1.0f - ddmr->linAlpha) * ddmr->linVel;  // lpf filter 
-    float angVel = 2*ddmr->wheelR*( mL->angularVel - mR->angularVel) / ddmr->wheelBase;        // ang vel in rad/s
-    ddmr->angVel = (ddmr->angAlpha * angVel) + (1.0f -ddmr->angAlpha ) * ddmr->angVel; // lpf filter
+    float vel = (mL->angularVel * RPS_TO_MPS + mR->angularVel * RPS_TO_MPS ) * 0.5f;    // convert to mps 
+    ddmr->linVel = (ddmr->linAlpha * vel) + (1.0f - ddmr->linAlpha) * ddmr->linVel;     // lpf filter 
+    float angVel = 2*ddmr->wheelR*( mL->angularVel - mR->angularVel) / ddmr->wheelBase; // ang vel in rad/s
+    ddmr->angVel = (ddmr->angAlpha * angVel) + (1.0f - ddmr->angAlpha ) * ddmr->angVel; // lpf filter
+    ddmr->xpos += ddmr->linVel * ddmr->dt; 
+
 
 }
 

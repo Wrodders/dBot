@@ -19,7 +19,7 @@
 #define NULL ((void *)0)
 #endif
 // ************* Task Execution Periods ******************** // 
-#define COMS_PERIOD             50  // 20Hz
+#define COMS_PERIOD             25  // 20Hz
 #define BLINK_PERIOD            100 // 10Hz
 #define IMU_FUSION_PERIOD       2   //  500 Hz
 #define BAL_CNTRL_PERIOD        10  // 250 Hz
@@ -61,14 +61,14 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 #define BAL_KI      2.2f 
 #define BAL_KD      0.0034f
 // Linear Velocity Control
-#define VEL_P       18  
-#define VEL_I       18
+#define VEL_P       25  
+#define VEL_I       24
 #define VEL_D       0.2
 #define VEL_ALPHA   1.0
 // Angular Velocity Control
 #define STEER_KP    1.2
-#define STEER_KI    0.5 
-#define STEER_KD    0.003
+#define STEER_KI    0.0
+#define STEER_KD    0.000
 #define STEER_ALPHA 1.0
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MIN;     

@@ -12,7 +12,7 @@ PORT=5000
 # GStreamer pipeline for receiving and displaying video
 GST_PIPELINE="gst-launch-1.0 udpsrc port=$PORT ! application/x-rtp, media=video, clock-rate=90000, payload=96 ! rtpjpegdepay ! queue ! jpegdec ! videoconvert ! fpsdisplaysink"
 
-FFPLAY="ffplay -vf "transpose=2" udp://localhost:$PORT  -fflags nobuffer -flags low_delay -framedrop"
+FFPLAY="ffplay  udp://localhost:$PORT  -fflags nobuffer -flags low_delay -framedrop"
 
 # Run GStreamer pipeline
 echo "Starting GStreamer pipeline..."

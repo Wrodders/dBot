@@ -20,8 +20,8 @@ float UUID = 3.14159;
 
 // ********* SUPER LOOP **************** // 
 int main(void){
-    enum STATE {INIT = 0, PARK, RUN} state = INIT;
-    enum MODE {MCNTRL = 0, PIDCNTRL,LQRCNTRL} mode = PIDCNTRL;
+    enum STATE {INIT = 0, PARK, RUN, CALIB} state = INIT;
+    float mode = 0;
 	// ***************************** HARDWARE SETUP ******************************************************** //
 	clock_setup();      // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup();    // 1ms Tick
@@ -56,32 +56,38 @@ int main(void){
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
     // ***************************** COMMUNICATIONS ******************************************************** // 
     const struct Topic pubMap[NUM_PUBS] = {
-        {.id = PUB_CMD_RET, .name = "CMD_RET", .format ="%s:%s", .nArgs=2}, // CMD_ID : RET_VAL
+        {.id = PUB_CMD_RET, .name = "CMD_RET", .format = "%s",   .nArgs=1}, // RET_VAL
         {.id = PUB_ERROR,   .name = "ERROR",   .format = "%s",   .nArgs=1}, // Error Message
         {.id = PUB_INFO,    .name = "INFO",    .format = "%s",   .nArgs=1}, // System INFO
         {.id = PUB_DEBUG,   .name = "DEBUG",   .format = "%s",   .nArgs=1}, // Debug prints 
         // Application Publisher Topics 
-        {.id = PUB_IMU,  .name = "IMU",  .format = "%0.3f:%0.3f", .nArgs=2}, // PITCH:ROLL
-        {.id = PUB_ODOM, .name = "ODOM", .format = "%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=4}, //LSPEED:RSPEED:LINVEL:ANGVEL
-        {.id = PUB_CTRL, .name = "CTRL", .format = "%0.3f:%0.3f:%0.3f:%0.3f", .nArgs=4} //TL:TR:UL:UR:UB:UA:UV
+        {.id = PUB_STATE,   .name = "STATE",  .nArgs=16, 
+        .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"}
+        // PITCH:ROLL:LW:RW:LINVEL:ANGVEL:THETA:XPOS:YPOS:TL:TR:UL:UR:UB:UA:UV 
     };
     const struct Param paramMap[NUM_PARAMS] = {
         {.id = PRM_ID,   .name = "ID",    .param = &UUID,             .format = "%f"},
+        {.id = PRM_MODE, .name = "MD",    .param = &mode,             .format = "%d"},
+
         {.id = PRM_LT,   .name = "LT",    .param = &motorL.wCtrl.ref, .format = "%f"},
         {.id = PRM_LP,   .name = "LP",    .param = &motorL.wCtrl.kp,  .format = "%f"},
         {.id = PRM_LI,   .name = "LI",    .param = &motorL.wCtrl.ki,  .format = "%f"},
+
         {.id = PRM_RT,   .name = "RT",    .param = &motorR.wCtrl.ref, .format = "%f"},
         {.id = PRM_RP,   .name = "RP",    .param = &motorR.wCtrl.kp,  .format = "%f"},
         {.id = PRM_RI,   .name = "RI",    .param = &motorR.wCtrl.ki,  .format = "%f"},
+
         {.id = PRM_BP,   .name = "BT",    .param = &balanceCtrl.ref,  .format = "%f"},
         {.id = PRM_BP,   .name = "BP",    .param = &balanceCtrl.kp,   .format = "%f"},
         {.id = PRM_BI,   .name = "BI",    .param = &balanceCtrl.ki,   .format = "%f"},
         {.id = PRM_BD,   .name = "BD",    .param = &balanceCtrl.kd,   .format = "%f"},
+
         {.id = PRM_VT,   .name = "VT",    .param = &velCtrl.ref,      .format = "%f"},
         {.id = PRM_VP,   .name = "VP",    .param = &velCtrl.kp,       .format = "%f"},
         {.id = PRM_VI,   .name = "VI",    .param = &velCtrl.ki,       .format = "%f"},
         {.id = PRM_VD,   .name = "VD",    .param = &velCtrl.kd,       .format = "%f"},
         {.id = PRM_VA,   .name = "VA",    .param = &ddmr.linAlpha,    .format = "%f"},
+
         {.id = PRM_AT,   .name = "AT",    .param = &steerCtrl.ref,    .format = "%f"},
         {.id = PRM_AP,   .name = "AP",    .param = &steerCtrl.kp,     .format = "%f"},
         {.id = PRM_AI,   .name = "AI",    .param = &steerCtrl.ki,     .format = "%f"},
@@ -107,6 +113,11 @@ int main(void){
                   if(get_ticks() >= 3000){
                     comsSendMsg(&coms, &ser1, PUB_INFO, "INIT => PARK ");
                     systick_clear();
+                    pidClear(&velCtrl);
+                    pidClear(&balanceCtrl);
+                    pidClear(&steerCtrl);
+                    motorDisable(&motorL);
+                    motorDisable(&motorR);
                     state = PARK;
                   }
                   break;
@@ -115,6 +126,8 @@ int main(void){
                     comsSendMsg(&coms, &ser1, PUB_INFO, "PAUSED => RUN ");
                     motorEnable(&motorL);
                     motorEnable(&motorR);
+                    pidClear(&velCtrl);
+                    pidClear(&balanceCtrl);
                     state = RUN;
                 }
                 break;
@@ -125,7 +138,12 @@ int main(void){
                     motorDisable(&motorR);
                     state = PARK;
                     break;
+                }else if(mode == 1){
+                    state = CALIB;
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "RUN => CALIB ");
+                    break;
                 }
+                // Cascaded PID Control Loop
                 if(CHECK_PERIOD(balanceCntrlTask, loopTick)){
                     // Balance Control Inverted Pendulum PID
                     balanceCtrl.out = pidRun(&balanceCtrl, imu.kal.pitch); 
@@ -140,6 +158,27 @@ int main(void){
                     pidSetRef(&balanceCtrl,BAL_OFFSET-velCtrl.out); // Sets Balance Reference point to reach desired velocity
                     velCtrlTask.lastTick= loopTick;
                 }
+                if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
+                    // Motor Speed Control ISR 
+                    motorSpeedCtrl(&motorL);
+                    motorSpeedCtrl(&motorR);
+                    wspeedCntlTask.lastTick = loopTick;
+                }
+                break;
+            case CALIB:
+                if(mode == 0){
+                    state = INIT;
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "CALIB => INIT ");
+                    break;
+                }
+                if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
+                    // Motor Speed Control ISR 
+                    motorEstSpeed(&motorR);
+                    motorEstSpeed(&motorL); 
+                    motorSetVoltage(&motorL, motorL.wCtrl.ref);
+                    motorSetVoltage(&motorR, motorR.wCtrl.ref);
+                    wspeedCntlTask.lastTick = loopTick;
+                }
                 break;
             default:
                 break;  
@@ -151,12 +190,7 @@ int main(void){
             imuKalUpdate(&imu); // Estimate Angle with Kalman Observer
             imuFusionTask.lastTick = loopTick;
         }
-        if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
-            // Motor Speed Control ISR 
-            motorSpeedCtrl(&motorL);
-            motorSpeedCtrl(&motorR);
-            wspeedCntlTask.lastTick = loopTick;
-        }
+
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
             blinkTask.lastTick = loopTick;  
@@ -164,12 +198,14 @@ int main(void){
         // ********** Communications ********************************************************************** //
         if(CHECK_PERIOD(comsTask, loopTick)){
             // TX Publishing Topics
-            comsSendMsg(&coms, &ser1, PUB_IMU,imu.kal.pitch, imu.kal.roll);
-            comsSendMsg(&coms, &ser1, PUB_ODOM, motorL.angularVel, motorR.angularVel, 
-                                               ddmr.linVel, ddmr.angVel);
-            comsSendMsg(&coms,&ser1, PUB_CTRL, motorL.wCtrl.ref, motorR.wCtrl.ref,
-                                                motorL.wCtrl.out,motorR.wCtrl.out,
-                                                balanceCtrl.out, steerCtrl.out, velCtrl.out); //TL:TR:UL:UR:UB:UA:UV
+            comsSendMsg(&coms, &ser1, PUB_STATE,imu.kal.pitch,      imu.kal.roll,
+                                                motorL.angularVel,  motorR.angularVel, 
+                                                ddmr.linVel,        ddmr.angVel,
+                                                ddmr.xpos,          ddmr.ypos,          
+                                                ddmr.theta,         motorL.wCtrl.ref,   
+                                                motorR.wCtrl.ref,   motorL.wCtrl.out,   
+                                                motorR.wCtrl.out,   balanceCtrl.out,    
+                                                steerCtrl.out,      velCtrl.out); //TL:TR:UL:UR:UB:UA:UV
             // Handle RX Messages 
             if(comsGrabMsg(&coms, &ser1)){
                 comsProcessMsg(&coms, &ser1);

@@ -21,7 +21,7 @@ EOF - End of Frame
 #define SOF_BYTE '<' // hex 0x3C 
 #define EOF_BYTE  '\n' // 
 #define DELIM_BYTE ':' // hex 0x3A
-#define MAX_MSG_DATA_SIZE 64
+#define MAX_MSG_DATA_SIZE 128
 #define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
 #define PROT_CMD_IDX 0 
@@ -47,15 +47,13 @@ enum PUB_ID_t {
     PUB_INFO, 
     PUB_DEBUG, 
     // ADD Application Specific Publishers
-    PUB_IMU,
-    PUB_ODOM,
-    PUB_CTRL,
-
+    PUB_STATE,
     NUM_PUBS
 }PUB_ID_t; // Publish Topic IDs
 
 enum PARAM_ID_t{
     PRM_ID = 0,
+    PRM_MODE,
     // Motor Speed PID 
     PRM_LT, PRM_LP, PRM_LI,
     PRM_RT, PRM_RP, PRM_RI,
@@ -70,11 +68,13 @@ enum PARAM_ID_t{
     PRM_VI,
     PRM_VD,
     PRM_VA,
+
     PRM_AT,
     PRM_AP,
     PRM_AI,
     PRM_AD,
     PRM_AA,
+
     NUM_PARAMS
 }PARAM_ID_t; // Parameter Ids
 
@@ -211,7 +211,7 @@ static void comsProcessMsg(struct Coms * coms, struct Serial *ser){
         case CMD_GET:
             char valBuf[7]; // working buffer
             snprintf(valBuf, sizeof(valBuf), "%0.3f", *coms->paramMap[paramIdx].param);
-            comsSendMsg(coms, ser, PUB_CMD_RET,(paramIdx + 'a'),valBuf);
+            comsSendMsg(coms, ser, PUB_CMD_RET,valBuf);
             break;
         case CMD_SET:
             float val; // working variable
