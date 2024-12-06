@@ -12,10 +12,9 @@
 #include "inc/ddmr.h"
 #include "drivers/analog.h"
 
-// ********** GLOBAL STATIC BUFFERS *************************************** // 
-#define RB_SIZE 128          // ACCESS THROUGH RING BUFFER 
-uint8_t rx1_buf_[RB_SIZE] = {0};
-uint8_t tx1_buf_[RB_SIZE] = {0};
+// ********** GLOBAL STATIC BUFFERS *************************************** //         // ACCESS THROUGH RING BUFFER 
+uint8_t rx1_buf_[128] = {0};
+uint8_t tx1_buf_[256] = {0};
 float UUID = 3.14159;
 
 // ********* SUPER LOOP **************** // 
@@ -62,7 +61,9 @@ int main(void){
         {.id = PUB_DEBUG,   .name = "DEBUG",   .format = "%s",   .nArgs=1}, // Debug prints 
         // Application Publisher Topics 
         {.id = PUB_STATE,   .name = "STATE",  .nArgs=16, 
-        .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"}
+        .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"},
+        {.id = PUB_IMURAW,  .name = "IMURAW", .nArgs=6, .format = "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"}
+
         // PITCH:ROLL:LW:RW:LINVEL:ANGVEL:THETA:XPOS:YPOS:TL:TR:UL:UR:UB:UA:UV 
     };
     const struct Param paramMap[NUM_PARAMS] = {
@@ -197,7 +198,8 @@ int main(void){
         }
         // ********** Communications ********************************************************************** //
         if(CHECK_PERIOD(comsTask, loopTick)){
-            // TX Publishing Topics
+            // TX Publishing Topic
+            //*
             comsSendMsg(&coms, &ser1, PUB_STATE,imu.kal.pitch,      imu.kal.roll,
                                                 motorL.angularVel,  motorR.angularVel, 
                                                 ddmr.linVel,        ddmr.angVel,
@@ -206,6 +208,11 @@ int main(void){
                                                 motorR.wCtrl.ref,   motorL.wCtrl.out,   
                                                 motorR.wCtrl.out,   balanceCtrl.out,    
                                                 steerCtrl.out,      velCtrl.out); //TL:TR:UL:UR:UB:UA:UV
+
+     
+            comsSendMsg(&coms, &ser1, PUB_IMURAW, imu.lpf.accel.x,  imu.lpf.accel.y, imu.lpf.accel.z, 
+                                                    imu.lpf.gyro.x, imu.lpf.gyro.y,  imu.lpf.gyro.z);
+
             // Handle RX Messages 
             if(comsGrabMsg(&coms, &ser1)){
                 comsProcessMsg(&coms, &ser1);

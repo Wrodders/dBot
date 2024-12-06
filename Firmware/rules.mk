@@ -37,7 +37,7 @@ CSTD ?= -std=c99
 
 # Be silent per default, but 'make V=1' will show all compiler calls.
 # If you're insane, V=99 will print out all sorts of things.
-V?=1
+V?=0
 ifeq ($(V),0)
 Q	:= @
 NULL	:= 2>/dev/null

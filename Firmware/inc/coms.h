@@ -21,14 +21,14 @@ EOF - End of Frame
 #define SOF_BYTE '<' // hex 0x3C 
 #define EOF_BYTE  '\n' // 
 #define DELIM_BYTE ':' // hex 0x3A
-#define MAX_MSG_DATA_SIZE 128
+#define MAX_MSG_DATA_SIZE 512
 #define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
 #define PROT_CMD_IDX 0 
 #define PROT_ID_IDX 1
 
 struct MsgFrame{
-    uint8_t size; // current size of msg buffer
+    size_t size; // current size of msg buffer
     uint8_t cmdType;
     uint8_t id;  // id for map  
     uint8_t buf[MAX_MSG_DATA_SIZE]; 
@@ -48,6 +48,7 @@ enum PUB_ID_t {
     PUB_DEBUG, 
     // ADD Application Specific Publishers
     PUB_STATE,
+    PUB_IMURAW,
     NUM_PUBS
 }PUB_ID_t; // Publish Topic IDs
 
