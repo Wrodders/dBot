@@ -1,393 +1,99 @@
+#include "../inc/vision.hpp"
 #include <iostream>
-#include <cstdio>
-#include <cstdlib>
+#include <string>
+#include <thread>
 #include <opencv2/opencv.hpp>
-#include <atomic>
+#include <zmq.hpp>
 #include <chrono>
 
+std::mutex velocityMutex;
+TargetVelocities latestVel;  // Shared variable to store the latest velocity data
 
-#include "../inc/roi_selector.h"
-#include "../inc/utils.h"
-#include "../inc/fitline.h"
+struct state state;
 
-#include <thread>
-#include <zmq.hpp> // Include the ZeroMQ header
-#include <getopt.h>  // For command-line argument parsing
-
-
-// Update ROI (Region of Interest) display
-void applyROIToFrameWithPadding(cv::Mat& frame, const std::vector<cv::Point>& roiPoints, cv::Mat& result, int padding) {
-    // Calculate the bounding rectangle for the points
-    cv::Rect boundingRect = cv::boundingRect(roiPoints);
-
-    // Expand the bounding rectangle by the padding
-    boundingRect.x = std::max(boundingRect.x - padding, 0);
-    boundingRect.y = std::max(boundingRect.y - padding, 0);
-    boundingRect.width = std::min(boundingRect.width + 2 * padding, frame.cols - boundingRect.x);
-    boundingRect.height = std::min(boundingRect.height + 2 * padding, frame.rows - boundingRect.y);
-
-    // Create a mask for the trapezium inside the expanded bounding rectangle
-    cv::Mat mask = cv::Mat::zeros(boundingRect.size(), CV_8UC1);
-    std::vector<std::vector<cv::Point>> contours = {roiPoints};
-    
-    // Shift the points to fit within the bounding rectangle
-    std::vector<cv::Point> shiftedPoints;
-    for (const auto& point : roiPoints) {
-        shiftedPoints.emplace_back(point.x - boundingRect.x, point.y - boundingRect.y);
-    }
-
-    // Fill the trapezium area within the mask
-    cv::fillPoly(mask, {shiftedPoints}, cv::Scalar(255));
-
-    // Crop the frame using the expanded bounding rectangle
-    cv::Mat croppedFrame = frame(boundingRect);
-
-    // Apply the mask to the cropped frame
-    croppedFrame.copyTo(result, mask);
-}
-
-
-
-// Global flags and variables
-bool stopFlag = false;
-int threshold_value = 63;
-int numSegments = 9;
-int kernelSize = 25;
-int morphIterations = 2;  // Default iterations for closing
-
-// FFmpeg process handling variables
-FILE* ffmpegProcess = nullptr;
-std::atomic<bool> frameReady(false);
-std::atomic<int> frameDropCount(0);
-
-ROIData roiData;
-
-// Set the correct resolution based on the stream
-const int frameWidth = 640;  // Adjust to the stream's width (e.g., 640x480)
-const int frameHeight = 480; // Adjust to the stream's height (e.g., 640x480)
-
-// Default values
-std::string udpAddress = "udp://localhost:5000";
-std::string outputFile = "output.mp4";
-
-// Open FFmpeg process to pipe video (with proper command)
-bool openFFmpegProcess(const std::string& streamUrl) {
-    std::string command = "ffmpeg -i " + streamUrl + " -f rawvideo -pix_fmt bgr24 -vsync 0 -an -sn -fflags nobuffer -flags low_delay pipe:1";
-
-    // Open the FFmpeg process for reading its output
-    ffmpegProcess = popen(command.c_str(), "r");
-    if (!ffmpegProcess) {
-        std::cerr << "Error: Could not open FFmpeg process.\n";
-        return false;
-    }
-
-    return true;
-}
-
-// Read frame from FFmpeg pipe
-bool readFFmpegFrame(cv::Mat& frameMat) {
-    if (!ffmpegProcess) return false;
-
-    // Calculate the frame size based on 640x480 resolution
-    size_t frameSize = frameWidth * frameHeight * 3;  // 3 channels (BGR)
-
-    // Create the Mat object for the frame
-    frameMat.create(frameHeight, frameWidth, CV_8UC3);
-
-    // Read raw frame data from the FFmpeg process
-    size_t bytesRead = fread(frameMat.data, 1, frameSize, ffmpegProcess);
-
-    if (bytesRead == 0) {
-        //std::cerr << "Error: No data received from FFmpeg process.\n";
-        return false;
-    }
-
-    if (bytesRead != frameSize) {
-        std::cerr << "Warning: Incomplete frame read. Expected " << frameSize << " bytes, but got " << bytesRead << " bytes.\n";
-        return false;
-    }
-
-    frameReady = true; // Mark frame as ready for processing
-    return true;
-}
-
-
-void setupZMQPublisher(zmq::context_t &context, zmq::socket_t &publisher) {
-    publisher.bind("tcp://*:5556");  // Binding to TCP socket on port 5556
-    std::cout << "Publisher bound to tcp://*:5556\n";
-}
-
-// Function to send the message under the topic SERIAL
-void sendZMQMessage(zmq::socket_t &publisher, double val) {
-    // Define the topic
-    std::string topic = "SERIAL";
-
-    // Format the message: <bm value>
-    std::string message = "<br" + std::to_string(val*kernelSize/10) + "\n";
-
-    // Create a ZMQ message for the topic
-    zmq::message_t topicMessage(topic.c_str(), topic.size());
-
-    // Create a ZMQ message for the message content
-    zmq::message_t zmqMessage(message.size());
-    memcpy(zmqMessage.data(), message.c_str(), message.size());
-
-    // Send the topic message first, followed by the actual message
-    //publisher.send(topicMessage, zmq::send_flags::sndmore);  // Topic with `sndmore` flag
-    //publisher.send(zmqMessage, zmq::send_flags::none);       // Message with `none` flag
-
-    // Print the message sent (for debugging)
-    //td::cout << "Sent topic: " << topic << " message: " << message << std::endl;
-}
-
-
-// Function to send ZMQ messages at 10 Hz
-void zmqSender(zmq::socket_t& publisher) {
-    while (true) {
-        sendZMQMessage(publisher, 9.0);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 10 Hz
-    }
-}
-
-
-
-void applyFilters(cv::Mat& frame, const std::vector<cv::Point>& roiPoints, cv::Mat& result) {
-    cv::Mat roi;
-    // Apply the region of interest (ROI) to the frame
-    applyROIToFrameWithPadding(frame, roiData.points, roi, 10);
-    
-    // Convert to grayscale
-    cv::cvtColor(roi, roi, cv::COLOR_BGR2GRAY);
-    
-    // Threshold the image
-    cv::threshold(roi, result, threshold_value, 255, 0);
-    
-    // Apply Gaussian blur
-    cv::GaussianBlur(result, result, cv::Size(29, 29), 0);
-    
-    // Apply morphological closing
-    cv::morphologyEx(result, result, cv::MORPH_CLOSE,
-                      cv::getStructuringElement(cv::MORPH_RECT, cv::Size(25, 25)), cv::Point(-1, -1), morphIterations);
-    
-    // Convert back to color (to be used in `method1` or `method2`)
-    cv::cvtColor(result, result, cv::COLOR_GRAY2BGR);
-}
-
-void method1(cv::Mat& frame, cv::Mat& result, ROIData roiData, zmq::socket_t& publisher) {
-    if (roiData.roiSelected && roiData.pointCount == 4) {
-        // Apply filtering steps using the helper function
-        applyFilters(frame, roiData.points, result);
-
-        // Fit lines to the points (example of how you might fit lines)
-        std::vector<cv::Point> points;
-        fitLine(result, points, 1, numSegments, 10, 200, 0);
-
-        // Compute the angle of the lines for each segment into an array 
-        std::vector<float> angles;
-        for (size_t i = 1; i < points.size(); ++i) {
-            float angle = calculateAngle(points[i - 1], points[i]);
-            angles.push_back(angle);
-        }
-    }
-}
-
-void method2(cv::Mat& frame, cv::Mat& result, ROIData roiData) {
-    if (roiData.roiSelected && roiData.pointCount == 4) {
-        // Apply filtering steps using the helper function
-        applyFilters(frame, roiData.points, result);
-
-        // Convert result to grayscale for moment calculation
-        cv::Mat grayResult;
-        cv::cvtColor(result, grayResult, cv::COLOR_BGR2GRAY);
-
-        // Split into a 4x4 grid and find moments for each segment
-        int numSegmentsX = numSegments;  // Number of horizontal segments
-        int numSegmentsY = numSegments;  // Number of vertical segments
-        int segmentWidth = grayResult.cols / numSegmentsX;
-        int segmentHeight = grayResult.rows / numSegmentsY;
-
-        // Use a vector to store segment moments
-        std::vector<std::vector<cv::Moments>> segmentMoments(numSegmentsY, std::vector<cv::Moments>(numSegmentsX));
-       
-
-        // Process each segment
-        for (int y = 0; y < numSegmentsY; ++y) {
-            for (int x = 0; x < numSegmentsX; ++x) {
-                cv::Rect segmentRect(x * segmentWidth, y * segmentHeight, segmentWidth, segmentHeight);
-                cv::Mat segment = grayResult(segmentRect);
-
-                // Calculate moments for the segment
-                segmentMoments[y][x] = cv::moments(segment, true);
-            }
-        }
-
-        // Process moments and assign color to each pixel based on orientation
-        for (int y = 0; y < numSegmentsY; ++y) {
-            for (int x = 0; x < numSegmentsX; ++x) {
-                double cx = segmentMoments[y][x].m10 / segmentMoments[y][x].m00 + x * segmentWidth;
-                double cy = segmentMoments[y][x].m01 / segmentMoments[y][x].m00 + y * segmentHeight;
-
-                // Calculate the orientation angle for the segment
-                double angle = 0.0;
-                if (segmentMoments[y][x].mu11 != 0.0) {
-                    angle = 0.5 * atan2(2.0 * segmentMoments[y][x].mu11, (segmentMoments[y][x].mu20 - segmentMoments[y][x].mu02));
-                }
-
-                // Normalize the angle to [0, 360] degrees
-                angle = angle * 180 / CV_PI;  // Convert to degrees
-                if (angle < 0) {
-                    angle += 360;  // Ensure angle is positive
-                }
-
-                // Map angle to a color in HSV space (H: 0-180, S: 255, V: 255)
-                int hue = static_cast<int>(angle) * 180 / 360;  // Scale angle to [0, 179] for Hue
-                cv::Scalar color(hue, 255, 255);  // Full saturation and value for bright colors
-
-                // Convert from HSV to BGR for OpenCV visualization
-                cv::Mat colorBGR;
-                cv::cvtColor(cv::Mat(1, 1, CV_8UC3, color), colorBGR, cv::COLOR_HSV2BGR);
-
-                // Now, color each pixel in the segment with the calculated color based on its orientation
-                for (int dy = 0; dy < segmentHeight; ++dy) {
-                    for (int dx = 0; dx < segmentWidth; ++dx) {
-                        int px = x * segmentWidth + dx;
-                        int py = y * segmentHeight + dy;
-                        result.at<cv::Vec3b>(py, px) = colorBGR.at<cv::Vec3b>(0,0);  // Apply the color to the result
-                    }
-                }
-
-                // Optionally, draw the centroid on the result image (as a red dot)
-                //cv::circle(result, cv::Point(cvRound(cx), cvRound(cy)), 5, cv::Scalar(0, 0, 255), -1);
-
-                // Optionally, display moments info for the segment
-                std::cout << "Segment (" << y + 1 << ", " << x + 1 << ") Centroid: (" << cx << ", " << cy << ")" << std::endl;
-                std::cout << "Segment (" << y + 1 << ", " << x + 1 << ") Orientation Angle: " << angle << " degrees" << std::endl;
-            }
-        }
-        // mask off any red pixels
-        // keep non red pixels
-
-
-
-
-
-    }
-}
-
-// Update ROI (Region of Interest) display
-void updateROI(cv::Mat& frame, ROIData roiData) {
-    if (roiData.pointCount > 0) {
-        for (size_t i = 0; i < roiData.points.size(); ++i) {
-            cv::circle(frame, roiData.points[i], 5, cv::Scalar(0, 0, 255), -1);
-        }
-        if (roiData.pointCount == 4) {
-            cv::polylines(frame, roiData.points, true, cv::Scalar(0, 255, 0), 2);
-        }
-    }
-}
-
-// Setup trackbars for adjusting parameters
-void setupTrackBars() {
-    cv::createTrackbar("Threshold", "Original Video", &threshold_value, 255);
-    cv::createTrackbar("Num Segments", "Original Video", &numSegments, 200);
-    cv::createTrackbar("Kernel Size", "Original Video", &kernelSize, 70);
-    cv::createTrackbar("Morph Iterations", "Morphologically Closed", &morphIterations, 10);
-}
-
-// Thread to handle frame reading from FFmpeg process
-void readFramesAsync(cv::Mat& frame) {
+void zmqPublishWorker(zmq::socket_t& publisher) {
     while (!stopFlag) {
-        if (!readFFmpegFrame(frame)) {
-            //std::cerr << "Error reading frame\n";
-            continue;
-        }
+        // Sleep to maintain 30Hz sending rate
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Allow some time for the next frame to be ready
+        // Lock mutex to access the latest velocity data safely
+        std::lock_guard<std::mutex> lock(velocityMutex);
+        
+        // Send the latest angular velocity (multiplied by kernel size)
+        sendZMQMessage(publisher, 'm',  -0.01f*velScale);
+        sendZMQMessage(publisher, 'r', fabs(latestVel.angularVelocity) < 0.8 ? latestVel.angularVelocity : 0.0);
+
+        sendZMQMessage(publisher, 's', (float)AP / 5.0  );
+        sendZMQMessage(publisher, 't', (float)KI / 5.0 );
+        sendZMQMessage(publisher, 'u', (float)kd / 5.0 );
+    }
+}
+void zmqSubscriberWorker(zmq::socket_t& subscriber) {
+    // receive multipart message and update the state with new valeu and timestamp
+    // block thread until message is received
+
+    while (!stopFlag) {
+        zmq::message_t topic_msg;
+        zmq::message_t data_msg;
+        int rc = *subscriber.recv(topic_msg, zmq::recv_flags::none);
+        if (rc) {
+            std::string topic = std::string(static_cast<char*>(topic_msg.data()), topic_msg.size());
+            rc = *subscriber.recv(data_msg, zmq::recv_flags::none);
+            if (rc) {
+                std::string data = std::string(static_cast<char*>(data_msg.data()), data_msg.size());
+                state.pitch = std::stof(data);
+                state.timestamp = std::chrono::steady_clock::now();
+            }
+        }
     }
 }
 
 
-// Function to display help text
-void displayHelp() {
-    std::cout << "Usage: program_name [options]\n";
-    std::cout << "Options:\n";
-    std::cout << "  --help           Display this help message\n";
-    std::cout << "  --source <path>  Specify the source file (default: videoData.mp4)\n";
-}
-
-// Function to parse the arguments
-std::string handleCLI(int argc, char* argv[]) {
-    std::string source = "videoData.mp4";  // Default value for source file
-    
-    // Check for --help flag
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--help") {
-            displayHelp();
-            exit(0);  // Exit after showing help
-        }
-    }
-
-    // Parse --source flag and its argument
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "--source" && i + 1 < argc) {
-            source = argv[i + 1];
-            i++;  // Skip next argument, it's the source file path
-        }
-    }
-    
-    return source;
-}
 
 int main(int argc, char* argv[]) {
-    // Parse the command-line arguments
-    udpAddress = handleCLI(argc, argv);
-    // ZMQ publisher setup
+    // IO setup // 
     zmq::context_t context(1);
     zmq::socket_t publisher(context, ZMQ_PUB);
-    //setupZMQPublisher(context, publisher);
 
-    std::thread zmqThread(zmqSender, std::ref(publisher));
+    zmq::socket_t subscriber(context, ZMQ_SUB);
+    subscriber.connect("tcp://dbot.local:5555");  // Connect to the publisher
+    std::string topic = "IMU/PITCH";
+    subscriber.setsockopt(ZMQ_SUBSCRIBE, topic.c_str(), topic.size());
+    std::thread zmqSubThread(zmqSubscriberWorker, std::ref(subscriber));
 
-    if (!openFFmpegProcess(udpAddress)) {
-            std::cerr << "Error: Could not open UDP stream.\n";
-            return -1;
-        }
+    cv::namedWindow("Video Stream", cv::WINDOW_NORMAL);
+    cv::setMouseCallback("Video Stream", selectROI, &roiData);
 
-    cv::namedWindow("Original Video", cv::WINDOW_NORMAL);
-    cv::setMouseCallback("Original Video", selectROI, &roiData);
-    setupTrackBars();
+    cv::createTrackbar("Threshold", "Video Stream", &threshold_value, 255);
+    cv::createTrackbar("KP", "Video Stream", &AP, 100);
+    cv::createTrackbar("KI", "Video Stream", &KI, 100);
+    cv::createTrackbar("KD", "Video Stream", &kd, 100);
+    cv::createTrackbar("LSCALE", "Video Stream", &velScale, 20);
 
-    cv::Mat frame, resultFrame;
-    std::thread readThread(readFramesAsync, std::ref(frame));
+    // VIDEO CAPTURE SETUP
+    cv::VideoCapture cap("udp://192.168.0.32:5000");
+    cap.set(cv::CAP_PROP_BUFFERSIZE, 1); //now the opencv buffer just one frame.
+    cv::Mat frame; // input frame
+    cv::Mat result; // Processed frame
+    
 
+    std::cout << "Starting Vision Loop\n";
     while (!stopFlag) {
-        if (frameReady) {
-            method2(frame, resultFrame, roiData);
-            updateROI(frame, roiData);
-            if (!resultFrame.empty()) {
-                cv::imshow("Processed Video", resultFrame);
-            }
-            cv::imshow("Original Video", frame);
-            frameReady = false; // Reset the frame flag
+        if (!cap.read(frame)) {
+            continue;
         }
+        TargetVelocities trgtVel = method2(frame, result, roiData, state);
+        updateROI(frame, roiData);
 
+        if (!result.empty()) {cv::imshow("Processed Video", result);}
+        cv::imshow("Video Stream", frame);
+        // Handle key events, exit if 'q' or 'ESC' is pressed
         int key = cv::waitKey(1);
         if (key == 'q' || key == 27) {
             stopFlag = true;
-            break;
         }
     }
-
-    // Clean up
-    if (ffmpegProcess) {
-        fclose(ffmpegProcess);
-    }
-
+    zmqSubThread.join();
     cv::destroyAllWindows();
-    readThread.join();
-    zmqThread.join();
-
     return 0;
 }

@@ -1,8 +1,0 @@
-name,id,format,argNames,delim
-CMD_RET,0,%f,
-ERROR,1,%s,
-INFO,2,%s",
-DEBUG,3,%s,
-IMU,4,%f:%f,PITCH:ROLL,:
-ODOM,5,%f:%f,LW:RW:LINVEL:ANGVEL,:
-CTRL,6,%f:%f,TL:TR:UL:UR:UB:UA:UV,:

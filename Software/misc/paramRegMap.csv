@@ -1,0 +1,23 @@
+Register,Access,Data Format,Description
+IDENT,R,%f,Device Id
+MODE,W,%f,Mode
+L_TRGT,W,%f,Target Left  Wheel RPM
+L_KP,W,%f,Left Wheel Speed KP
+L_KI,W,%f,Left Wheel Speed KI
+R_TRGT,W,%f,Target Right Wheel RPM
+R_KP,W,%f,Right Wheel Speed KP
+R_KI,W,%f,Right Wheel Speed KI
+BAL_TRGT,W,%f,Balance Trgt
+BAL_KP,W,%f,Balance KP
+BA_KI,W,%f,Balance KI
+BAL_KD,W,%f,Balance KD
+VEL_TRGT,W,%f,Target LinVel mps
+VEL_KP,W,%f,LinVel KP
+VEL_KI,W,%f,LinVel KI
+VEL_KD,W,%f,LinVel KD
+VEL_ALPHA,W,%f,LinVel LPF Alpha
+ANG_TRGT,W,%f,Steer T
+ANG_KP,W,%f,Steer KP
+ANG_KI,W,%f,Steer KI
+ANG_KD,W,%f,Steer KD
+ANG_ALPHA,W,%f,Steer Alpha LPF
