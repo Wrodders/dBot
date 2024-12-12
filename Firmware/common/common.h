@@ -51,7 +51,7 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 #define IMU_A_COMP  0.05f
 // Motor Speed Control
 #define SPEED_KP    3.0f
-#define SPEED_KI    0.4f
+#define SPEED_KI    12f
 #define SPEED_KD    0.00f
 #define SPEED_ALPHA 0.95f
 // Balance Control 
@@ -59,17 +59,17 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; //m
 #define BAL_CUTOFF  35       
 #define BAL_KP      0.1
 #define BAL_KI      2.2f 
-#define BAL_KD      0.0034f
+#define BAL_KD      0.003f
 // Linear Velocity Control
-#define VEL_P       25  
-#define VEL_I       24
-#define VEL_D       0.2
-#define VEL_ALPHA   1.0
+#define VEL_P       14  
+#define VEL_I       9
+#define VEL_D       3
+#define VEL_ALPHA   0.1
 // Angular Velocity Control
-#define STEER_KP    1.2
-#define STEER_KI    0.0
+#define STEER_KP    2
+#define STEER_KI    1
 #define STEER_KD    0.000
-#define STEER_ALPHA 1.0
+#define STEER_ALPHA 0.1
 // *********** GLOBAL VARIABLES **************************** //
 static float VBAT_VAL_ = VBAT_MIN;     
 
