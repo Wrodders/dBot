@@ -16,20 +16,12 @@ show_help() {
 upload() {
     LOCAL_PATH=$1
     REMOTE_BIN_PATH="$REMOTE_BIN_DIR/$(basename "$LOCAL_PATH")"
-
-    # Prompt for password only before the first scp command
-    if [[ -z "$PASSWORD" ]]; then
-        echo -n "Enter SSH password for $PI_USER@$PI_IP: "
-        read -s PASSWORD
-        echo
-    fi
-
     # Use the SSH command to prompt for password if necessary
     if [ -d "$LOCAL_PATH" ]; then
-        echo "Uploading folder $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_BIN_PATH"
+        echo "UPLOAD: Uploading folder $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_BIN_PATH"
         scp -r "$LOCAL_PATH" "$PI_USER@$PI_IP:$REMOTE_BIN_PATH"
     else
-        echo "Uploading file $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_BIN_PATH"
+        echo UPLOAD: "Uploading file $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_BIN_PATH"
         scp "$LOCAL_PATH" "$PI_USER@$PI_IP:$REMOTE_BIN_PATH"
     fi
 
@@ -37,7 +29,6 @@ upload() {
         echo "Error: Failed to upload to Raspberry Pi."
         exit 1
     fi
-    echo "Upload successful."
 }
 
 # Parse command line arguments
@@ -69,3 +60,6 @@ PI_USER_IP="$PI_USER@$PI_IP"
 for FILE in "${FILE_LIST[@]}"; do
     upload "$FILE"
 done
+
+echo "UPLOAD: All files uploaded successfully."
+exit 0

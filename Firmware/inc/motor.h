@@ -17,29 +17,30 @@ wR = wL = V * Kt / (s^2(LaJm) + s(RaJm + BmLa) + KtKe + RaBm)
 
 #include "pid.h"
 
-struct Driver{
-    uint32_t timPerif;
-    enum tim_oc_id timCH_A;
-    enum tim_oc_id timCH_B;
-    struct GPIO pwmA;
-    struct GPIO pwmB;
-    struct GPIO en;
-    float vPSU;
-    float vMin; 
-}Driver; // PWM H Bridge Motor Driver 
+struct HBridgeDriver{
+    uint32_t timPerif;      // PWM Timer Peripheral
+    enum tim_oc_id timCH_A; // H Bridge PWM Channels
+    enum tim_oc_id timCH_B; // H Bridge PWM Channels
+    struct GPIO pwmA;       // H Bridge Pin
+    struct GPIO pwmB;       // H Bridge Pin
+    struct GPIO en;         // Enable Pin
+    float vPSU;             // PSU Voltage   
+    float vMin;             // Minimum Voltage to Drive Motor
+}HBridgeDriver;             // PWM H Bridge Motor Driver 
 
 struct Motor {
-    struct Driver drv;
-    int flipDir;       // 1 or -1
-    struct Encoder *enc;      // Encoder
-    struct PID tCtrl;         // Torque PID Controller
-    struct PID wCtrl;         // Speed PI Controller
-    float angularVel;  // angular speed rps
-    float alpha;       // speed lowpass filter parameter
-    float maxVel;      // Saturation
+    struct HBridgeDriver drv;
+    int flipDir;            // 1 or -1
+    struct Encoder *enc;    // Encoder
+    struct PID torqueCtrl;  // Torque PID Controller
+    struct PID speedCtrl;   // Shaft Rotation Speed PI Controller
+    float shaftRPS;         // Estimated angular speed rps
+    float alpha;            // speed lowpass filter parameter
+    float maxVel;           // Saturation
 }Motor;
 
-static struct Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort, 
+
+static struct Motor motorInit(const uint32_t timPerif,const uint32_t pwmPort, 
                         const enum tim_oc_id timCH_A, const uint32_t pwmA, 
                         const enum tim_oc_id timCH_B, const uint32_t pwmB,  
                         const uint32_t enPin, const uint32_t enPort){
@@ -53,10 +54,8 @@ static struct Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
         .drv.pwmB.pin = pwmB,
         .drv.pwmB.port = pwmPort,
         .drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE),
-        .wCtrl = pidInit(-VBAT_MIN, VBAT_MIN, SPEED_KP, SPEED_KI, SPEED_KD, (WSPEED_CNTRL_PERIOD * MS_TO_S))
+        .speedCtrl = pidInit(-VSYS, VSYS, SPEED_KP, SPEED_KI, SPEED_KD, (WSPEED_CNTRL_PERIOD * MS_TO_S))
     };
-
-    // Initialize Timer PWM
     pwmInit(m.drv.timPerif,84,25000); // set freq to 1Hz period to 25000 ARR reg
 	pwmConfig(m.drv.timPerif, m.drv.timCH_A, m.drv.pwmA.port, m.drv.pwmA.pin, GPIO_AF1); 
 	pwmConfig(m.drv.timPerif, m.drv.timCH_B, m.drv.pwmB.port, m.drv.pwmB.pin, GPIO_AF1); 
@@ -65,6 +64,8 @@ static struct Motor motorInit(const uint32_t timPerif, const uint32_t pwmPort,
 
     return m;
 }
+
+
 
 static void motorConfig(struct Motor *m,struct Encoder* enc, const float vPSU, const float vMin,
                         const int flipDir, float alpha, float maxVel){
@@ -77,19 +78,23 @@ static void motorConfig(struct Motor *m,struct Encoder* enc, const float vPSU, c
     m->maxVel = maxVel;
 }
 
+//@Brief: Starts Motor Driver 
 static void motorEnable(struct Motor *motor){
-    //@Brief: Starts Motor Driver 
-    pidClear(&motor->wCtrl);
-    pidEnable(&motor->wCtrl);
+    pidClear(&motor->speedCtrl); // clean start
+    pidEnable(&motor->speedCtrl); 
     gpio_set(motor->drv.en.port, motor->drv.en.pin); // enable driver
 }
+// @Brief: Stops Motor Driver
 static void motorDisable(struct Motor *motor){
-    pidDisable(&motor->wCtrl);
-    gpio_clear(motor->drv.en.port, motor->drv.en.pin);
+    pidDisable(&motor->speedCtrl);
+    gpio_clear(motor->drv.en.port, motor->drv.en.pin); // disable driver board
 }
 
+/*
+@Brief: Sets the pwm on a Unipolar DC H bridge
+@Description: Applies PWM to H bridge according to motor configuration
+*/
 static void motorSetUnipolarPWM(const struct Motor* motor, const float duty, const int dir){
-    //@Brief: Sets the pwm on a Unipolar DC H bridge:
     if(dir == motor->flipDir){
         // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
         // DRIVE BACKWARDS
@@ -103,10 +108,12 @@ static void motorSetUnipolarPWM(const struct Motor* motor, const float duty, con
         pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0); 
     }
 }
+
+/*
+@Brief: Sets PWM Duty Cycle as voltage vector
+@Description: Applies voltage to H bridge according to motor configuration
+*/
 static void motorSetVoltage(const struct Motor* motor, const float voltage){
-    //@Brief: Sets PWM Duty Cycle as voltage vector
-    //@Description: Forwards == +ve => dir 1
-    //              Backwards == -ve => dir -1
     int dir = _sign(voltage);
     float v = _fabs(voltage);
     v = v <= motor->drv.vMin ? motor->drv.vMin*dir : v;
@@ -114,45 +121,40 @@ static void motorSetVoltage(const struct Motor* motor, const float voltage){
     motorSetUnipolarPWM(motor, dc, dir); // apply to unipolar H bridge
 }
 
+//@Brief: Sets H Bridge Inputs High
 static void motorStop(const struct Motor *motor){ 
-    //@Brief: Sets H Bridge Inputs High
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 1);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 1);
 }
 
+//@Brief: Sets H Bridge Inputs Low
 static void motorBreak(const struct Motor *motor){
-    //@Brief: Sets H Bridge Inputs Low
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0);
     pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, 0);
 }
 
-static void motorSetTrgtSpeed(struct Motor *motor, const float vel){
-    //@Brief: Pushes Target speed through speedCurve buffer.
-    float v = _clamp(vel, -motor->maxVel, motor->maxVel);
-    motor->wCtrl.ref = v;
+//@Brief: Sets Target Speed for Motor in RPS
+static void motorSetTrgtSpeed(struct Motor *motor, const float trgtRPS){
+    float v = _clamp(trgtRPS, -motor->maxVel, motor->maxVel);
+    motor->speedCtrl.ref = v;
 }
 
+/*
+@Brief: Estimates GearBox Shaft Angular Speed in Rotations per Second
+@Description: Uses Quadrature Encoder to estimate motor shaft speed
+Applies low-pass filter to smooth quantization errors 
+*/
 static void motorEstSpeed(struct Motor* motor) {
-    //@Brief: Calculate Angular Speed in Rotations per Second
-    //@Description: Applies low-pass filter to smooth quantization errors 
-    //@Note: Speed is relative to motor shaft (after gearbox)
     uint32_t mCount = encoderRead(motor->enc);
-    int32_t dCount = (int32_t)(mCount - motor->enc->lastCount);
+    int32_t dCount = (int32_t)(mCount - motor->enc->lastCount); 
     // Handle overflow and underflow
     dCount = (dCount + (UINT16_MAX + 1)) % (UINT16_MAX + 1);
-    // Convert to signed range [-32768, 32767]
-    if (dCount > (UINT16_MAX / 2)) { dCount -= (UINT16_MAX + 1);}
-    motor->enc->lastCount = mCount;
-    float mSpeed = (float)dCount * TICKS_TO_RPS * motor->flipDir;
-    motor->angularVel = (motor->alpha * mSpeed) + (1.0f - motor->alpha) * motor->angularVel;
+    if (dCount > (UINT16_MAX / 2)) { dCount -= (UINT16_MAX + 1);}  // Convert to signed range [-32768, 32767]
+    motor->enc->lastCount = mCount; 
+    float measuredRPS = (float)dCount * TICKS_TO_RPS * motor->flipDir; // convert to rotations per second
+    motor->shaftRPS = iirLPF(motor->alpha, measuredRPS, motor->shaftRPS); 
 }
 
-static void motorSpeedCtrl(struct Motor *m){
-    // Set Motor Voltage based on Speed Control PID 
-    // Uses Encoders to Estimate Motor Shaft Speed  
-    motorEstSpeed(m);
-    m->wCtrl.out = pidRun(&m->wCtrl, m->angularVel);
-    motorSetVoltage(m, m->wCtrl.out);
-}
+
 
 #endif // DCMOTOR_H

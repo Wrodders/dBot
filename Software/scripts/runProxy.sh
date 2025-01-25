@@ -1,4 +1,5 @@
 #!bin/bash 
 
-# Start the proxy server
-./build/zmqproxy ipc:///tmp/comsterm_cmd ipc:///tmp/vision_cmd tcp://*:5556 --debug
+echo "Starting PC <-> dBot proxy server"
+./build/zmqproxy 'ipc:///tmp/comsterm_msg' 'tcp://dbot.local:5555' & ./build/zmqproxy 'tcp://*:5556' 'ipc:///tmp/vision_cmd' 'ipc:///tmp/comsterm_cmd'
+

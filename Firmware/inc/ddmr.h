@@ -3,45 +3,56 @@
 
 #include "motor.h"
 
-// ******* Differential Drive Mobile Robot ********* // 
-struct DDMR{
+// 
+/*  // ******* Differential Drive Mobile Robot ********* // 
+
+Robot Frame:
+
+x_dot = (v/2) * (w1 + w2) * cos(theta) 
+y_dot = (v/2) * (w1 + w2) * sin(theta)
+theta_dot = (v/L) * (w1 - w2)
+
+where:
+    v = linear velocity
+    w1 = angular velocity of left wheel
+    w2 = angular velocity of right wheel
+    L = wheel base
+
+
+*/ // ************************************************* //
+struct DiffDriveModel{
     const float wheelR;     // R [m]
     const float wheelBase;  // L [m]
-    float linAlpha;   // LPF coeff
-    float angAlpha;   // LPF coeff 
+    float linearVelAlpha;   // LPF coeff
+    float angularVelAlpha;  // LPF coeff 
     // kinematic state
-    float linVel;   // m/s    
-    float angVel;   // angular vel [rad/s]
-    float xpos, ypos, theta; // position and orientation cm 
-    float dt;
-
-}DDMR; // Deferential Drive Mobile Robot
+    float linearVel;    // m/s    
+    float angularVel;   // angular vel [rad/s]
+    float dt;           // sample period [s]
+}DiffDriveModel; // Deferential Drive Mobile Robot
 
 
-static struct DDMR ddmrInit(const float wheelRadius, const float wheelBase, const float linAlpha, const float angAlpha){
-    struct DDMR ddmr =  {
+
+
+static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheelBase, const float linearVel_alpha, const float angularVel_alpha){
+    struct DiffDriveModel ddmr =  {
         .wheelR = wheelRadius,
         .wheelBase = wheelBase,
-        .linAlpha = linAlpha,
-        .angAlpha = angAlpha,
-        .linVel = linAlpha,
+        .linearVelAlpha = linearVel_alpha,
+        .angularVelAlpha = angularVel_alpha,
+        .linearVel = 0.0f,
+        .angularVel = 0.0f,
         .dt = VEL_CNTRL_PERIOD*MS_TO_S,
     };
     return ddmr;
 } 
 
-//@Brief: Compute Kinematic State of Mobile Robot using WheelOdometry
-//@Description:  vel = R * (wR + wL) / 2
-//               angVel = 2R * (wR - wL) / L
-static void ddmrEstimateOdom(struct DDMR *const ddmr, const struct Motor *const mL, const struct Motor *const mR){
-    float vel = (mL->angularVel * RPS_TO_MPS + mR->angularVel * RPS_TO_MPS ) * 0.5f;    // convert to mps 
-    ddmr->linVel = (ddmr->linAlpha * vel) + (1.0f - ddmr->linAlpha) * ddmr->linVel;     // lpf filter 
-    float angVel = 2*ddmr->wheelR*( mL->angularVel - mR->angularVel) / ddmr->wheelBase; // ang vel in rad/s
-    ddmr->angVel = (ddmr->angAlpha * angVel) + (1.0f - ddmr->angAlpha ) * ddmr->angVel; // lpf filter
-    ddmr->theta += ddmr->angVel * ddmr->dt; 
-    ddmr->theta = fmodf(ddmr->theta, 2*M_PI);// bound to 2pi
-    ddmr->xpos += ddmr->linVel*100 * cosf(ddmr->theta) * ddmr->dt;
-    ddmr->ypos += ddmr->linVel*100 * sinf(ddmr->theta) * ddmr->dt;
+//@Brief: Compute Inverse Kinematic State of Mobile Robot using Wheel Odometry
+static void ddmrEstimateOdom(struct DiffDriveModel *const ddmr, const struct Motor *const motorLeft, const struct Motor *const motorRight){
+    float speed =  RPS_TO_MPS * (motorLeft->shaftRPS + motorRight->shaftRPS) * 0.5f;                            // convert to mps 
+    ddmr->linearVel = iirLPF(ddmr->linearVelAlpha, speed, ddmr->linearVel);                                      // lpf filter
+    float angVel = (motorLeft->shaftRPS - motorRight->shaftRPS) * ddmr->wheelR/ddmr->wheelBase ;                // ang vel in rad/s
+    ddmr->angularVel = iirLPF(ddmr->angularVelAlpha, angVel, ddmr->angularVel);                                  // lpf filter
 }
 
 #endif // DDMR_H

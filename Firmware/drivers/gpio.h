@@ -9,8 +9,8 @@ struct  GPIO {
 	uint32_t port;
 }GPIO;
 
-static struct GPIO initGPIO(uint32_t pin, uint32_t port, uint32_t mode, uint32_t pupd) {
-	struct GPIO p;
+static struct GPIO initGPIO( uint32_t pin, uint32_t port, uint32_t mode, uint32_t pupd) {
+    struct GPIO p;
 	p.pin = pin;
 	p.port = port;
 

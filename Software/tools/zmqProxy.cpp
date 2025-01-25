@@ -1,3 +1,14 @@
+/************************************************************************************
+ *  @file    zmqProxy.cpp
+ *  @brief   ZeroMQ Proxy implementation
+ *  @date    2025-01-09
+ *  @version 1.0.0
+ *
+ *  ZeroMQ Proxy CLI tool.
+ *  Up to 5 input sockets are supported which are proxied through to the output in a round-robin fashion.
+ *  Distributed under MIT license
+ ************************************************************************************/  
+
 #include <zmq.hpp>
 #include <iostream>
 #include <string>
@@ -5,31 +16,44 @@
 #include <atomic>
 #include <unistd.h>
 
+void printProxyInfo(std::vector<std::string> input_sckAddrs, std::string output_Addr) {
+    std::cout << "Proxy started.\n";
+    std::cout << "+-------------------+-------------------------+\n";
+    std::cout << "|     Socket Type   |         Address         |\n";
+    std::cout << "+-------------------+-------------------------+\n";
+    for (const auto& input_socket : input_sckAddrs) {
+        std::cout << "| Input Socket      | " << input_socket << " |\n";
+    }
+    std::cout << "| Output Socket     | " << output_Addr << " |\n";
+    std::cout << "+-------------------+-------------------+\n";
+}
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <input_socket1> <input_socket2> <output_socket> \n";
+    if (argc < 3 || argc > 7) {  // 1 output + 1 to 5 input sockets
+        std::cerr << "Usage: " << argv[0] << " <output_address> <input_address1> [input_address2] [input_address3] [input_address4] [input_address5] \n";
         return 1;
     }
-    std::string input_socket1 = argv[1];
-    std::string input_socket2 = argv[2];
-    std::string output_socket = argv[3];
+
+    std::string output_Addr = argv[1];
+    std::vector<std::string> input_sckAddrs;
+
+    // Collect input sockets
+    for (int i = 2; i < argc; ++i) {
+        input_sckAddrs.push_back(argv[i]);
+    }
+
+    // Call the function to print proxy info
+    printProxyInfo(input_sckAddrs, output_Addr);
 
     zmq::context_t context(1);
     zmq::socket_t subscriber(context, zmq::socket_type::sub);
-    subscriber.connect(input_socket1);
-    subscriber.connect(input_socket2);
-    subscriber.setsockopt(ZMQ_SUBSCRIBE, "", 0);
+    for (const auto& sckAddr : input_sckAddrs)
+        subscriber.connect(sckAddr);
+    subscriber.set(zmq::sockopt::subscribe, "");
     zmq::socket_t publisher(context, zmq::socket_type::pub);
-    publisher.bind(output_socket);
-    std::cout << "Proxy started.\n";
-    std::cout << "+-------------------+-------------------+\n";
-    std::cout << "|     Socket Type   |      Address      |\n";
-    std::cout << "+-------------------+-------------------+\n";
-    std::cout << "| Input Socket 1    | " << input_socket1 << " |\n";
-    std::cout << "| Input Socket 2    | " << input_socket2 << " |\n";
-    std::cout << "| Output Socket     | " << output_socket << " |\n";
-    std::cout << "+-------------------+-------------------+\n";
+    publisher.bind(output_Addr);
+    
+
 
     std::atomic<bool> running(true);
 

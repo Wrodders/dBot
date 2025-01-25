@@ -139,6 +139,7 @@ void usart6_isr(void){
 static struct Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, uint32_t txPin,
                          uint32_t pinMode, uint32_t irq, uint8_t* const rxBuf, size_t rxSize, 
                          uint8_t* const txBuf, size_t txSize){
+    
     //@Brief: Initializes the USART Peripheral Hardware
     //@Brief: If irc == NULL serial device will be confirmed without ISR 
     gpio_mode_setup(port, GPIO_MODE_AF, GPIO_PUPD_NONE, rxPin | txPin);
@@ -198,30 +199,30 @@ static void serialConfig(struct Serial *ser, uint32_t baud, uint8_t databits, ui
 // *********** POLLING *************************** //
 //@Note: This doesn't fully work when the ISR is enabled ???? gives some wired values on read
 
-static void serialWrite(struct Serial *ser, uint8_t *data, uint16_t size){
+static void serialWrite(struct Serial *ser, uint8_t *data, uint16_t bufSize){
     //@Brief: Writes Bytes to USART Transmit Data Register 
     //@Note: Blocking, waits on transmit complete
-    for(int i =0; i<size; i++){
+    for(int i =0; i<bufSize; i++){
         while((USART_SR(ser->perif) & USART_SR_TXE) == 0){}; // wait for shift register to be empty
         USART_DR(ser->perif) = data[i] & USART_DR_MASK; // write byte
     }
 }
 
-static void serialRead(struct Serial *ser, uint8_t *buf, uint16_t size){
+static void serialRead(struct Serial *ser, uint8_t *buf, uint16_t bufSize){
     //@Brief: Reads from USART Receive Data Register
     //@Note: Blocking, waits on data available
-    for(int i =0; i< size; i++){
+    for(int i =0; i< bufSize; i++){
         // wait for data to be available in receive shift register
         while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; 
         buf[i] = (USART_DR(ser->perif) & USART_DR_MASK);
     }
 }
 
-static uint8_t serialReadLine(struct Serial *ser, uint8_t *buf, uint8_t size){
+static uint8_t serialReadLine(struct Serial *ser, uint8_t *buf, uint8_t bufSize){
     //@Brief: Reads USART Data Register until \n 
     //@Note: Blocking, waits on data available
     uint8_t c, i;
-    for(i = 0; i < size; i++){
+    for(i = 0; i < bufSize; i++){
         while((USART_SR(ser->perif) & USART_SR_RXNE) == 0){}; // wait for data
         c = (USART_DR(ser->perif) & USART_DR_MASK);
         if(c == '\n'){
@@ -240,33 +241,33 @@ static bool serialAvailable(struct Serial *ser){
 
 // *********** ISR DRIVEN *********************** //
 
-static void serialSend(struct Serial *ser, uint8_t *data, uint16_t size){
+static void serialSend(struct Serial *ser, uint8_t *data, uint16_t bufSize){
     //@Brief: adds data to ring buffer and sets up ISR transmit
     //@Note: Blocks if ringbuffer full
 
-    for(int i =0; i < size; i++){
+    for(int i =0; i < bufSize; i++){
         while(rbFull(&ser->txRB) == 1){}; // block while full
         rbPut(&ser->txRB, &data[i]);
     }
     usart_enable_tx_interrupt(ser->perif); // Set up ISR 
 }
 
-static uint8_t serialReceive(struct Serial *ser, uint8_t *buf, uint16_t size){
-    //@Brief: reads size bytes from ring buffer 
+static uint8_t serialReceive(struct Serial *ser, uint8_t *buf, uint16_t bufSize){
+    //@Brief: reads bufSize bytes from ring buffer 
     //@Note: Blocks, Returns number of bytes read
     int i = 0;
-    for(; i < size; i++){
+    for(; i < bufSize; i++){
         while(rbEmpty(&ser->rxRB) == 1){};
         rbGet(&ser->rxRB, &buf[i]);
     }
     return i;
 }
 
-static uint8_t serialGrab(struct Serial *ser, uint8_t *buf, uint16_t size){
-    //@Brief: Attempts to read size bytes from ring buffer
+static uint8_t serialGrab(struct Serial *ser, uint8_t *buf, uint16_t bufSize){
+    //@Brief: Attempts to read bufSize bytes from ring buffer
     //@Note: If less bytes available returns num of bytes read
     int i = 0;
-    for(; i < size; i++){
+    for(; i < bufSize; i++){
         if(rbEmpty(&ser->rxRB) == 1){return i;}
         rbGet(&ser->rxRB, &buf[i]);
     }

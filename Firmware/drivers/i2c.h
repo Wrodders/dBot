@@ -4,6 +4,7 @@
 #include "../common/common.h"
 #include <libopencm3/stm32/i2c.h>
 
+
 static void i2cReset(uint32_t i2cPerif){
     I2C_CR1(i2cPerif) |= I2C_CR1_SWRST;
     I2C_CR1(i2cPerif) &= ~I2C_CR1_SWRST;
@@ -135,7 +136,6 @@ static void i2cWriteReg(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t data) 
     // I2C_EVENT_MASTER_MODE_SELECT EV5: BUSY, MSL and SB 
     while (!((I2C_SR1(i2c) & I2C_SR1_SB) & 
              (I2C_SR2(i2c) & (I2C_SR2_MSL | I2C_SR2_BUSY))));
-
     i2c_send_7bit_address(i2c, addr, I2C_WRITE);
     // I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED EV6: BUSY, MSL, ADDR, TXE and TRA 
     while (!(  (I2C_SR1(i2c) & (I2C_SR1_TxE | I2C_SR1_ADDR)) & 

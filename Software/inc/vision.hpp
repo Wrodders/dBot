@@ -20,10 +20,6 @@ struct TargetVelocities {
 };
 
 
-struct state{
-    double pitch; // degrees
-    std::chrono::time_point<std::chrono::steady_clock> timestamp;
-};
 struct ROIData {
     std::vector<cv::Point> points;  // Store selected points for the trapezium
     bool drawing = false;
@@ -109,12 +105,7 @@ void applyROIToFrameWithPadding(cv::Mat& frame, const std::vector<cv::Point>& ro
     cv::Mat croppedFrame = frame(adjustedROI);
     croppedFrame.copyTo(result, mask);
 }
-struct TargetVelocities method2(cv::Mat& frame, cv::Mat& result, ROIData roiData, struct state state) {
-    struct TargetVelocities targetVelocities = {0.0, 0.0};
-
-    // Synchronize pitch with camera timestamp
-    double currentPitch = state.pitch;  // Get the current pitch value
-
+void processFrame(cv::Mat& frame, cv::Mat& result, ROIData roiData) {
     if (roiData.roiSelected && roiData.pointCount == 4) {
         // Define the source points (the corners of the ROI)
 
@@ -126,46 +117,40 @@ struct TargetVelocities method2(cv::Mat& frame, cv::Mat& result, ROIData roiData
         cv::cvtColor(roi, roi, cv::COLOR_BGR2GRAY);
         cv::threshold(roi, roi, threshold_value, 255, cv::THRESH_BINARY);
         cv::GaussianBlur(roi, roi, cv::Size(5, 5), 0);
+        method1(roi, result);
+    }
+}
 
+void method1(cv::Mat &roi, cv::Mat &result) {
+// split into 3x3 grid 
+    int numDivisions = numDivSliderValue;
+    int divisionHeight = roi.rows / numDivisions;
+    // Compute the centroid of the binary image
+    cv::Moments moments = cv::moments(roi, true);
+    double cx = moments.m10 / moments.m00;
+    double cy = moments.m01 / moments.m00;
 
-
-        // split into 3x3 grid 
-        int numDivisions = 9;
-        int divisionHeight = roi.rows / numDivisions;
-        // Compute the centroid of the binary image
-        cv::Moments moments = cv::moments(roi, true);
-        double cx = moments.m10 / moments.m00;
-        double cy = moments.m01 / moments.m00;
-
-        // compute sentroid for each grid
-        // Compute the centroid of each grid
-        double gridCentroids[numDivisions];
-        for (int i = 0; i < numDivisions; ++i) {
-            cv::Mat grid = roi(cv::Rect(0, i * divisionHeight, roi.cols, divisionHeight));
-            cv::Moments gridMoments = cv::moments(grid, true);
-            gridCentroids[i] = gridMoments.m10 / gridMoments.m00;
-        }
-
-        cv::cvtColor(roi, roi, cv::COLOR_GRAY2BGR);
-        drawGridLines(roi, numDivisions, divisionHeight);
-        // Draw the centroid on the result image
-        cv::circle(roi, cv::Point(cx, cy), 5, cv::Scalar(0, 0, 255), -1);
-        // draw a cirle with the pitch offset applied to the center centorid
-        cv::circle(roi, cv::Point(cx, cy+kd*state.pitch), 5, cv::Scalar(0,255,0 ), -1);
-
-        // Draw the centroid of each grid
-        for (int i = 0; i < numDivisions; ++i) {
-            cv::circle(roi, cv::Point(gridCentroids[i], i * divisionHeight + divisionHeight / 2), 5, cv::Scalar(255, 0, 0), -1);
-        }
-
-        // Compute the target velocities
-
-        result = roi;
-
+    // compute sentroid for each grid
+    // Compute the centroid of each grid
+    double gridCentroids[numDivisions];
+    for (int i = 0; i < numDivisions; ++i) {
+        cv::Mat grid = roi(cv::Rect(0, i * divisionHeight, roi.cols, divisionHeight));
+        cv::Moments gridMoments = cv::moments(grid, true);
+        gridCentroids[i] = gridMoments.m10 / gridMoments.m00;
     }
 
-    return targetVelocities;
+    cv::cvtColor(roi, roi, cv::COLOR_GRAY2BGR);
+    drawGridLines(roi, numDivisions, divisionHeight);
+    // Draw the centroid on the result image
+    cv::circle(roi, cv::Point(cx, cy), 5, cv::Scalar(0, 0, 255), -1);
+
+    // Draw the centroid of each grid
+    for (int i = 0; i < numDivisions; ++i) {
+        cv::circle(roi, cv::Point(gridCentroids[i], i * divisionHeight + divisionHeight / 2), 5, cv::Scalar(255, 0, 0), -1);
+    }
+    result = roi;
 }
+
 
 // Update ROI (Region of Interest) display
 void updateROI(cv::Mat& frame, ROIData roiData) {
@@ -208,17 +193,7 @@ void setupZMQPublisher(zmq::context_t &context, zmq::socket_t &publisher) {
     std::cout << "Publisher bound to tcp://*:5556\n";
 }
 
-void sendZMQMessage(zmq::socket_t &publisher, char id, double val) {
-    // Define the topic
-    std::string topic = "SERIAL";
-    std::string message = "<b" + std::string(1, id)+ std::to_string(val)+"\n";
 
-    zmq::message_t topicMessage(topic.c_str(), topic.size());
-    zmq::message_t zmqMessage(message.size());
-    memcpy(zmqMessage.data(), message.c_str(), message.size());
-    publisher.send(topicMessage, zmq::send_flags::sndmore);
-    publisher.send(zmqMessage, zmq::send_flags::none);
-}
 
 
 
@@ -228,3 +203,44 @@ void sendZMQMessage(zmq::socket_t &publisher, char id, double val) {
 
 
 #endif // VISION_H
+
+
+
+void zmqPublishWorker(zmq::socket_t& publisher) {
+    while (!stopFlag) {
+        // Sleep to maintain 30Hz sending rate
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // Lock mutex to access the latest velocity data safely
+        std::lock_guard<std::mutex> lock(velocityMutex);
+        
+        // Send the latest angular velocity (multiplied by kernel size)
+        sendZMQMessage(publisher, 'm',  -0.01f*velScale);
+        sendZMQMessage(publisher, 'r', fabs(latestVel.angularVelocity) < 0.8 ? latestVel.angularVelocity : 0.0);
+
+        sendZMQMessage(publisher, 's', (float)AP / 5.0  );
+        sendZMQMessage(publisher, 't', (float)KI / 5.0 );
+        sendZMQMessage(publisher, 'u', (float)kd / 5.0 );
+    }
+}
+void zmqSubscriberWorker(zmq::socket_t& subscriber) {
+    // receive multipart message and update the state with new valeu and timestamp
+    // block thread until message is received
+
+    std::cout << "Starting ZMQ Subscriber\n";
+
+    while (!stopFlag) {
+        zmq::message_t topic_msg;
+        zmq::message_t data_msg;
+        int rc = *subscriber.recv(topic_msg, zmq::recv_flags::none);
+        if (rc) {
+            std::string topic = std::string(static_cast<char*>(topic_msg.data()), topic_msg.size());
+            rc = *subscriber.recv(data_msg, zmq::recv_flags::none);
+            if (rc) {
+                std::string data = std::string(static_cast<char*>(data_msg.data()), data_msg.size());
+                state.pitch = std::stof(data);
+                state.timestamp = std::chrono::steady_clock::now();
+            }
+        }
+    }
+}

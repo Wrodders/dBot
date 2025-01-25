@@ -41,7 +41,6 @@ struct MPU6050{
 
 
 // *** // *** // INTERNAL // *** // **** // 
-
 static void mpu6505Reset(uint32_t i2c){
     // Reset device
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_PWR_MGMT_1, 0x80); // Set reset bit
@@ -59,7 +58,6 @@ static void mpu6050Config(uint32_t i2c){
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_GYRO_CONFIG, 0x05); // full scale range +/- 500 deg/s
     i2cWriteReg(i2c, MPU6050_ADDR, MPU6050_ACCEL_CONFIG, 0x10); // full scale range +/- 8g
 }
-
 
 static void mpu6050Wake(uint32_t i2c){
     // Wake up device
@@ -151,20 +149,16 @@ static void accelCalib(struct MPU6050 *sensor, int samples){
     sensor->offset.accel.y /= samples;
     sensor->offset.accel.z /= samples;
 }
-
-
 // *** // **** // PUBLIC // **** // **** // 
-
-
 static struct MPU6050 mpu6050Init(uint32_t perif){
     // Initialize MPU6050 Sensor
     struct MPU6050 sensor;
     sensor.i2c = perif;
-    delay(100); 
-
+    delay(100);
     mpu6505Reset(sensor.i2c);
-    mpu6050Wake(sensor.i2c);
+   
 
+    mpu6050Wake(sensor.i2c);
     // Set Config Registers
     // Read WHO_AM_I register
     uint8_t data = i2cReadReg(sensor.i2c, MPU6050_ADDR, MPU6050_WHO_AM_I);

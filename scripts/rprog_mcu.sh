@@ -19,12 +19,12 @@ flash_stlink() {
     BIN_FILENAME=$1
     echo "Flashing $REMOTE_BIN_DIR/$BIN_FILENAME using ST-Link on Raspberry Pi..."
     ssh "$PI_USER@$PI_IP" << EOF
-        sudo st-flash write "$REMOTE_BIN_DIR/$BIN_FILENAME" 0x8000000
+        sudo st-flash --hot-plug write "$REMOTE_BIN_DIR/$BIN_FILENAME" 0x8000000
         if [ $? -ne 0 ]; then
             echo "Error: Flashing failed."
             exit 1
         else
-            echo "Flashing successful."
+            echo "RPROG_MCU: Flashing successful."
         fi
 EOF
 }
@@ -39,7 +39,7 @@ flash_stm32flash() {
             echo "Error: Flashing failed."
             exit 1
         else
-            echo "Flashing successful."
+            echo "RPROG_MCU: Flashing successful."
         fi
 EOF
 }

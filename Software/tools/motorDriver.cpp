@@ -1,20 +1,66 @@
 #include "../common/common.h"
-#include "../inc/motorDriver.hpp"
+#include <iostream>
+#include <sys/time.h>
+
+
+#include <queue>
+#include <map>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+
+#include <unistd.h>
+#include <string.h>
+#include <sys/fcntl.h>
+#include <termios.h>
+#include <errno.h>
+#include <signal.h>
+#include <sys/time.h>
+#include <signal.h>
+#include <sys/select.h>
+#include <thread>
 
 #include <csignal>
 
+
+#include "../../Firmware/inc/mcuComs.h"
+
 #define MAX_STRING_LENGTH 30  // Maximum string length for INFO, DEBUG, ERROR
+
+struct MotorState {
+    struct IMU {
+        float pitch;
+        float roll;
+    } imu;
+
+    struct Odometry {
+        float lw;
+        float rw;
+        float linVel;
+        float angVel;
+        float xPos;
+        float yPos;
+        float theta;
+    } odom;
+
+
+
+    time_t timestamp;
+};
+
+
+
 
 void printMotorStateTable(struct MotorState &motorState) {
     // ANSI escape code to clear the screen
     printf("\033[H\033[J");
-
     // Table Header
     printf("Motor State Table:\n");
     printf("+-----------------------+------------------------+\n");
     printf("| %-21s | %-22s |\n", "Variable", "Value");
     printf("+-----------------------+------------------------+\n");
-
     // Table Rows (Formatted for fixed column width)
     printf("| %-21s | %-22.2f |\n", "IMU Pitch",            motorState.imu.pitch);
     printf("| %-21s | %-22.2f |\n", "IMU Roll",             motorState.imu.roll);
@@ -25,8 +71,8 @@ void printMotorStateTable(struct MotorState &motorState) {
     printf("| %-21s | %-22.2f |\n", "Odometry X Position",  motorState.odom.xPos);
     printf("| %-21s | %-22.2f |\n", "Odometry Y Position",  motorState.odom.yPos);
     printf("| %-21s | %-22.2f |\n", "Odometry Theta",       motorState.odom.theta);
-    printf("| %-21s | %-22.2f |\n", "Control TL",           motorState.cntrl.tl);
-    printf("| %-21s | %-22.2f |\n", "Control TR",           motorState.cntrl.tr);
+    printf("| %-21s | %-22.2f |\n", "Control TL",           motorState.cntrl.targetLeftWheelRPM);
+    printf("| %-21s | %-22.2f |\n", "Control TR",           motorState.cntrl.targetRightWheelRPM);
     printf("| %-21s | %-22.2f |\n", "Control UL",           motorState.cntrl.ul);
     printf("| %-21s | %-22.2f |\n", "Control UR",           motorState.cntrl.ur);
     printf("| %-21s | %-22.2f |\n", "Control UB",           motorState.cntrl.ub);
@@ -66,13 +112,10 @@ int main(int argc, char* argv[]) {
         // Register signal handler for graceful termination
         std::signal(SIGINT, signalHandler);
 
-        // Initialize MotorDriver
-        MotorDriver motorDriver(paramFile, serialPort);
-
         // Main loop
         while (keepRunning) {
             // Fetch the current motor state
-            MotorState* motorState = motorDriver.getMotorState();
+            
 
             // Print the motor state table
             printMotorStateTable(*motorState);

@@ -12,15 +12,16 @@ Pitch == Y
 */
 
 struct Kalman{
-    float Q_angle;
-    float Q_bias;
-    float R_measure;
-    float angle;
-    float bias;
-    float P[2][2];
+    float Q_angle; // Process Noise
+    float Q_bias; // Gyro Bias
+    float R_measure; // Measurement Noise
+    float angle; // Angle Estimate
+    float bias; // Gyro Bias Estimate
+    float P[2][2]; // Error Covariance Matrix
 }Kalman;
 
 struct IMU{
+    struct MPU6050 * sensor;  // IMU Sensor
     const float dt;         // Sample Period [s]
     // Low Pass IIR Filter 
     struct{
@@ -38,10 +39,13 @@ struct IMU{
         float pitch, roll;
     }comp;
     struct {
-        struct Kalman X;
-        struct Kalman Y;
+        struct Kalman rollK;
+        struct Kalman pitchK;
         float pitch, roll;
     }kal;
+
+    float pitchMountOffset;
+    float rollMountOffset;
 }IMU; 
 
 static struct IMU imuInit(const float alphaAccel, const float alphaGyro, const float alphaComp, const float dt){
@@ -50,11 +54,15 @@ static struct IMU imuInit(const float alphaAccel, const float alphaGyro, const f
         .lpf = {.aAccel = alphaAccel, .aGyro = alphaGyro},
         .comp = {.a = alphaComp},
         .kal = {
-            .X =  {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f},
-            .Y =  {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f}
+            .rollK =  {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f},
+            .pitchK =  {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f}
         }
     };
     return imu;
+}
+
+static void imuLinkSensor(struct IMU* imu, struct MPU6050* sensor){
+    imu->sensor = sensor;
 }
 
 static void imuLPF(struct IMU* imu, const struct vector_t* accel, const struct vector_t* gyro){
@@ -88,19 +96,17 @@ static void imuCompFilt(struct IMU* imu){
     // Roll
     imu->comp.roll = imu->comp.a * (imu->comp.roll - imu->lpf.gyro.x * imu->dt) 
                     + (1-imu->comp.a) * imu->raw.roll;
-
 }
 
 static float imuKalPredict(struct Kalman* kal, const float newAngle, const float newRate, float const dt) {
     // Predicts an angle via kalman filter algorithm from angle[n] and dy/dt angle[n]
-    //
     float rate = newRate - kal->bias;
     kal->angle += dt * rate;
 
     kal->P[0][0] += dt * (dt * kal->P[1][1] - kal->P[0][1] - kal->P[1][0] + kal->Q_angle);
     kal->P[0][1] -= dt * kal->P[1][1];
     kal->P[1][0] -= dt * kal->P[1][1];
-    kal->P[1][1] += kal->Q_bias * dt;
+    kal->P[1][1] += kal->Q_bias * dt; // 
 
     float S = kal->P[0][0] + kal->R_measure;
     float K[2];
@@ -123,6 +129,7 @@ static float imuKalPredict(struct Kalman* kal, const float newAngle, const float
 }
 
 static void imuKalUpdate(struct IMU* imu){
+    // Update Kalman Filter with latest data
     float xRate = imu->lpf.gyro.x;
     float yRate = imu->lpf.gyro.y;
     float ax = imu->lpf.accel.x;
@@ -130,28 +137,33 @@ static void imuKalUpdate(struct IMU* imu){
     float az = imu->lpf.accel.z;
     float ax2 = ax * ax;
     float az2 = az * az;
-    // Kalman angle solver
-    // Compute Roll estimate from lpf accelerometer
-    float roll;
+
+    float roll_estimate; // Compute Roll estimate from lpf accelerometer
     float rollsqrt = sqrt(ax2 + az2);
-    if(rollsqrt != 0.0f){roll = atan(ay / rollsqrt) * RAD_TO_DEG;} // Fix -180=180
-    else{roll = 0.0f;}
-      
-    if (fabs(imu->kal.pitch) > 90){
-        xRate *= -1;
-    }   
-    imu->kal.roll= imuKalPredict(&imu->kal.X, roll, xRate, imu->dt);
+    if(rollsqrt != 0.0f){roll_estimate = atan(ay / rollsqrt) * RAD_TO_DEG;} // Fix -180=180
+    else{roll_estimate = 0.0f;} 
+    if (fabs(imu->kal.pitch) > 90){xRate *= -1;} // Invert Rate if Pitch is > 90   
+    imu->kal.roll= imuKalPredict(&imu->kal.rollK, roll_estimate, xRate, imu->dt);
 
     // Estimate Pitch From Accelerometer
-    float pitch = atan2(-ax, az ) * RAD_TO_DEG;
-    if ((pitch < -90 && imu->kal.pitch > 90) || (pitch > 90 && imu->kal.pitch < -90)){
-        imu->kal.Y.angle = pitch;
-        imu->kal.pitch = pitch;
+    float pitch_estimate = atan2(-ax, az ) * RAD_TO_DEG;
+    if ((pitch_estimate < -90 && imu->kal.pitch > 90) || (pitch_estimate > 90 && imu->kal.pitch < -90)){
+        imu->kal.pitchK.angle = pitch_estimate; // Reset the Angle when the IMU has moved 180 degrees
+        imu->kal.pitch = pitch_estimate; 
     }
     else{
-        imu->kal.pitch = imuKalPredict(&imu->kal.Y, pitch, yRate, imu->dt);
+        imu->kal.pitch = imuKalPredict(&imu->kal.pitchK, pitch_estimate, yRate, imu->dt);
     }
 }
+
+
+static void imuUpdate(struct IMU* imu){
+    mpu6050Read(imu->sensor); // Read Sensor need to move this to Interrupt Based
+    
+    imuLPF(imu, &imu->sensor->accel, &imu->sensor->gyro); // Apply Low pass filter
+    imuKalUpdate(imu); // Estimate Angle with Kalman Observer
+}
+
 
 
 #endif // IMU_H
