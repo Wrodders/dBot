@@ -12,17 +12,18 @@ show_help() {
     exit 0
 }
 
-# Function to upload the binary file or folder to the Raspberry Pi
+# Function to upload the binary file or folder to the Raspberry Pi using rsync
 upload() {
     LOCAL_PATH=$1
-    REMOTE_BIN_PATH="$REMOTE_BIN_DIR/$(basename "$LOCAL_PATH")"
-    # Use the SSH command to prompt for password if necessary
+    REMOTE_PATH="$REMOTE_BIN_DIR/$(basename "$LOCAL_PATH")"
+    
+    # Check if the local path is a directory or a file
     if [ -d "$LOCAL_PATH" ]; then
-        echo "UPLOAD: Uploading folder $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_BIN_PATH"
-        scp -r "$LOCAL_PATH" "$PI_USER@$PI_IP:$REMOTE_BIN_PATH"
+        echo "UPLOAD: Uploading folder $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_PATH"
+        rsync -avz --delete "$LOCAL_PATH/" "$PI_USER@$PI_IP:$REMOTE_PATH"
     else
-        echo UPLOAD: "Uploading file $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_BIN_PATH"
-        scp "$LOCAL_PATH" "$PI_USER@$PI_IP:$REMOTE_BIN_PATH"
+        echo "UPLOAD: Uploading file $LOCAL_PATH to $PI_USER@$PI_IP:$REMOTE_PATH"
+        rsync -avz "$LOCAL_PATH" "$PI_USER@$PI_IP:$REMOTE_PATH"
     fi
 
     if [ $? -ne 0 ]; then
@@ -56,7 +57,7 @@ fi
 # Create the full user@ip address
 PI_USER_IP="$PI_USER@$PI_IP"
 
-# Main logic to upload files
+# Main logic to upload files/folders
 for FILE in "${FILE_LIST[@]}"; do
     upload "$FILE"
 done

@@ -27,9 +27,18 @@ endif()
 include_directories(${CPPZMQ_INCLUDE_DIR})
 
 
+find_package(Boost REQUIRED)
+if (Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+    link_directories(${Boost_LIBRARY_DIRS})
+else()
+    message(FATAL_ERROR "Boost not found. Please specify Boost_INCLUDE_DIR and Boost_LIBRARY_DIRS.")
+endif()
 # Include directories
 include_directories(
     ${OpenCV_INCLUDE_DIRS}  # OpenCV headers
+    ${ZMQ_INCLUDE_DIRS}     # ZeroMQ headers
+    ${Boost_INCLUDE_DIRS}   # Boost headers
     ../inc/                  # Custom headers (if any, adjust the path as needed)
 )
 
@@ -43,7 +52,7 @@ add_executable(main src/main.cpp)
 add_executable(zmqproxy tools/zmqProxy.cpp)
 
 # Add executable for 'motorDriver' (located in tools/)
-add_executable(motordriver tools/motorDriver.cpp)
+add_executable(twsbDriver tools/twsbDriver.cpp)
 
 # Link both executables to the necessary libraries
 target_link_libraries(main PRIVATE 
@@ -57,10 +66,11 @@ target_link_libraries(zmqproxy PRIVATE
     zmq
 )
 
-target_link_libraries(motordriver PRIVATE 
+target_link_libraries(twsbDriver PRIVATE 
     ${OpenCV_LIBS}       # Link OpenCV libraries
     ${ZMQ_LIBRARIES}     # Link ZeroMQ libraries
     zmq
+    ${Boost_LIBRARIES}
 )
 
 # Include paths for cppzmq and ZeroMQ headers
@@ -72,7 +82,7 @@ target_include_directories(zmqproxy PRIVATE
     ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
 )
 
-target_include_directories(motordriver PRIVATE
+target_include_directories(twsbDriver PRIVATE
     ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
 )
 

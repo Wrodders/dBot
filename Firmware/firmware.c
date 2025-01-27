@@ -97,7 +97,7 @@ int main(void){
     // ***************************** COMMUNICATIONS ******************************************************** // 
     struct Coms coms = comsInit();
     // -------------------- TOPIC PUBLISHERS ---------------------- //
-    comsRegisterPub(&coms, PUB_CMD_RET, SERIALIZED_CMDRET_FTM);
+    comsRegisterPub(&coms, PUB_CMD_RET, SERIALIZED_CMDRET_FMT);
     comsRegisterPub(&coms, PUB_ERROR, SERIALIZED_ERROR_FMT);
     comsRegisterPub(&coms, PUB_INFO, SERIALIZED_INFO_FMT);
     comsRegisterPub(&coms, PUB_DEBUG, SERIALIZED_DEBUG_FMT);
@@ -217,6 +217,7 @@ int main(void){
         // ********* FIXED TIME TASKS ******************************************************************* // 
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
+            comsSendMsg(&coms, &ser1, PUB_DEBUG, "BLINK");
             blinkTask.lastTick = loopTick;  
         }
         if(CHECK_PERIOD(imuTask, loopTick)){
@@ -239,10 +240,6 @@ int main(void){
             if(comsGrabCmdMsg(&coms, &ser1)){
                 comsProcessCmdMsg(&coms, &ser1);
             }
-
-            char buf[64] = {0};
-            ftoa(buf,get_ticks(),  3);
-            comsSendMsg(&coms, &ser1, PUB_CMD_RET, buf);
             comsTask.lastTick = loopTick;
         }
     }

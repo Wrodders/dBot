@@ -175,7 +175,7 @@ static inline  char  comsDecodeID_(char id){return id - 'a';}
 #define SERIALIZED_ERROR_FMT  "%s"
 #define SERIALIZED_INFO_FMT   "%s"
 #define SERIALIZED_DEBUG_FMT  "%s"
-#define SERIALIZED_CMDRET_FTM "%s"
+#define SERIALIZED_CMDRET_FMT "%s"
 
 struct TWSBState{
     float *pitch, *roll;
