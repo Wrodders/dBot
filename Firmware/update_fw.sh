@@ -21,25 +21,11 @@ DEVICE="/dev/serial0"
 # Parse command-line arguments
 while [ "$#" -gt 0 ]; do
     case $1 in
-        -u|--user) 
-            USER="$2"
-            shift 2
-            ;;
-        -i|--hostname) 
-            HOSTNAME="$2"
-            shift 2
-            ;;
-        -p|--device) 
-            DEVICE="$2"
-            shift 2
-            ;;
-        -h|--help)  
-            show_help 
-            ;;
-        *) 
-            echo "Unknown parameter: $1"
-            show_help
-            ;;
+        -u|--user) USER="$2";shift 2;;
+        -i|--hostname) HOSTNAME="$2";shift 2;;
+        -p|--device) DEVICE="$2";shift 2;;
+        -h|--help)  show_help;;
+        *) echo "Unknown parameter: $1"; show_help;;
     esac
 done
 

@@ -12,7 +12,6 @@
 #include "inc/ddmr.h"
 #include "drivers/analog.h"
 
-#define SERIALIZED_STATE_FMT "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
 
 // ********** GLOBAL STATIC BUFFERS ***************************************// ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[128] = {0};
@@ -56,7 +55,6 @@ int main(void){
                             rx1_buf_, ARRAY_SIZE(rx1_buf_), 
                             tx1_buf_, ARRAY_SIZE(tx1_buf_));
     serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-    serialSend(&ser1, "Hello World\n", 12);
    
     // IMU 
     i2cInit(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
@@ -76,6 +74,7 @@ int main(void){
     motorConfig(&motorR, &encR, VSYS, MOTOR_DEADBAND, false,  SPEED_ALPHA, RPS_MAX);
     motorEnable(&motorL);
     motorEnable(&motorR);
+
     // BALANCE CONTROLLER
     struct PID balanceAngleCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&balanceAngleCtrl, -7.5f);
@@ -83,48 +82,55 @@ int main(void){
     struct DiffDriveModel ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, STEER_ALPHA);
     struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
+   
+   // ****************************** TELEMETRY STATE******************************************************** //
+    struct TWSBState twsbState = {
+        .pitch = &imu.kal.pitch, .roll = &imu.kal.roll,
+        .leftShaftRPS = &motorL.shaftRPS, .rightShaftRPS = &motorR.shaftRPS,
+        .leftWheelTargetRPS = &motorL.speedCtrl.ref, 
+        .rightWheelTargetRPS = &motorR.speedCtrl.ref,
+        .voltageLeft = &motorL.speedCtrl.out, .voltageRight = &motorR.speedCtrl.out,
+
+        .linearVelocity = &ddmr.linearVel, .targetLinVel = &velCtrl.ref, .balanceAngle = &balanceAngleCtrl.ref,
+        .angularVelocity = &ddmr.angularVel, .targetAngularVel = &steerCtrl.ref, .steerDiff = &steerCtrl.out
+    };
     // ***************************** COMMUNICATIONS ******************************************************** // 
-    const struct Topic pubMap[NUM_PUBS] = {
-        {.id = PUB_CMD_RET, .name = "CMD_RET", .format = "%s",   .nArgs=1}, // RET_VAL
-        {.id = PUB_ERROR,   .name = "ERROR",   .format = "%s",   .nArgs=1}, // Error Message
-        {.id = PUB_INFO,    .name = "INFO",    .format = "%s",   .nArgs=1}, // System INFO
-        {.id = PUB_DEBUG,   .name = "DEBUG",   .format = "%s",   .nArgs=1}, // Debug prints 
-        // Application Publisher Topics 
-        {.id = PUB_STATE,   .name = "STATE",   .nArgs=14, .format = SERIALIZED_STATE_FMT}, 
-    };
-    const struct Param paramMap[NUM_PARAMS] = {
-        {.id = P_ID,        .name = "IDENT", .param = &uuid,                .format = "%0.3f"},
-        {.id = P_MODE,      .name = "MODE",  .param = &nextMode,            .format = "%0.3f"},
-
-        {.id = P_LTRGT,     .name = "LTRGT", .param = &motorL.speedCtrl.ref, .format = "%0.3f"},
-        {.id = P_LKP,       .name = "LKP",   .param = &motorL.speedCtrl.kp,  .format = "%0.3f"},
-        {.id = P_LKI,       .name = "LKI",   .param = &motorL.speedCtrl.ki,  .format = "%0.3f"},
-
-        {.id = P_RTRGT,     .name = "RTRGT", .param = &motorR.speedCtrl.ref, .format = "%0.3f"},
-        {.id = P_RKP,       .name = "RKP",   .param = &motorR.speedCtrl.kp,  .format = "%0.3f"},
-        {.id = P_RKI,       .name = "RKI",   .param = &motorR.speedCtrl.ki,  .format = "%0.3f"},
-
-        {.id = P_BKP,       .name = "BTRGT", .param = &balanceAngleCtrl.ref, .format = "%0.3f"},
-        {.id = P_BKP,       .name = "BKP",   .param = &balanceAngleCtrl.kp,  .format = "%0.3f"},
-        {.id = P_BKI,       .name = "BKI",   .param = &balanceAngleCtrl.ki,  .format = "%0.3f"},
-        {.id = P_BKD,       .name = "BKD",   .param = &balanceAngleCtrl.kd,  .format = "%0.3f"},
-
-        {.id = P_VTRGT,     .name = "VTRGT", .param = &velCtrl.ref,          .format = "%0.3f"},
-        {.id = P_VKP,       .name = "VKP",   .param = &velCtrl.kp,           .format = "%0.3f"},
-        {.id = P_VKI,       .name = "VKI",   .param = &velCtrl.ki,           .format = "%0.3f"},
-        {.id = P_VKD,       .name = "VKD",   .param = &velCtrl.kd,           .format = "%0.3f"},
-        {.id = P_VAPLHA,    .name = "VALPHA",.param = &ddmr.linearVelAlpha,  .format = "%0.3f"},
-
-        {.id = P_ATRGT,     .name = "ATRGT", .param = &steerCtrl.ref,        .format = "%0.3f"},
-        {.id = P_AKP,       .name = "AKP",   .param = &steerCtrl.kp,         .format = "%0.3f"},
-        {.id = P_AKI,       .name = "AKI",   .param = &steerCtrl.ki,         .format = "%0.3f"},
-        {.id = P_AKD,       .name = "AKD",   .param = &steerCtrl.kd,         .format = "%0.3f"},
-        {.id = P_AALPHA,    .name = "AALPHA",.param = &ddmr.angularVelAlpha, .format = "%0.3f"},
-    };
-
-
-    struct Coms coms = comsInit(pubMap, paramMap);
-
+    struct Coms coms = comsInit();
+    // -------------------- TOPIC PUBLISHERS ---------------------- //
+    comsRegisterPub(&coms, PUB_CMD_RET, SERIALIZED_CMDRET_FTM);
+    comsRegisterPub(&coms, PUB_ERROR, SERIALIZED_ERROR_FMT);
+    comsRegisterPub(&coms, PUB_INFO, SERIALIZED_INFO_FMT);
+    comsRegisterPub(&coms, PUB_DEBUG, SERIALIZED_DEBUG_FMT);
+    comsRegisterPub(&coms, PUB_STATE, SERIALIZED_STATE_FMT);
+    // --------------------PARAMETER REGISTERS ---------------------- //
+    comsRegisterParam(&coms, P_ID,      "%0.3f", &uuid);
+    comsRegisterParam(&coms, P_MODE,    "%0.3f", &nextMode);
+    // - LEFT MOTOR
+    comsRegisterParam(&coms, P_LTRGT,   "%0.3f", &motorL.speedCtrl.ref);
+    comsRegisterParam(&coms, P_LKP,     "%0.3f", &motorL.speedCtrl.kp);
+    comsRegisterParam(&coms, P_LKI,     "%0.3f", &motorL.speedCtrl.ki);
+    // - RIGHT MOTOR
+    comsRegisterParam(&coms, P_RTRGT,   "%0.3f", &motorR.speedCtrl.ref);
+    comsRegisterParam(&coms, P_RKP,     "%0.3f", &motorR.speedCtrl.kp);
+    comsRegisterParam(&coms, P_RKI,     "%0.3f", &motorR.speedCtrl.ki);
+    // - BALANCE CONTROLLER
+    comsRegisterParam(&coms, P_BTRGT,   "%0.3f", &balanceAngleCtrl.ref);
+    comsRegisterParam(&coms, P_BKP,     "%0.3f", &balanceAngleCtrl.kp);
+    comsRegisterParam(&coms, P_BKI,     "%0.3f", &balanceAngleCtrl.ki);
+    comsRegisterParam(&coms, P_BKD,     "%0.3f", &balanceAngleCtrl.kd);
+    // - Linear Velocity Controller
+    comsRegisterParam(&coms, P_VTRGT,   "%0.3f", &velCtrl.ref);
+    comsRegisterParam(&coms, P_VKP,     "%0.3f", &velCtrl.kp);
+    comsRegisterParam(&coms, P_VKI,     "%0.3f", &velCtrl.ki);
+    comsRegisterParam(&coms, P_VKD,     "%0.3f", &velCtrl.kd);
+    comsRegisterParam(&coms, P_VAPLHA,  "%0.3f", &ddmr.linearVelAlpha);
+    // - Angular Velocity Controller
+    comsRegisterParam(&coms, P_ATRGT,   "%0.3f", &steerCtrl.ref);
+    comsRegisterParam(&coms, P_AKP,     "%0.3f", &steerCtrl.kp);
+    comsRegisterParam(&coms, P_AKI,     "%0.3f", &steerCtrl.ki);
+    comsRegisterParam(&coms, P_AKD,     "%0.3f", &steerCtrl.kd);
+    comsRegisterParam(&coms, P_AALPHA,  "%0.3f", &ddmr.angularVelAlpha);
+    // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
     // ***** Application Tasks **************************************************************************** // 
     struct FixedTimeTask blinkTask = createTask(BLINK_PERIOD);              // Watchdog led
@@ -136,7 +142,6 @@ int main(void){
 
     // ****** Loop Parameters **************************************************************************** // 
     enum MODE {INIT = 0,PARK, CASCADE, LQR, TUNE_MOTOR} mode = INIT;
-    
     uint16_t loopTick = 0;
 	for(;;){
         loopTick = get_ticks();
@@ -231,9 +236,13 @@ int main(void){
                                                 ddmr.linearVel,     velCtrl.ref,           balanceAngleCtrl.ref,
                                                 ddmr.angularVel,    steerCtrl.ref,         steerCtrl.out);             
             // Handle RX Messages 
-            if(comsGrabMsg(&coms, &ser1)){
-                comsProcessMsg(&coms, &ser1);
+            if(comsGrabCmdMsg(&coms, &ser1)){
+                comsProcessCmdMsg(&coms, &ser1);
             }
+
+            char buf[64] = {0};
+            ftoa(buf,get_ticks(),  3);
+            comsSendMsg(&coms, &ser1, PUB_CMD_RET, buf);
             comsTask.lastTick = loopTick;
         }
     }
