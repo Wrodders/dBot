@@ -35,19 +35,42 @@ int handleSerialPortRead(TWSBDriver &twsbDriver) {
     twsbDriver.update();
     return 0;
 }
-//
-int publishTelemetry(zmq::socket_t &pubSocket, TWSBDriver &twsbDriver) {
+//@Brief: Publish the TwoWheelSelfBalancing telemetry data over ZMQ
+int publishTWSB(zmq::socket_t &pubSocket, TWSBDriver &twsbDriver) {
     std::string msg;
-    //Serialize the telemetry data
+    //Serialize the telemetry data with the protocol
     for (int i = 0; i < T_NUM_VARS; i++) {
         msg += std::to_string(twsbDriver.telemetry_.stateVars[i]);
-        if(i < T_NUM_VARS - 1) {msg += twsbDriver.protocol.delim_byte;}
+        msg += twsbDriver.protocol.delim_byte;
     }
+    // serialize the timestamp
+   
     // publish under SERIAL topic
-    zmq::message_t topic("SERIAL/", 7);
-    zmq::message_t message(msg.c_str(), msg.size());
-    pubSocket.send(topic, zmq::send_flags::sndmore);
-    pubSocket.send(message, zmq::send_flags::none);
+    std::string topic = "SERIAL/STATE/";
+    for(int i = 0; i < T_NUM_VARS; i++){
+        //get pubslish string 
+        topic += stateVarString((enum StateVars)i);
+        //send the topic and message
+        pubSocket.send(zmq::message_t(topic), zmq::send_flags::sndmore);
+        pubSocket.send(zmq::message_t(twsbDriver.getTelemetryValue((enum StateVars)i)), zmq::send_flags::sndmore);
+    }
+  
+    if(twsbDriver.cmdret_.msg != "" ){
+        // Publish the command return message
+        zmq::message_t topic("SERIAL/CMDRET/", 14);
+        zmq::message_t message(twsbDriver.cmdret_.msg.c_str(), twsbDriver.cmdret_.msg.size());
+        pubSocket.send(topic, zmq::send_flags::sndmore);
+        pubSocket.send(message, zmq::send_flags::none);
+    }
+    if(twsbDriver.logentry_.message != "" ){
+        // Publish the log entry message
+        zmq::message_t topic("SERIAL/LOG/", 11);
+        zmq::message_t message(twsbDriver.logentry_.message.c_str(), twsbDriver.logentry_.message.size());
+        pubSocket.send(topic, zmq::send_flags::sndmore);
+        pubSocket.send(message, zmq::send_flags::none);
+    }
+
+
     return 0;
 }
 
@@ -59,8 +82,6 @@ int handleZMQCmd(zmq::socket_t &subSocket, TWSBDriver &twsbDriver) {
 
     std::string topicStr = std::string(static_cast<char*>(topic.data()), topic.size());
     std::string msgStr = std::string(static_cast<char*>(msg.data()), msg.size());
-
-    std::cout << "Received Topic: " << topicStr << " Message: " << msgStr << std::endl;
     return 0;
 }
 
@@ -100,8 +121,7 @@ int main(int argc, char* argv[]) {
         if (FD_ISSET(twsbDriver.serialFd, &readFds)) { // Serial port data available
             handleSerialPortRead(twsbDriver);
             if (!DEBUG_MODE){twsbDriver.printTelemetryTable();}
-            publishTelemetry(pubSocket, twsbDriver);
-
+            publishTWSB(pubSocket, twsbDriver); // 
         }
         if (FD_ISSET(zmqSubFd, &readFds)) { // ZMQ socket data available
             handleZMQCmd(subSocket, twsbDriver);

@@ -17,11 +17,7 @@
 #include "../inc/mcuComs.h"
 #elif __APPLE__
 #include "../../Firmware/pubrpc/mcuComs.h"
-
 #endif
-
-
-
 #define DEFAULT_PORT "/dev/serial0"
 #define DEFAULT_BAUD 115200
 
@@ -67,6 +63,11 @@ public:
             std::cerr << "Error: Unable to configure serial port" << std::endl;
             return;
         }
+        // Initialize the last time
+        lastTime = std::chrono::system_clock::now();
+        // Initialize the telemetry data
+        telemetry_.stateVars = std::vector<float>(T_NUM_VARS, 0.0);
+       
     }
     ~TWSBDriver() {
         close(serialFd);
@@ -131,7 +132,6 @@ private:
     //@Note: If partial frames are available, they can be processed in the next iteration
     void grabMsgFrame() {
         ssize_t bytesRead = read(serialFd, rxBuffer, sizeof(rxBuffer));
-       
         uint8_t idx = 0;
         while ((bytesRead - idx) > 0) { // iterate through the read data
             decodeTopicMsgFrame(rxBuffer[idx++]);
@@ -157,7 +157,6 @@ private:
                 } 
                 else if(byte == protocol.eof_byte){ // Message Frame Complete
                     // Add the message frame to the queue
-                   
                     topicMsgQueue.push(rxMsgFrame);
                     comsDecodeState = COMS_DECODE_IDLE; // Reset
                     break;

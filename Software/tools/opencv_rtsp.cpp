@@ -3,14 +3,20 @@
 #include <vector>
 #include <opencv2/opencv.hpp> // OpenCV library
 
+/************ OpenCV Camera Pipeline Filter Stage ***************************/
+/*
+
+|------------|--------|---------|--------|--------|
+| RPICAM-VID | yuv420 | camFilt | yuv420 | ffmpeg |
+
+
+*/
+
 const int WIDTH = 640;   // Frame width
 const int HEIGHT = 360;  // Frame height
 const int FRAME_SIZE = WIDTH * HEIGHT * 3 / 2; // YUV420p (Y + U + V)
 
 const int THRESHOLD = 50;  // Threshold value for binary image
-
-
-
 int main() {
     // Command to capture video using rpicam-vid with YUV420p output
     const char* rpicam_cmd = "rpicam-vid -t 0 --camera 0 --rotation 180 --nopreview --codec yuv420 --width 640 --height 360 --inline --listen -o -";
@@ -40,14 +46,16 @@ int main() {
         cv::Mat binary_image;
         cv::threshold(y_plane, binary_image, THRESHOLD, 255, cv::THRESH_BINARY);
 
-        // canny edge detection
-        cv::Mat edges;
-        cv::Canny(binary_image, edges, 100, 200);
+
         // Fill U and V planes with constant values (e.g., 128)
         uint8_t* u_plane = yuv_buffer.data() + (WIDTH * HEIGHT);
         uint8_t* v_plane = u_plane + (WIDTH * HEIGHT / 4);
         std::fill(u_plane, u_plane + (WIDTH * HEIGHT / 4), 128);
         std::fill(v_plane, v_plane + (WIDTH * HEIGHT / 4), 128);
+
+         // canny edge detection
+        cv::Mat edges;
+        cv::Canny(binary_image, edges, 100, 200);
 
         // Replace the Y plane in the original YUV buffer with the binary image
         std::memcpy(yuv_buffer.data(), edges.data, WIDTH * HEIGHT);

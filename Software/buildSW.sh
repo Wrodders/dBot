@@ -28,5 +28,9 @@ make zmqproxy || error_exit "Build process failed."
 
 make zmqSubTest || error_exit "Build process failed."
 
+make opencv_rtsp || error_exit "Build process failed."
+
+make camFilt || error_exit "Build process failed."
+
 
 echo "Build completed successfully!"

@@ -45,7 +45,10 @@ include_directories(
 add_executable(main src/main.cpp)
 add_executable(zmqproxy tools/zmqProxy.cpp)
 add_executable(twsbDriver tools/twsbDriver.cpp)
+add_executable(opencv_rtsp tools/opencv_rtsp.cpp)
 add_executable(zmqSubTest Test/zmqSubTest.cpp)
+add_executable(camFilt tools/camFilt.cpp)
+
 
 # Link both executables to the necessary libraries
 target_link_libraries(main PRIVATE 
@@ -66,7 +69,21 @@ target_link_libraries(twsbDriver PRIVATE
     ${Boost_LIBRARIES}
 )
 
+target_link_libraries(opencv_rtsp PRIVATE 
+    ${OpenCV_LIBS}       # Link OpenCV libraries
+    ${ZMQ_LIBRARIES}     # Link ZeroMQ libraries
+    zmq
+    ${Boost_LIBRARIES}
+)
+
 target_link_libraries(zmqSubTest PRIVATE 
+    ${OpenCV_LIBS}       # Link OpenCV libraries
+    ${ZMQ_LIBRARIES}     # Link ZeroMQ libraries
+    zmq
+    ${Boost_LIBRARIES}
+)
+
+target_link_libraries(camFilt PRIVATE 
     ${OpenCV_LIBS}       # Link OpenCV libraries
     ${ZMQ_LIBRARIES}     # Link ZeroMQ libraries
     zmq
@@ -86,7 +103,14 @@ target_include_directories(twsbDriver PRIVATE
     ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
 )
 
+target_include_directories(opencv_rtsp PRIVATE
+    ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
+)
 target_include_directories(zmqSubTest PRIVATE
+    ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
+)
+
+target_include_directories(camFilt PRIVATE
     ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
 )
 

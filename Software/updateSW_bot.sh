@@ -20,7 +20,7 @@ HOSTNAME="bot.local"
 
 
 
-rsync -az . "$USER"@"$HOSTNAME":prog/software
+rsync -az --exclude 'mediamtx/mediamtx' --exclude 'mediamtx/mediamtx_v1.11.2_darwin_amd64.tar.gz' . "$USER"@"$HOSTNAME":prog/software
 rsync -az ../Firmware/pubrpc/mcuComs.h "$USER"@"$HOSTNAME":prog/software/inc
 
 # Build the project on the remote
