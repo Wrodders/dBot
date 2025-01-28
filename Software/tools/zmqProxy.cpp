@@ -42,19 +42,26 @@ int main(int argc, char* argv[]) {
         input_sckAddrs.push_back(argv[i]);
     }
 
-    // Call the function to print proxy info
-    printProxyInfo(input_sckAddrs, output_Addr);
-
+    
     zmq::context_t context(1);
     zmq::socket_t subscriber(context, zmq::socket_type::sub);
     for (const auto& sckAddr : input_sckAddrs)
-        subscriber.connect(sckAddr);
+        try
+        {
+            subscriber.connect(sckAddr);
+        }
+        catch (const zmq::error_t& e)
+        {
+            std::cerr << "Error connecting to input socket: " << e.what() << "\n";
+            return 1;
+        }
+        
     subscriber.set(zmq::sockopt::subscribe, "");
     zmq::socket_t publisher(context, zmq::socket_type::pub);
     publisher.bind(output_Addr);
-    
 
-
+    // Call the function to print proxy info
+    printProxyInfo(input_sckAddrs, output_Addr);
     std::atomic<bool> running(true);
 
     try {

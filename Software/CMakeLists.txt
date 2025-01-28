@@ -42,17 +42,10 @@ include_directories(
     ../inc/                  # Custom headers (if any, adjust the path as needed)
 )
 
-
-
-
-# Add executable for 'main' (located in src/)
 add_executable(main src/main.cpp)
-
-# Add executable for 'tools' (located in tools/)
 add_executable(zmqproxy tools/zmqProxy.cpp)
-
-# Add executable for 'motorDriver' (located in tools/)
 add_executable(twsbDriver tools/twsbDriver.cpp)
+add_executable(zmqSubTest Test/zmqSubTest.cpp)
 
 # Link both executables to the necessary libraries
 target_link_libraries(main PRIVATE 
@@ -73,6 +66,13 @@ target_link_libraries(twsbDriver PRIVATE
     ${Boost_LIBRARIES}
 )
 
+target_link_libraries(zmqSubTest PRIVATE 
+    ${OpenCV_LIBS}       # Link OpenCV libraries
+    ${ZMQ_LIBRARIES}     # Link ZeroMQ libraries
+    zmq
+    ${Boost_LIBRARIES}
+)
+
 # Include paths for cppzmq and ZeroMQ headers
 target_include_directories(main PRIVATE
     ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
@@ -86,5 +86,8 @@ target_include_directories(twsbDriver PRIVATE
     ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
 )
 
+target_include_directories(zmqSubTest PRIVATE
+    ${ZMQ_INCLUDE_DIRS}   # Include ZeroMQ headers (from find_package)
+)
 
 

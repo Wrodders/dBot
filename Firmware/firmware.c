@@ -217,7 +217,6 @@ int main(void){
         // ********* FIXED TIME TASKS ******************************************************************* // 
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
-            comsSendMsg(&coms, &ser1, PUB_DEBUG, "BLINK");
             blinkTask.lastTick = loopTick;  
         }
         if(CHECK_PERIOD(imuTask, loopTick)){

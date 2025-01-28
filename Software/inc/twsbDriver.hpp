@@ -17,7 +17,7 @@
 #include "../inc/mcuComs.h"
 #elif __APPLE__
 #include "../../Firmware/pubrpc/mcuComs.h"
-#include "../modules/cUtils/ringbuffer.h"
+
 #endif
 
 
@@ -36,24 +36,30 @@ const bool DEBUG_MODE = false;
 */
 
 class TWSBDriver {
+public:
+    int serialFd; 
     struct Telemetry{
         std::vector<float> stateVars;
-        std::chrono::time_point<std::chrono::high_resolution_clock> timestamp;
+        std::chrono::time_point<std::chrono::system_clock> timestamp;
     }telemetry_;
 
     struct LogEntry {
         std::string message;
-        std::chrono::time_point<std::chrono::high_resolution_clock> timestamp;
+        std::chrono::time_point<std::chrono::system_clock> timestamp;
     } logentry_;
     struct CmdRet {
         std::string msg;
-        std::chrono::time_point<std::chrono::high_resolution_clock> timestamp;
+        std::chrono::time_point<std::chrono::system_clock> timestamp;
     } cmdret_;
 
-    
-
-public:
-    int serialFd; 
+    //************************ PROTOCOL ***********************************/
+    struct Protocol protocol = {
+        .sof_byte = SOF_BYTE,
+        .eof_byte = EOF_BYTE,
+        .delim_byte = DELIM_BYTE,
+        .max_msg_data_size = MAX_MSG_DATA_SIZE,
+        .max_msg_frame_size = MAX_MSG_FRAME_SIZE
+    }; // ASCII Protocol Used for Communication over Serial Port
     // Constructor
     TWSBDriver( const std::string& port, int baud) {
         serialFd = configSerialPort(port, baud);
@@ -83,6 +89,8 @@ public:
         std::cout << "\033[1;36m" << "+--------------------+-------------------+" << "\033[0m" << std::endl;
         std::cout << "\033[1;31m" << "\nLo: " << "\033[0m" << std::endl;
         std::cout << "| " << std::left << std::setw(18) << "Msg: " << logentry_.message << " |" << std::endl;
+        // get the timestamp in human-readable format
+        std::chrono::time_point<std::chrono::system_clock> timestamp = std::chrono::system_clock::now();
         std::cout << "| " << std::setw(12) << "Timestamp: " << formatTimestamp(logentry_.timestamp) << " |" << std::endl;
         // Display the command return in a more compact format with left alignment
         std::cout << "\033[1;32m" << "\nCommand Return: " << "\033[0m" << std::endl;
@@ -101,7 +109,7 @@ private:
     uint8_t rxBuffer[1024] = {0}; // Serial port read buffer
     
     // TimeStamp
-    std::chrono::time_point<std::chrono::high_resolution_clock> lastTime;
+    std::chrono::time_point<std::chrono::system_clock> lastTime;
     
     struct TopicMsgFrame { // Serialized Message Frame
         enum Publishers pubID; // Publisher ID
@@ -109,14 +117,7 @@ private:
     } rxMsgFrame;
     
     std::queue<TopicMsgFrame> topicMsgQueue; // Received Topic Message Queue
-    //************************ PROTOCOL ***********************************/
-    struct Protocol protocol = {
-        .sof_byte = SOF_BYTE,
-        .eof_byte = EOF_BYTE,
-        .delim_byte = DELIM_BYTE,
-        .max_msg_data_size = MAX_MSG_DATA_SIZE,
-        .max_msg_frame_size = MAX_MSG_FRAME_SIZE
-    }; // ASCII Protocol Used for Communication over Serial Port
+    
     enum COMS_DECODE_STATE {
         COMS_DECODE_IDLE = 0, 
         COMS_DECODE_ID, 
@@ -191,32 +192,26 @@ private:
                             telemetry_.stateVars.push_back(std::stof(token));
                         } catch (const std::invalid_argument& e) {
                             std::cerr << "Invalid token for float conversion: " << token << std::endl;
+                            break; // Exit the loop
                         }
                     }
-                    telemetry_.timestamp = std::chrono::high_resolution_clock::now();
+                    telemetry_.timestamp = std::chrono::system_clock::now();
                     break;
-
                 case PUB_CMD_RET:
                     cmdret_.msg = msgFrame.data;
-                    cmdret_.timestamp = std::chrono::high_resolution_clock::now();
-                    if(DEBUG_MODE){ std::cerr << "[DEBUG] Deserializing Command Return" <<  cmdret_.msg << std::endl;}
+                    cmdret_.timestamp = std::chrono::system_clock::now();
                     break;
-
                 case PUB_ERROR:
                     logentry_.message = msgFrame.data;
-                    logentry_.timestamp = std::chrono::high_resolution_clock::now();
-                    if(DEBUG_MODE){ std::cerr << "[DEBUG] Deserializing Log Entry" <<  logentry_.message << std::endl;}
+                    logentry_.timestamp = std::chrono::system_clock::now();
                     break;
                 case PUB_INFO:
                     logentry_.message = msgFrame.data;
-                    logentry_.timestamp = std::chrono::high_resolution_clock::now();
-                    if(DEBUG_MODE){ std::cerr << "[DEBUG] Deserializing Log Entry" <<  logentry_.message << std::endl;}
+                    logentry_.timestamp = std::chrono::system_clock::now();
                     break;
                 case (PUB_DEBUG):
                     logentry_.message = msgFrame.data;
-                    logentry_.timestamp = std::chrono::high_resolution_clock::now();
-                    if(DEBUG_MODE){ std::cerr << "[DEBUG] Deserializing Log Entry" <<  logentry_.message << std::endl;}
-                    
+                    logentry_.timestamp = std::chrono::system_clock::now();
                     break;
                 default:
                     break;
@@ -237,7 +232,7 @@ private:
     
     // Calculate the time difference between two sample in ms
     double calcSampleTimeDiff(){
-        std::chrono::time_point<std::chrono::high_resolution_clock> currentTime = std::chrono::high_resolution_clock::now();
+        std::chrono::time_point<std::chrono::system_clock> currentTime = std::chrono::system_clock::now();
         std::chrono::duration<double> timeDiff = std::chrono::duration_cast<std::chrono::duration<double>>(currentTime - lastTime);
         lastTime = currentTime;
         return timeDiff.count() * 1000;

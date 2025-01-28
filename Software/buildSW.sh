@@ -24,4 +24,9 @@ cmake .. || error_exit "CMake configuration failed."
 # Build the project
 make twsbDriver || error_exit "Build process failed."
 
+make zmqproxy || error_exit "Build process failed."
+
+make zmqSubTest || error_exit "Build process failed."
+
+
 echo "Build completed successfully!"
