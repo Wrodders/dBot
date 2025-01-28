@@ -1,0 +1,248 @@
+%%%%%%%%%%%%%%%%%% USAGE INSTRUCTIONS %%%%%%%%%%%%%%%%%%
+% - Compile using LuaLaTeX and biber, unless there is a particular reason not to. Do not use the older LaTex/PDFLaTeX or BibTeX. (The fonts won't work correctly.)
+% - Font and the report 'year' must be specified when all \documentclass or the template won't work correctly. (There's no error checking/default cases!)
+% - For best performance save images/graphics as PDF files, not as png/jpg/eps. This makes no difference to how images are inserted using \includegraphics.
+% - As many further packages as wanted can be loaded. Below are just an example set. Note that template itself loads a number of packages, including hyperref.
+% - References are handed using biblatex.
+% - Link to the presentation of theses policy: https://documents.manchester.ac.uk/DocuInfo.aspx?DocID=2863
+
+
+
+%%%%%%%%%%%%%%%%%% META DATA SETUP %%%%%%%%%%%%%%%%%%
+% This is where the document title and author are set. Other details for the title page are set later
+% Note that if/when you edit these you may need to 'Recompile from scratch' to get the changes to display in the PDF. (In Overleaf, select the down arrow to the right of the 'Recompile' button)
+\begin{filecontents*}{\jobname.xmpdata}
+  \Title{Bsc  Report} 
+  \Author{10706715} % should be student number rather than name to help with annoymous marking
+  \Language{en-GB}
+  \Copyrighted{True}
+  % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
+\end{filecontents*}
+
+
+%%%%%%%%%%%%%%%%%% DOCUMENT SETUP %%%%%%%%%%%%%%%%%%
+\documentclass{uom_eee_dissertation_casson} 
+
+
+%%%%%%%%%%%%%%%%%% PACKAGES AND COMMANDS %%%%%%%%%%%%%%%%%%
+
+% Packages
+\usepackage{graphicx,psfrag,color} % for postscript graphics files
+  \graphicspath{ {./images/} }
+\usepackage{amsmath}               % assumes amsmath package installed
+  \allowdisplaybreaks[1]           % allow eqnarrays to break across pages
+\usepackage{amssymb}               % assumes amsmath package installed 
+\usepackage{url}                   % format hyperlinks correctly
+\usepackage{rotating}              % allow portrait figures and tables
+\usepackage{multirow}              % allows merging of rows in tables
+\usepackage{lscape}                % allows pages to be typeset in landscape mode
+\usepackage{tabularx}              % allows fixed width tables
+\usepackage{verbatim}              % enhanced version of built-in verbatim environment
+\usepackage{footnote}              % allows more control over footnote environments
+\usepackage{float}                 % allows H option on floats to force here placement
+\usepackage{booktabs}              % improve table line spacing
+\usepackage{lipsum}                % for adding dummy text here
+\usepackage[base]{babel}           % for proper hypthenation in lipsum sections
+\usepackage{subcaption}            % for multiple sub-figures in a single float
+% Add your packages here
+
+% Optional: for adding alt-text to images:
+%\usepackage{pdfcomment}            % for alt text for accessibility
+% Then to add images use:
+% \pdftooltip{\includegraphics[width=0.5\textwidth]{image.pdf}}{Alt-text here}
+% This makes the text in the image non-select-able though (assuming it's a vector file)
+
+% Custom commands
+\newcommand{\degree}{\ensuremath{^\circ}}
+\newcommand{\sus}[1]{$^{\mbox{\scriptsize #1}}$} % superscript in text (e.g. 1st)
+\newcommand{\sub}[1]{$_{\mbox{\scriptsize #1}}$} % subscript in text
+\newcommand{\sect}[1]{Section~\ref{#1}}
+\newcommand{\fig}[1]{Fig.~\ref{#1}}
+\newcommand{\tab}[1]{Table~\ref{#1}}
+\newcommand{\equ}[1]{(\ref{#1})}
+\newcommand{\appx}[1]{Appendix~\ref{#1}}
+
+
+
+%%%%%%%%%%%%%%%%%% REFERENCES SETUP %%%%%%%%%%%%%%%%%%
+
+% Setup your references here. Change the reference style here if wanted
+\usepackage[style=ieee,backend=biber,backref=true,hyperref=auto]{biblatex}
+% Note backref=true adds a page number (and hyperlink) to each reference so you can easily go back from the references to the main document. You may prefer backref=false if you need to stick strictly to a given reference style
+
+
+% Fixes which can't be applied in the .cls file
+\DefineBibliographyStrings{english}{backrefpage = {cited on p\adddot},  backrefpages = {cited on pp\adddot}}
+%  \renewcommand*{\bibfont}{\large}
+
+
+% Add more .bib files here if wanted
+\addbibresource{references.bib}
+
+
+
+%%%%%%%%%%%%%%%%%% START DOCUMENT %%%%%%%%%%%%%%%%%%
+
+% Don't edit these lines, title and author are automatically taken from the document meta-data defined above
+\begin{document}
+\makeatletter
+\title{\xmp@Title}
+\studentid{\xmp@Author}
+\makeatother
+
+% Set the below yourself
+\course{Mechatronics and Robotics Engineering}  % "Bachelor of Science in" is added automatically
+                                                   % Our courses are: Advanced Control and Systems Engineering, Advanced Control and Systems Engineering with Extended Research, Communications and Signal Processing, Communications and Signal Processing with Extended Research, Electrical Power Systems Engineering, Advanced Electrical Power Systems Engineering, Renewable Energy and Clean Technology, Renewable Energy and Clean Technology with Extended Research
+\submitdate{2025}                                  % regulations ask only for the year, not month
+\wordcount{1000}		                           % use \wordcount{} to set the count, \thewordcount to print in the text
+\maketitle
+
+
+%%%%%%%%%%%%%%%%%% LISTS OF CONTENT %%%%%%%%%%%%%%%%%%
+\uomtoc
+% other lists are not required, but can include \uomlof and \uomlot if really want to
+
+
+%%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
+\begin{abstract} % put abstract here. Limit is 1 page.
+
+  asdasdasd
+  \lipsum[1-2]
+\end{abstract}%
+\clearpage
+
+
+
+%%%%%%%%%%%%%%%%%% DECLARATIONS %%%%%%%%%%%%%%%%%%
+\uomdeclarations % Don't need unless final thesis
+
+
+
+%%%%%%%%%%%%%%%%%% ACKNOWLEDGEMENTS %%%%%%%%%%%%%%%%%%
+\begin{uomacknowledgements}
+No need to include, but can if want to.
+\end{uomacknowledgements}
+
+
+
+%%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
+\section{Introduction}
+
+  \subsection{Background and motivation}
+  \lipsum[1-2] \cite{ref:jCAS09,ref:jCAS09a,ref:jCAS10} \lipsum[3-5]
+  
+  \subsection{Aims and objectives}
+  \lipsum[6-7]. Below is an example table. See \tab{table:example_table} for more details.
+  \begin{table}
+    \centering
+    \caption{Example table.}
+    \label{table:example_table}
+    \begin{tabular}{ccccc}
+      \toprule
+      \multirow{2}{*}{Participant} & \multicolumn{2}{c}{Number / \%} & \multicolumn{2}{c}{Duration / \%} \\
+                                   & Prime dresses & Non-prime dresses & Prime dresses & Non-prime dresses \\
+	  \toprule
+      1  & 33.33 & 33.91 & 20.83 & 18.42 \\
+      2  & 13.04 & 17.50 & 04.93 & 07.62 \\
+      3  & 22.73 & 20.10 & 13.00 & 08.20 \\
+      4  & 31.34 & 21.88 & 10.57 & 11.09 \\
+      5  & 08.47 & 19.32 & 03.04 & 09.73 \\
+      \hline
+      Mean & 16.4 & 16.5 & 07.8 & 07.5 \\
+      Standard deviation & 09.7 & 06.6 & 05.4 & 03.3 \\
+      \bottomrule
+    \end{tabular}
+  \end{table}  
+  
+  This is an example equation. See \equ{equ:example} for info.
+  \begin{equation}
+      a^{2} + b^{2} = c^{2} \label{equ:example}
+  \end{equation}
+  
+  \subsection{Report structure}
+  \lipsum[8]
+
+
+%%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
+\section{Literature review} % edit section heading as appropriate
+    \subsection{Introduction}
+	\lipsum[1]
+	
+	\subsection{Detail}
+    \lipsum[1-2] \cite{ref:jCAS10,ref:jCAS09,ref:jCAS09a} \lipsum[3-5] This is an example figure. See \fig{fig:uom_logo} for more details. 
+	\begin{figure}
+      \centering
+      \includegraphics[width=0.3\textwidth]{uom_logo.pdf}
+      \caption{Example figure.}
+      \label{fig:uom_logo}
+    \end{figure} 
+    
+	\subsection{More detail}
+	\lipsum[1-2] \cite{ref:jCAS10,ref:jCAS09,ref:jCAS09a} \lipsum[3-5]
+	
+	\subsection{Summary}
+	\lipsum[1]
+
+
+%%%%%%%%%%%%%%%%%% SECTION 3 %%%%%%%%%%%%%%%%%%
+\section{Methods} % edit section heading as appropriate
+    \subsection{Introduction}
+	\lipsum[1]
+	
+	\subsection{Detail}
+    \lipsum[1-2] \cite{ref:jCAS10,ref:jCAS09,ref:jCAS09a} \lipsum[3-5] 
+    
+	\subsection{More detail}
+	\lipsum[1-2] \cite{ref:jCAS10,ref:jCAS09,ref:jCAS09a} \lipsum[3-5]
+	
+	\subsection{Summary}
+	\lipsum[1]  
+
+
+%%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
+\section{Results and discussion} % edit section heading as appropriate
+    \subsection{Introduction}
+	\lipsum[1]
+	
+	\subsection{Detail}
+    \lipsum[1-2] \cite{ref:jCAS10,ref:jCAS09,ref:jCAS09a} \lipsum[3-5]
+    
+	\subsection{More detail}
+	\lipsum[1-2] \cite{ref:jCAS10,ref:jCAS09,ref:jCAS09a} \lipsum[3-5]
+	
+	\subsection{Summary}
+	\lipsum[1]
+
+% Add more sections if necessary
+
+
+%%%%%%%%%%%%%%%%%% SECTION 5 %%%%%%%%%%%%%%%%%%
+\section{Conclusions and future work} % edit section heading as appropriate
+    \subsection{Conclusions}
+	\lipsum[1]
+	
+	\subsection{Future work}
+    \lipsum[1-2] \cite{ref:jCAS10,ref:jCAS09,ref:jCAS09a} \lipsum[3-5]
+
+
+
+%%%%%%%%%%%%%%%%%% REFERENCES %%%%%%%%%%%%%%%%%%
+%\clearpage % uncomment to start on a new page if wanted
+\printbibliography[title={References},heading=bibintoc] % a single list of references for the whole thesis
+
+
+
+%%%%%%%%%%%%%%%%%% APPENDICES %%%%%%%%%%%%%%%%%%
+\begin{uomappendix} 
+    \section{Project outline}
+    Project outline as submitted at the start of the project is a required appendix. Put here. 
+    
+    \section{Risk assessment}
+    Risk assessment is a required appendix. Put here.
+    
+    %\section{Other appendices as necessary}
+\end{uomappendix}
+
+
+%%%%%%%%%%%%%%%%%% END MATTER %%%%%%%%%%%%%%%%%%
+\end{document}
