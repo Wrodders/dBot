@@ -25,17 +25,17 @@ struct IMU{
     const float dt;         // Sample Period [s]
     // Low Pass IIR Filter 
     struct{
-        float aAccel;       // LFP Alpha 
-        float aGyro;        //    
-        struct vector_t accel;     // LPF output 
+        float alpha_accel;          // LFP Alpha 
+        float alpha_gyro;           //    
+        struct vector_t accel;      // LPF output 
         struct vector_t gyro;      //
     }lpf;
     struct{
-        float pitch, roll;
+        float pitch, roll;  // degreess
     }raw;
     // Complementary Filter
     struct{
-        const float a;
+        const float a; // Complementary Filter Alpha
         float pitch, roll;
     }comp;
     struct {
@@ -44,18 +44,18 @@ struct IMU{
         float pitch, roll;
     }kal;
 
-    float pitchMountOffset;
+    float pitchMountOffset; //degrees
     float rollMountOffset;
 }IMU; 
 
 static struct IMU imuInit(const float alphaAccel, const float alphaGyro, const float alphaComp, const float dt){
     struct IMU imu = {
         .dt = dt,
-        .lpf = {.aAccel = alphaAccel, .aGyro = alphaGyro},
+        .lpf = {.alpha_accel = alphaAccel, .alpha_gyro = alphaGyro},
         .comp = {.a = alphaComp},
         .kal = {
-            .rollK =  {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f},
-            .pitchK =  {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f}
+            .rollK =  {.Q_angle = IMU_KAL_Q, .Q_bias = IMU_Q_BIAS, .R_measure = IMU_KAL_R},
+            .pitchK =  {.Q_angle = IMU_KAL_Q, .Q_bias = IMU_Q_BIAS, .R_measure = IMU_KAL_R}
         }
     };
     return imu;
@@ -68,13 +68,13 @@ static void imuLinkSensor(struct IMU* imu, struct MPU6050* sensor){
 static void imuLPF(struct IMU* imu, const struct vector_t* accel, const struct vector_t* gyro){
     // first order IIR filter
     // y[n] = a * y[n-1] + (1-a) * x[n]
-    imu->lpf.accel.x = (imu->lpf.aAccel * imu->lpf.accel.x) + (1.0f - imu->lpf.aAccel) * accel->x;
-    imu->lpf.accel.y = (imu->lpf.aAccel * imu->lpf.accel.y) + (1.0f - imu->lpf.aAccel) * accel->y;
-    imu->lpf.accel.z = (imu->lpf.aAccel * imu->lpf.accel.z) + (1.0f - imu->lpf.aAccel) * accel->z;
+    imu->lpf.accel.x = (imu->lpf.alpha_accel * imu->lpf.accel.x) + (1.0f - imu->lpf.alpha_accel) * accel->x;
+    imu->lpf.accel.y = (imu->lpf.alpha_accel * imu->lpf.accel.y) + (1.0f - imu->lpf.alpha_accel) * accel->y;
+    imu->lpf.accel.z = (imu->lpf.alpha_accel * imu->lpf.accel.z) + (1.0f - imu->lpf.alpha_accel) * accel->z;
 
-    imu->lpf.gyro.x = (imu->lpf.aGyro * imu->lpf.gyro.x) + (1.0f - imu->lpf.aGyro) * gyro->x;
-    imu->lpf.gyro.y = (imu->lpf.aGyro * imu->lpf.gyro.y) + (1.0f - imu->lpf.aGyro) * gyro->y;
-    imu->lpf.gyro.z = (imu->lpf.aGyro * imu->lpf.gyro.z) + (1.0f - imu->lpf.aGyro) * gyro->z;
+    imu->lpf.gyro.x = (imu->lpf.alpha_gyro * imu->lpf.gyro.x) + (1.0f - imu->lpf.alpha_gyro) * gyro->x;
+    imu->lpf.gyro.y = (imu->lpf.alpha_gyro * imu->lpf.gyro.y) + (1.0f - imu->lpf.alpha_gyro) * gyro->y;
+    imu->lpf.gyro.z = (imu->lpf.alpha_gyro * imu->lpf.gyro.z) + (1.0f - imu->lpf.alpha_gyro) * gyro->z;
 }
 
 static void imuCalcRawAngle(struct IMU* imu){

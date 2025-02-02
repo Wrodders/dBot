@@ -6,32 +6,31 @@
 #include "../drivers/i2c.h"
 #include <math.h>
 
-// MPU6050 Config Registers
-#define MPU6050_ADDR 0x68 // MPU6050 I2C Address
-#define MPU6050_WHO_AM_I 0x75 // Returns address of device (0x68)
-#define MPU6050_PWR_MGMT_1 0x6B // Power management register
-#define MPU6050_PWR_MGMT_2 0x6C // Power management register
-#define MPU6050_CONFIG 0x1A // Configuration register
-#define MPU6050_GYRO_CONFIG 0x1B // Gyro config register
-#define MPU6050_ACCEL_CONFIG 0x1C // Accel config register
-#define SMPLRT_DIV 0x19 // Sample rate divider register
+// MPU6050 Config Registers Inversense MPU6050
+#define MPU6050_ADDR            0x68 // MPU6050 I2C Address
+#define MPU6050_WHO_AM_I        0x75 // Returns address of device (0x68)
+#define MPU6050_PWR_MGMT_1      0x6B // Power management register
+#define MPU6050_PWR_MGMT_2      0x6C // Power management register
+#define MPU6050_CONFIG          0x1A // Configuration register
+#define MPU6050_GYRO_CONFIG     0x1B // Gyro config register
+#define MPU6050_ACCEL_CONFIG    0x1C // Accel config register
+#define SMPLRT_DIV              0x19 // Sample rate divider register
 
 // MPU6050 Data Registers
-#define MPU6050_ACCEL_XOUT_H 0x3B // Accel X axis high byte
-#define MPU6050_ACCEL_YOUT_H 0x3D // Accel Y axis high byte
-#define MPU6050_ACCEL_ZOUT_H 0x3F // Accel Z axis high byte
-#define MPU6050_TEMP_OUT_H 0x41 // Temperature high byte
-#define MPU6050_GYRO_XOUT_H 0x43 // Gyro X axis high byte
+#define MPU6050_ACCEL_XOUT_H    0x3B // Accel X axis high byte
+#define MPU6050_ACCEL_YOUT_H    0x3D // Accel Y axis high byte
+#define MPU6050_ACCEL_ZOUT_H    0x3F // Accel Z axis high byte
+#define MPU6050_TEMP_OUT_H      0x41 // Temperature high byte
+#define MPU6050_GYRO_XOUT_H     0x43 // Gyro X axis high byte
 
 // MPU6050 Functions
-
 struct IMUCalib{
     struct vector_t accel;
     struct vector_t gyro;
 }IMUCalib;
 
 struct MPU6050{
-    uint32_t i2c; //STM32 I2C Device handler
+    uint32_t perif; //STM32 I2C Device handler
     bool initalized;
     uint8_t data; // read data byte
     struct IMUCalib offset; // Calibration offset
@@ -78,7 +77,7 @@ static void gyroCalib(struct MPU6050 *sensor, int samples){
     // Take samples
     for(int i = 0; i < samples; i++){
         // Read raw data
-        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_GYRO_XOUT_H, rawData, 6); 
+        i2cReadSeq(sensor->perif, MPU6050_ADDR, MPU6050_GYRO_XOUT_H, rawData, 6); 
         // convert to 16 bit signed integers
         gyroRaw[0] = (int16_t)((rawData[0] << 8) | rawData[1]); // Gyro X
         gyroRaw[1] = (int16_t)((rawData[2] << 8) | rawData[3]); // Gyro Y
@@ -111,7 +110,7 @@ static void accelCalib(struct MPU6050 *sensor, int samples){
     delay(1000);
     for(int i = 0; i< samples; i++){
         // Read raw data
-        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 2);
+        i2cReadSeq(sensor->perif, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 2);
         // convert to 16 bit signed integers
         accelRaw[0] = (int16_t)((rawData[0] << 8) | rawData[1]); // Accel X
         // Add to offset
@@ -123,7 +122,7 @@ static void accelCalib(struct MPU6050 *sensor, int samples){
 
     for(int i = 0; i < samples ; i++){
         // Read raw data
-        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_YOUT_H, rawData, 2);
+        i2cReadSeq(sensor->perif, MPU6050_ADDR, MPU6050_ACCEL_YOUT_H, rawData, 2);
         // convert to 16 bit signed integers
         accelRaw[1] = (int16_t)((rawData[0] << 8) | rawData[1]); // Accel Y
         // Add to offset
@@ -134,7 +133,7 @@ static void accelCalib(struct MPU6050 *sensor, int samples){
     delay(1000);
     for(int i = 0; i < samples; i++){
         // Read raw data
-        i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_ZOUT_H, rawData, 2);
+        i2cReadSeq(sensor->perif, MPU6050_ADDR, MPU6050_ACCEL_ZOUT_H, rawData, 2);
         // convert to 16 bit signed integers
         accelRaw[2] = (int16_t)((rawData[0] << 8) | rawData[1]); // Accel Z
         // Add to offset
@@ -153,28 +152,25 @@ static void accelCalib(struct MPU6050 *sensor, int samples){
 static struct MPU6050 mpu6050Init(uint32_t perif){
     // Initialize MPU6050 Sensor
     struct MPU6050 sensor;
-    sensor.i2c = perif;
+    sensor.perif = perif;
     delay(100);
-    mpu6505Reset(sensor.i2c);
-   
-
-    mpu6050Wake(sensor.i2c);
+    mpu6505Reset(sensor.perif);
+    mpu6050Wake(sensor.perif);
     // Set Config Registers
     // Read WHO_AM_I register
-    uint8_t data = i2cReadReg(sensor.i2c, MPU6050_ADDR, MPU6050_WHO_AM_I);
+    uint8_t data = i2cReadReg(sensor.perif, MPU6050_ADDR, MPU6050_WHO_AM_I);
     if (data != MPU6050_ADDR){
         delay(100); // debug
         sensor.initalized = false;
         sensor.data = data;
-        //return sensor;
     }
-    mpu6050Config(sensor.i2c);
-    mpu6050Wake(sensor.i2c);
+    mpu6050Config(sensor.perif);
+    mpu6050Wake(sensor.perif);
     gyroCalib(&sensor, 100);
     //accelCalib(sensor, 100);
-    sensor.offset.accel.x = 0.036453f;
-    sensor.offset.accel.y = -0.0021066f;
-    sensor.offset.accel.z = 0.133658f;
+    sensor.offset.accel.x = IMU_A_XOFFSET;      // Pre Computed Calibration Offset
+    sensor.offset.accel.y = IMU_A_YOFFSET;        
+    sensor.offset.accel.z = IMU_A_ZOFFSET;
 
     sensor.initalized = true;
 
@@ -187,9 +183,9 @@ static void mpu6050Read(struct MPU6050 *sensor){
     // Apply Offsets
     // Data stored in SI Units
 
-    uint8_t rawData[14]; // 14 bytes of data
-    // Read raw data
-    i2cReadSeq(sensor->i2c, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 14);
+    uint8_t rawData[14];
+    // Read raw data 14 bytes
+    i2cReadSeq(sensor->perif, MPU6050_ADDR, MPU6050_ACCEL_XOUT_H, rawData, 14);
 
     int16_t accelRaw[3]; // 3 axes of accel data
     int16_t gyroRaw[3]; // 3 axes of gyro data
@@ -203,10 +199,10 @@ static void mpu6050Read(struct MPU6050 *sensor){
     gyroRaw[2] = (int16_t)((rawData[12] << 8) | rawData[13]); // Gyro Z
 
     // Convert to SI units
-    sensor->accel.x = (float)accelRaw[0] / 4096.0f;
+    sensor->accel.x = (float)accelRaw[0] / 4096.0f; // Taken from datasheet
     sensor->accel.y = (float)accelRaw[1] / 4096.0f;
     sensor->accel.z = (float)accelRaw[2] / 4096.0f;
-    sensor->gyro.x = (float)gyroRaw[0] / 65.5f;
+    sensor->gyro.x = (float)gyroRaw[0] / 65.5f; // Taken from datasheet
     sensor->gyro.y = (float)gyroRaw[1] / 65.5f;
     sensor->gyro.z = (float)gyroRaw[2] / 65.5f; 
 

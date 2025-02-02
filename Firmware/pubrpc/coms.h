@@ -11,20 +11,6 @@
 
 *****************************************************************/
 
-
-struct CmdFrame{
-    size_t bufSize; // current size of msg buffer
-    uint8_t cmdID; // Command Type identifier
-    uint8_t id;  // Register id for map  
-    uint8_t buf[MAX_MSG_FRAME_SIZE]; 
-}CmdFrame; 
-
-struct TopicFrame{
-    size_t bufSize; // current size of msg buffer
-    uint8_t id;  // Register id for map  
-    uint8_t buf[MAX_MSG_FRAME_SIZE];
-}TopicFrame;
-
 struct Topic {
     enum  Publishers id;     // Topic Register ID
     const char* format;      // Topic Register Format

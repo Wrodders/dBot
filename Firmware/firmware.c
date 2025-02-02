@@ -10,19 +10,22 @@
 #include "inc/motor.h"
 
 #include "inc/ddmr.h"
-#include "drivers/analog.h"
+
+
 
 
 // ********** GLOBAL STATIC BUFFERS ***************************************// ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[128] = {0};
 uint8_t tx1_buf_[256] = {0};
 float uuid = 3.14159;
-// ********** MOTOR CONTROL FUNCTIONS ***************************************//
+// ********** CASCADED PID FUNCTIONS ***************************************//
+//@Brief: Motor Speed Control Loop
 static void runMotorSpeedLoop(struct Motor *m){
     motorEstSpeed(m);
     m->speedCtrl.out = pidRun(&m->speedCtrl, m->shaftRPS);
     motorSetVoltage(m, m->speedCtrl.out);
 }
+//@Brief: Balance Angle Control Loop
 static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, struct IMU *imu, 
                     struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
     ddmrEstimateOdom(ddmr, motorL, motorR);
@@ -31,6 +34,7 @@ static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, 
     motorSetTrgtSpeed(motorL, (balanceAngleCtrl->out + steerCtrl->out)); // Apply Steering Correction
     motorSetTrgtSpeed(motorR, (balanceAngleCtrl->out - steerCtrl->out)); // Apply Steering Correction
 }
+//@Brief: Differential Drive Velocity Control Loop
 static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PID *balanceAngleCtrl, 
                             struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
     // Twist Velocity Control Loop
@@ -39,13 +43,15 @@ static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PI
     steerCtrl->out = pidRun(steerCtrl,ddmr->angularVel); // Reference - odometry angular velocity
     pidSetRef(balanceAngleCtrl, BAL_OFFSET-velCtrl->out); // Sets Balance Reference point to reach desired velocity
 }
-// ******************************************************************************************************************** //
+// ********** LQR FUNCTIONS ***************************************//
+
+
 
 // ********* SUPER LOOP **************** // 
 int main(void){
      float nextMode = 0;
 	// ***************************** HARDWARE SETUP ******************************************************** //
-	clock_setup();      // Main System external XTAL 25MHz Init Peripheral Clocks
+	systemClockSetup();      // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup();    // 1ms Tick
 	struct GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
 
@@ -59,10 +65,8 @@ int main(void){
     // IMU 
     i2cInit(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
     struct MPU6050 mpu6050 = mpu6050Init(IMU_PERIF);
-
     struct IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (IMU_PERIOD * MS_TO_S));
     imuLinkSensor(&imu, &mpu6050);
-   
     // MOTORS 
     struct Encoder encR = encoderInit(ENC_2_TIM, UINT16_MAX, ENC_2_A, ENC_1_PORT, ENC_2_B, ENC_2_PORT, ENC_2_AF);
     struct Encoder encL = encoderInit(ENC_1_TIM, UINT16_MAX, ENC_1_A, ENC_2_PORT, ENC_1_B, ENC_1_PORT, ENC_1_AF);
@@ -83,9 +87,8 @@ int main(void){
     struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
    
-   // ****************************** TELEMETRY STATE******************************************************** //
-    struct TWSBState twsbState = {
-        .pitch = &imu.kal.pitch, .roll = &imu.kal.roll,
+   // ****************************** TELEMETRY ACCESS STRUCTURES ******************************************************** //
+    struct TWSB_State twsbState = {
         .leftShaftRPS = &motorL.shaftRPS, .rightShaftRPS = &motorR.shaftRPS,
         .leftWheelTargetRPS = &motorL.speedCtrl.ref, 
         .rightWheelTargetRPS = &motorR.speedCtrl.ref,
@@ -94,14 +97,20 @@ int main(void){
         .linearVelocity = &ddmr.linearVel, .targetLinVel = &velCtrl.ref, .balanceAngle = &balanceAngleCtrl.ref,
         .angularVelocity = &ddmr.angularVel, .targetAngularVel = &steerCtrl.ref, .steerDiff = &steerCtrl.out
     };
+    struct TWSB_Imu twsbImu = {
+        .pitch = &imu.kal.pitch, .roll = &imu.kal.roll,
+        .accX = &imu.lpf.accel.x, .accY = &imu.lpf.accel.y, .accZ = &imu.lpf.accel.z,
+        .gyroX = &imu.lpf.gyro.x, .gyroY = &imu.lpf.gyro.y, .gyroZ = &imu.lpf.gyro.z
+    };
     // ***************************** COMMUNICATIONS ******************************************************** // 
     struct Coms coms = comsInit();
     // -------------------- TOPIC PUBLISHERS ---------------------- //
-    comsRegisterPub(&coms, PUB_CMD_RET, SERIALIZED_CMDRET_FMT);
-    comsRegisterPub(&coms, PUB_ERROR, SERIALIZED_ERROR_FMT);
-    comsRegisterPub(&coms, PUB_INFO, SERIALIZED_INFO_FMT);
-    comsRegisterPub(&coms, PUB_DEBUG, SERIALIZED_DEBUG_FMT);
-    comsRegisterPub(&coms, PUB_STATE, SERIALIZED_STATE_FMT);
+    comsRegisterPub(&coms, PUB_CMD_RET, SERIALIZED_CMDRET_FTM);
+    comsRegisterPub(&coms, PUB_ERROR,   SERIALIZED_ERROR_FMT);
+    comsRegisterPub(&coms, PUB_INFO,    SERIALIZED_INFO_FMT);
+    comsRegisterPub(&coms, PUB_DEBUG,   SERIALIZED_DEBUG_FMT);
+    comsRegisterPub(&coms, PUB_STATE,   SERIALIZED_STATE_FMT);
+    comsRegisterPub(&coms, PUB_IMU,     SERIALIZED_IMU_FMT);
     // --------------------PARAMETER REGISTERS ---------------------- //
     comsRegisterParam(&coms, P_ID,      "%0.3f", &uuid);
     comsRegisterParam(&coms, P_MODE,    "%0.3f", &nextMode);
@@ -130,6 +139,15 @@ int main(void){
     comsRegisterParam(&coms, P_AKI,     "%0.3f", &steerCtrl.ki);
     comsRegisterParam(&coms, P_AKD,     "%0.3f", &steerCtrl.kd);
     comsRegisterParam(&coms, P_AALPHA,  "%0.3f", &ddmr.angularVelAlpha);
+    // - IMU Parameters
+    comsRegisterParam(&coms, P_IMU_AA,  "%0.3f", &imu.lpf.alpha_accel);
+    comsRegisterParam(&coms, P_IMU_GA,  "%0.3f", &imu.lpf.alpha_gyro);
+    comsRegisterParam(&coms, P_IMU_KQ,  "%0.3f", &imu.kal.pitchK.Q_angle);
+    comsRegisterParam(&coms, P_IMU_KQB, "%0.3f", &imu.kal.pitchK.Q_bias);
+    comsRegisterParam(&coms, P_IMU_KR,  "%0.3f", &imu.kal.pitchK.R_measure);
+    comsRegisterParam(&coms, P_IMU_A_XOFFSET,  "%0.3f", &imu.sensor->offset.accel.x);
+    comsRegisterParam(&coms, P_IMU_A_YOFFSET, "%0.3f", &imu.sensor->offset.accel.y);
+    comsRegisterParam(&coms, P_IMU_A_ZOFFSET, "%0.3f", &imu.sensor->offset.accel.z);
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
     // ***** Application Tasks **************************************************************************** // 
@@ -141,23 +159,23 @@ int main(void){
     struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);            // Velocity Control Loop
 
     // ****** Loop Parameters **************************************************************************** // 
-    enum MODE {INIT = 0,PARK, CASCADE, LQR, TUNE_MOTOR} mode = INIT;
+    enum MODE {INIT = 0,PARK, CASCADE, LQR, TUNE_MOTOR, FW_UPDATE} mode;
+    nextMode = INIT;
     uint16_t loopTick = 0;
 	for(;;){
-        loopTick = get_ticks();
+        loopTick = sysGetMillis();
         mode = nextMode;
         switch (mode){
             case INIT: // Initialize System 
                 // State Transition
-                if(get_ticks() >= 3000){ // 3s Delay
+                if(sysGetMillis() >= 3000){ // 3s Delay
                     systick_clear();
                     pidClear(&velCtrl);
                     pidClear(&balanceAngleCtrl);
                     pidClear(&steerCtrl);
                     motorDisable(&motorL);
                     motorDisable(&motorR);
-                   
-                    nextMode = PARK;
+                    nextMode = FW_UPDATE;
                     comsSendMsg(&coms, &ser1, PUB_INFO, "INIT => PARK ");
                 }
                 break;
@@ -200,7 +218,6 @@ int main(void){
                 }
                 break;
             case LQR:
-                
                 break;
 
             case TUNE_MOTOR:
@@ -211,35 +228,57 @@ int main(void){
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 break;
+            case FW_UPDATE:
+                // Disable Motors, 
+                motorDisable(&motorL);
+                motorDisable(&motorR);
+                // Disable Peripherals
+
+
+                // Set GPIO Values High Z
+                gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
+                gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
+                gpio_mode_setup(GPIOC, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
+                
+                systemReflash();
+
+
+                break;
             default:
                 break;  
         };
-        // ********* FIXED TIME TASKS ******************************************************************* // 
-        if(CHECK_PERIOD(blinkTask, loopTick)){
-            gpio_toggle(led.port, led.pin);
-            blinkTask.lastTick = loopTick;  
-        }
+        // ********** IMU ********************************************************************************* //
         if(CHECK_PERIOD(imuTask, loopTick)){
             mpu6050Read(&mpu6050);
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro);
             imuKalUpdate(&imu);
-
-
             imuTask.lastTick = loopTick;
         }
         // ********** Communications ********************************************************************** //
         if(CHECK_PERIOD(comsTask, loopTick)){
             // TX Publishing Topic
-            comsSendMsg(&coms, &ser1, PUB_STATE, imu.kal.pitch,     imu.kal.roll,    
-                                                motorL.shaftRPS,    motorL.speedCtrl.ref,  motorL.speedCtrl.out, 
-                                                motorR.shaftRPS,    motorR.speedCtrl.ref,  motorR.speedCtrl.out,  
-                                                ddmr.linearVel,     velCtrl.ref,           balanceAngleCtrl.ref,
-                                                ddmr.angularVel,    steerCtrl.ref,         steerCtrl.out);             
+            /*
+            comsSendMsg(&coms, &ser1, PUB_IMU,  &twsbImu.pitch,     &twsbImu.roll, 
+                                                &twsbImu.accX,      &twsbImu.accY,  &twsbImu.accZ,
+                                                &twsbImu.gyroX,     &twsbImu.gyroY, &twsbImu.gyroZ);
+            
+            */
+            /*
+            comsSendMsg(&coms, &ser1, PUB_STATE, &twsbState.leftShaftRPS,       &twsbState.leftWheelTargetRPS,  &twsbState.voltageLeft,
+                                                 &twsbState.rightShaftRPS,      &twsbState.rightWheelTargetRPS, &twsbState.voltageRight,
+                                                 &twsbState.linearVelocity,     &twsbState.targetLinVel,        &twsbState.balanceAngle,
+                                                 &twsbState.angularVelocity,    &twsbState.targetAngularVel,    &twsbState.steerDiff);
+            */
             // Handle RX Messages 
             if(comsGrabCmdMsg(&coms, &ser1)){
                 comsProcessCmdMsg(&coms, &ser1);
             }
             comsTask.lastTick = loopTick;
+        }
+        // ********* DEBUG LED ******************************************************************* // 
+        if(CHECK_PERIOD(blinkTask, loopTick)){
+            gpio_toggle(led.port, led.pin);
+            blinkTask.lastTick = loopTick;  
         }
     }
 }

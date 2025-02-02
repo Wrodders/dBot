@@ -8,7 +8,7 @@
 // ********* PERIPHERAL DEFINITIONS ************************ //
 #include "pinnmap.h"
 // ********* COMMON LIBRARIES ****************************** //
-#include "../drivers/clock.h"
+#include "../drivers/system.h"
 #include "../../modules/cutils/ringbuffer.h"
 #include "../../modules/cutils/utils.h"
 #include "../../modules/cUtils/printf.h"
@@ -21,7 +21,7 @@
 #endif
 // ************* Task Execution Periods ******************** // 
 #define COMS_PERIOD            50  // ms
-#define BLINK_PERIOD           100 // ms
+#define BLINK_PERIOD           10 // ms
 #define IMU_PERIOD             2
 #define WSPEED_CNTRL_PERIOD    5 
 #define BAL_CNTRL_PERIOD       10  
@@ -44,16 +44,22 @@ const float MS_TO_S         = 0.001f; // s
 const float S_TO_MS         = 1000;   // ms
 const float TICKS_TO_RPS    = (float)(1/(MOTOR_CPR * (WSPEED_CNTRL_PERIOD * MS_TO_S)));
 const float MPS_TO_RPS      = (float) 1/(WHEEL_RADIUS*2*M_PI);
-const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS;
+const float RPS_TO_MPS      = (float) 2*M_PI*WHEEL_RADIUS; 
 const float RAD_TO_DEG      = (float)(180.0f / M_PI); 
 const float RPS_TO_RADS     = (float)(2*M_PI);      
 const float RPS_MAX         = 10.00f;               // rotations per second
 const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 // *********** Initial Default Parameters ********************************** //
 // IMU Pre-Filtering
-#define IMU_A_ACCEL 0.5f
-#define IMU_A_GYRO  0.01f
-#define IMU_A_COMP  0.05f
+#define IMU_A_ACCEL     0.5f
+#define IMU_A_GYRO      0.01f
+#define IMU_A_COMP      0.05f
+#define IMU_KAL_Q       0.001f
+#define IMU_KAL_R       0.03f
+#define IMU_Q_BIAS      0.003f
+#define IMU_A_XOFFSET   0.036453f
+#define IMU_A_YOFFSET   -0.0021066f
+#define IMU_A_ZOFFSET   0.133658f
 // Motor Speed Control
 #define SPEED_KP    2.0f
 #define SPEED_KI    12.0f
@@ -77,4 +83,6 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 #define STEER_ALPHA 1.0
 // *********** GLOBAL VARIABLES ******************************************** //
 static float vbat_val_ = VSYS;     
+
+
 #endif // COMMON_h

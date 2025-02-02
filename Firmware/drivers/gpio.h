@@ -18,4 +18,5 @@ static struct GPIO initGPIO( uint32_t pin, uint32_t port, uint32_t mode, uint32_
 	return p;
 }
 
+
 #endif // GPIO_H

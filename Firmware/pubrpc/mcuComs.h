@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-
 /* PUB_RPC Communication MCU Application Definitions ***************
 Protocol Frame Structure(s)
           |-----------Packet----------|
@@ -16,7 +15,6 @@ Protocol Frame Structure(s)
  Transmit | SOF | Pub ID | DATA | EOF | 
         | | 1   | 1      | .... | 1   |     
 ********* |-----+--------+------+-----|
-
 
 This Is the Application Layer of the PUB-SUB RPC Communication Interface
 Defines the Protocol Frame Structure and Application Specific Commands
@@ -34,6 +32,9 @@ Defines the Application Specific Topics and Parameters
 #define PROT_CMD_IDX 0  // Command position in Frame
 #define PROT_ID_IDX 1   // ID position in Frame
 
+#define ID_ASCII_OFFSET 'A' // ASCII 'A' == 65 This is needed to avoid non-printable characters
+                            // Allows for IDs [A, Z] + [a,z] = 52 unique IDs
+
 struct Protocol {
     const char sof_byte;
     const char eof_byte;
@@ -42,6 +43,19 @@ struct Protocol {
     const size_t max_msg_frame_size;
 }; // ASCII  Protocol 
 
+struct CmdFrame{
+    size_t bufSize; // current size of msg buffer
+    uint8_t cmdID; // Command Type identifier
+    uint8_t id;  // Register id for map  
+    uint8_t buf[MAX_MSG_FRAME_SIZE]; 
+}CmdFrame; 
+
+struct TopicFrame{
+    size_t bufSize; // current size of msg buffer
+    uint8_t id;  // Register id for map  
+    uint8_t buf[MAX_MSG_FRAME_SIZE];
+}TopicFrame;
+
 enum Commands{
     CMD_GET = 0, // Get Parameter Value
     CMD_SET,     // Set Parameter Value
@@ -49,6 +63,35 @@ enum Commands{
     NUM_CMDS
 }; // Command Type 
 
+static inline  char  comsEncodeID_(uint8_t id){return id + 'A';}
+static inline  char  comsDecodeID_(char id){return id - 'A';}
+
+//                                ±  100  .  999   /0            
+#define MAX_SERIALIZED_FLOAT_SIZE (1 + 3 + 1 + 3 + 1)
+
+#define SERIALIZED_IMU_FMT    "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
+#define SERIALIZED_STATE_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
+#define SERIALIZED_ERROR_FMT  "%s"
+#define SERIALIZED_INFO_FMT   "%s"
+#define SERIALIZED_DEBUG_FMT  "%s"
+#define SERIALIZED_CMDRET_FTM "%s"
+
+struct TWSB_State{
+    float *leftShaftRPS,        *rightShaftRPS;
+    float *leftWheelTargetRPS,  *rightWheelTargetRPS;
+    float *voltageLeft,         *voltageRight;
+
+    float *linearVelocity,      *targetLinVel,      *balanceAngle;
+    float *angularVelocity,     *targetAngularVel,  *steerDiff;
+}; // State data publish structure
+
+struct TWSB_Imu{
+    float *pitch, *roll;
+    float *gyroX, *gyroY, *gyroZ;
+    float *accX, *accY, *accZ;
+}; // Imu data publish structure
+
+// *********** Parameters **************************** //
 
 #define PARAM_REGISTERS(X)                            \
     X(0,  P_ID,      "P_ID")                          \
@@ -76,8 +119,17 @@ enum Commands{
     X(19, P_AKI,     "P_AKI")                         \
     X(20, P_AKD,     "P_AKD")                         \
     X(21, P_AALPHA,  "P_AALPHA")                      \
-    X(22, NUM_PARAMS,"NUM_PARAMS")                    \
-
+    /* IMU */                                         \
+    X(22, P_IMU_AA, "P_IMU_AALPHA")                   \
+    X(23, P_IMU_GA, "P_IMU_GALPHA")                   \
+    X(24, P_IMU_KQ, "P_IMU_KAL_Q")                    \
+    X(25, P_IMU_KR, "P_IMU_KAL_R")                    \
+    X(26, P_IMU_KQB, "P_IMU_KAL_QB")                  \
+    X(27, P_IMU_A_XOFFSET, "P_IMU_A_XOFFSET")         \
+    X(28, P_IMU_A_YOFFSET, "P_IMU_A_YOFFSET")         \
+    X(29, P_IMU_A_ZOFFSET, "P_IMU_A_ZOFFSET")         \
+    X(30, NUM_PARAMS,   "NUM_PARAMS")                 \
+  
 #define PARAM_ENUM(ID, NAME, MSG) NAME = ID,
 #define PARAM_STRING(ID, NAME, MSG) case NAME: return MSG;
 
@@ -91,6 +143,8 @@ static const char* paramRegisterString(enum ParamRegisters param) {
         default: return "UNKNOWN PARAM";
     }
 }
+
+// *********** REMOTE PROCEDURES **************************** //
 
 #define REMOTE_PROCEDURES(X)                            \
     X(0,    RUN_RESET,      "RESET")                    \
@@ -111,13 +165,15 @@ static const char* remoteProcedureString(enum RemoteProcedures rpc){
     }
 }
 
-#define PUBLISHERS(X)                                   \
-    X(0,    PUB_CMD_RET,    "CMD_RET")                  \
-    X(1,    PUB_ERROR,      "ERROR")                    \
-    X(2,    PUB_INFO,       "INFO")                     \
-    X(3,    PUB_DEBUG,      "DEBUG")                    \
-    X(4,    PUB_STATE,      "STATE")                    \
-    X(5,    NUM_PUBS,       "NUM_PUBS")                 \
+// *********** PUBLISHERS **************************** //
+#define PUBLISHERS(X)                       \
+    X(0,    PUB_CMD_RET,    "CMD_RET")      \
+    X(1,    PUB_ERROR,      "ERROR")        \
+    X(2,    PUB_INFO,       "INFO")         \
+    X(3,    PUB_DEBUG,      "DEBUG")        \
+    X(4,    PUB_STATE,      "STATE")        \
+    X(5,    PUB_IMU,        "IMU")          \
+    X(6,    NUM_PUBS,       "NUM_PUBS")     \
 
 #define PUBLISHER_ENUM(ID, NAME, MSG) NAME = ID,
 #define PUBLISHER_STRING(ID, NAME, MSG) case NAME: return MSG;
@@ -133,58 +189,41 @@ static const char* publisherString(enum Publishers pub){
     }
 }
 
-#define STATE_VARS(X)                                   \
-    X(0,    T_PITCH,              "PITCH")              \
-    X(1,    T_ROLL,               "ROLL")               \
-    X(2,    T_LEFT_SHAFTS_RPS,    "LEFT_SHAFT_RPS")     \
-    X(3,    T_RIGHT_SHAFTS_RPS,   "RIGHT_SHAFT_RPS")    \
-    X(4,    T_LEFT_WHEEL_TRGT,    "LEFT_WHEEL_TRGT")    \
-    X(5,    T_RIGHT_WHEEL_TRGT,   "RIGHT_WHEEL_TRGT")   \
-    X(6,    T_LEFT_VOLTAGE,       "LEFT_VOLTAGE")       \
-    X(7,    T_RIGHT_VOLTAGE,      "RIGHT_VOLTAGE")      \
-    X(8,    T_LINEAR_VEL,         "LINEAR_VEL")         \
-    X(9,    T_LIN_VEL_TRGT,       "LIN_VEL_TRGT")       \
-    X(10,   T_BALANCE_ANGLE,      "BALANCE_ANGLE")      \
-    X(11,   T_ANGULAR_VEL,        "ANGULAR_VEL")        \
-    X(12,   T_ANG_VEL_TRGT,       "ANG_VEL_TRGT")       \
-    X(13,   T_STEER_DIFF,         "STEER_DIFF")         \
-    X(14,   T_NUM_VARS,           "NUM_VARS")           \
+// TELEMETRY ARGUMENTS SERIALIZATION HELPERS
+#define TELEMETRY_VARS(X)                              \
+    X(1,   T_PITCH,                "PITCH")            \
+    X(2,   T_ROLL,                 "ROLL")             \
+    X(3,   T_ACCEL_X,              "ACCEL_X")          \
+    X(4,   T_ACCEL_Y,              "ACCEL_Y")          \
+    X(5,   T_ACCEL_Z,              "ACCEL_Z")          \
+    X(6,   T_GYRO_X,              "GYRO_X")            \
+    X(7,   T_GYRO_Y,              "GYRO_Y")            \
+    X(8,   T_GYRO_Z,              "GYRO_Z")            \
+    X(9,   T_LEFT_SHAFTS_RPS,    "LEFT_SHAFT_RPS")     \
+    X(10,  T_LEFT_WHEEL_TRGT,    "LEFT_WHEEL_TRGT")    \
+    X(11,  T_LEFT_VOLTAGE,       "LEFT_VOLTAGE")       \
+    X(12,  T_RIGHT_SHAFTS_RPS,   "RIGHT_SHAFT_RPS")    \
+    X(13,  T_RIGHT_WHEEL_TRGT,   "RIGHT_WHEEL_TRGT")   \
+    X(14,  T_RIGHT_VOLTAGE,      "RIGHT_VOLTAGE")      \
+    X(15,  T_LINEAR_VEL,         "LINEAR_VEL")         \
+    X(16,  T_LIN_VEL_TRGT,       "LIN_VEL_TRGT")       \
+    X(17,  T_BALANCE_ANGLE,      "BALANCE_ANGLE")      \
+    X(18,  T_ANGULAR_VEL,        "ANGULAR_VEL")        \
+    X(19,  T_ANG_VEL_TRGT,       "ANG_VEL_TRGT")       \
+    X(20,  T_STEER_DIFF,         "STEER_DIFF")         \
+    X(21,  T_NUM_SATE_VARS,      "NUM__STATE_VARS")    \
 
+#define TELEMETRY_ENUM(ID, NAME, MSG) NAME = ID,
+#define TELEMETRY_STRING(ID, NAME, MSG) case NAME: return MSG;
 
-#define STATE_ENUM(ID, NAME, MSG) NAME = ID,
-#define STATE_STRING(ID, NAME, MSG) case NAME: return MSG;
-
-enum StateVars{
-    STATE_VARS(STATE_ENUM)
+enum TelemetryVars{
+    TELEMETRY_VARS(TELEMETRY_ENUM)
 };
 
-static const char* stateVarString(enum StateVars var){
+static const char* telemetryVarString(enum TelemetryVars var){
     switch(var){
-        STATE_VARS(STATE_STRING)
-        default: return "UNKNOWN STATE VAR";
+        TELEMETRY_VARS(TELEMETRY_STRING)
+        default: return "UNKNOWN TELEMETRY VAR";
     }
 }
-
-static inline  char  comsEncodeID_(uint8_t id){return id + 'a';}
-static inline  char  comsDecodeID_(char id){return id - 'a';}
-
-//                                ±  100  .  999   /0            
-#define MAX_SERIALIZED_FLOAT_SIZE (1 + 3 + 1 + 3 + 1)
-
-#define SERIALIZED_STATE_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
-#define SERIALIZED_ERROR_FMT  "%s"
-#define SERIALIZED_INFO_FMT   "%s"
-#define SERIALIZED_DEBUG_FMT  "%s"
-#define SERIALIZED_CMDRET_FMT "%s"
-
-struct TWSBState{
-    float *pitch, *roll;
-
-    float *leftShaftRPS,        *rightShaftRPS;
-    float *leftWheelTargetRPS,  *rightWheelTargetRPS;
-    float *voltageLeft,         *voltageRight;
-
-    float *linearVelocity,      *targetLinVel,      *balanceAngle;
-    float *angularVelocity,     *targetAngularVel,  *steerDiff;
-};
 #endif // MCU_COMS_H

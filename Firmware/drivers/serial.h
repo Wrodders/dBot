@@ -160,7 +160,6 @@ static struct Serial serialInit(uint32_t perif, uint32_t port, uint32_t rxPin, u
     return ser;    
 }
 
-
 static void serialConfig(struct Serial *ser, uint32_t baud, uint8_t databits, uint8_t stopBits, 
                         uint32_t parity, uint32_t flowcontroll ){
     //@Brief: Configures USART Parameters
@@ -191,7 +190,6 @@ static void serialConfig(struct Serial *ser, uint32_t baud, uint8_t databits, ui
         default:
             break;
     }   
-
     usart_enable(usart);
 }
 

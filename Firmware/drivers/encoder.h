@@ -1,7 +1,5 @@
 #ifndef ENCODER_H
 #define ENCODEr_H
-
-
 #include "../common/common.h"
 #include <libopencm3/stm32/timer.h>
 #include "gpio.h"
@@ -17,7 +15,7 @@ struct Encoder {
     uint32_t lastCount; // encoder count
 }Encoder;
 
- static struct Encoder encoderInit(uint32_t timPerif,  uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
+static struct Encoder encoderInit(uint32_t timPerif,  uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
     struct Encoder e;
     // Store the timer peripheral in the encoder structure
     e.timPerif = timPerif;
@@ -42,6 +40,7 @@ struct Encoder {
 
     return e;
 }
+
 
 static inline uint32_t encoderRead(struct Encoder *enc){
     return timer_get_counter(enc->timPerif);

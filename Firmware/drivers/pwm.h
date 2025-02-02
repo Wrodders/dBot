@@ -13,6 +13,9 @@ static void pwmInit(uint32_t timPerif, uint32_t prescaler, uint32_t freq){
     uint32_t period = (rcc_ahb_frequency) /freq;
     timer_set_period(timPerif, period - 1); 
 }
+
+
+
 static void pwmConfig(uint32_t timPerif, enum tim_oc_id timCH, 
                             uint32_t gpioPort, uint32_t gpioPin, uint32_t gpioAF){
     //@Brief: Set Up GPIO and Output Compare for PWM
