@@ -34,6 +34,8 @@
 
 #define DRV_EN_PIN      GPIO4   // DRV8833 Enable PIN
 #define DRV_EN_PORT     GPIOA   // DRV8833 Enable PORT
+
+// 
 // Quaducore Hall Effect Encoder
 #define ENC_1_TIM       TIM3
 #define ENC_1_AF        GPIO_AF2
@@ -46,6 +48,8 @@
 #define ENC_2_PORT      GPIOB
 #define ENC_2_A         GPIO6   // TIM4 CH1
 #define ENC_2_B         GPIO7   // TIM4 CH2
+
+
 // ADC Inputs
 #define IPROP_L         GPIO6
 #define IPROP_R         GPIO7

@@ -38,7 +38,8 @@ static struct PID pidInit(float min, float max, float kp, float ki, float kd, fl
         .min = min,
         .max = max,
         .ref = 0.0f,
-        .en = true
+        .en = true,
+        .out  = 0.0f
     };
     return pid;
 }

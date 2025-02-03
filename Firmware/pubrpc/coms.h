@@ -139,6 +139,8 @@ static bool comsDeserializeCmdMsg(struct Coms* coms, uint8_t byte){
                 break;
             case COMS_DECODE_ERROR:
                 coms->decodeState=COMS_DECODE_IDLE;
+                coms->rxFrame.bufSize = 0; // clear buffer new message to parse
+                memset(coms->rxFrame.buf, 0, coms->protocol.max_msg_data_size); 
                 break;
             default:
                 coms->decodeState=COMS_DECODE_IDLE;

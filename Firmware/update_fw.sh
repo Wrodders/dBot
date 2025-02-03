@@ -34,3 +34,11 @@ make clean
 make
 bash ../scripts/upload.sh -f firmware.bin -d downloads -u "$USER" -i "$HOSTNAME"
 bash ../scripts/rprog_mcu.sh -f firmware.bin -d downloads -u "$USER" -i "$HOSTNAME" -m stm32flash -p "$DEVICE"
+
+
+
+echo "[INFO] TWSB DEBUG CONSOLE"
+echo "-------------------------"
+echo "[INFO] Listening on $PORT at $BAUD baud. Filtering messages with '<$FILTER'."
+echo "[INFO] Type 'exit' to quit."
+echo "-------------------------"

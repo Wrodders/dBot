@@ -87,8 +87,8 @@ int main(void){
     struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
    
-   // ****************************** TELEMETRY ACCESS STRUCTURES ******************************************************** //
-    struct TWSB_State twsbState = {
+   // ****************************** TELEMETRY VARIABLES ACCESS STRUCTURES ******************************************************** //
+    struct TelemState twsbState = {
         .leftShaftRPS = &motorL.shaftRPS, .rightShaftRPS = &motorR.shaftRPS,
         .leftWheelTargetRPS = &motorL.speedCtrl.ref, 
         .rightWheelTargetRPS = &motorR.speedCtrl.ref,
@@ -97,7 +97,7 @@ int main(void){
         .linearVelocity = &ddmr.linearVel, .targetLinVel = &velCtrl.ref, .balanceAngle = &balanceAngleCtrl.ref,
         .angularVelocity = &ddmr.angularVel, .targetAngularVel = &steerCtrl.ref, .steerDiff = &steerCtrl.out
     };
-    struct TWSB_Imu twsbImu = {
+    struct TelemImu twsbImu = {
         .pitch = &imu.kal.pitch, .roll = &imu.kal.roll,
         .accX = &imu.lpf.accel.x, .accY = &imu.lpf.accel.y, .accZ = &imu.lpf.accel.z,
         .gyroX = &imu.lpf.gyro.x, .gyroY = &imu.lpf.gyro.y, .gyroZ = &imu.lpf.gyro.z
@@ -161,21 +161,23 @@ int main(void){
     // ****** Loop Parameters **************************************************************************** // 
     enum MODE {INIT = 0,PARK, CASCADE, LQR, TUNE_MOTOR, FW_UPDATE} mode;
     nextMode = INIT;
+
     uint16_t loopTick = 0;
 	for(;;){
-        loopTick = sysGetMillis();
+        
+        loopTick = sysGetMillis(); // Update Loop Time
         mode = nextMode;
         switch (mode){
             case INIT: // Initialize System 
                 // State Transition
-                if(sysGetMillis() >= 3000){ // 3s Delay
+                if(sysGetMillis() >= 3000){ // 3s Startup helps stabilize Kalman Filter
                     systick_clear();
                     pidClear(&velCtrl);
                     pidClear(&balanceAngleCtrl);
                     pidClear(&steerCtrl);
                     motorDisable(&motorL);
                     motorDisable(&motorR);
-                    nextMode = FW_UPDATE;
+                    nextMode = PARK;
                     comsSendMsg(&coms, &ser1, PUB_INFO, "INIT => PARK ");
                 }
                 break;
@@ -201,7 +203,6 @@ int main(void){
                 }
                 // ** WHEEL SPEED CONTROL LOOP //
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
-                    // Motor Speed Control ISR 
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
                     wspeedCntlTask.lastTick = loopTick;
@@ -229,20 +230,16 @@ int main(void){
                 }
                 break;
             case FW_UPDATE:
-                // Disable Motors, 
+                comsSendMsg(&coms, &ser1, PUB_INFO, "FW_UPDATE");
+                // Disable Motors, safety disable drivers
                 motorDisable(&motorL);
                 motorDisable(&motorR);
-                // Disable Peripherals
-
-
                 // Set GPIO Values High Z
                 gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
                 gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
                 gpio_mode_setup(GPIOC, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
-                
+                // Jump to Bootloader
                 systemReflash();
-
-
                 break;
             default:
                 break;  
@@ -263,12 +260,13 @@ int main(void){
                                                 &twsbImu.gyroX,     &twsbImu.gyroY, &twsbImu.gyroZ);
             
             */
-            /*
-            comsSendMsg(&coms, &ser1, PUB_STATE, &twsbState.leftShaftRPS,       &twsbState.leftWheelTargetRPS,  &twsbState.voltageLeft,
-                                                 &twsbState.rightShaftRPS,      &twsbState.rightWheelTargetRPS, &twsbState.voltageRight,
-                                                 &twsbState.linearVelocity,     &twsbState.targetLinVel,        &twsbState.balanceAngle,
-                                                 &twsbState.angularVelocity,    &twsbState.targetAngularVel,    &twsbState.steerDiff);
-            */
+            
+            comsSendMsg(&coms, &ser1, PUB_STATE, twsbState.leftShaftRPS,       twsbState.leftWheelTargetRPS,  twsbState.voltageLeft,
+                                                 twsbState.rightShaftRPS,      twsbState.rightWheelTargetRPS, twsbState.voltageRight,
+                                                 twsbState.linearVelocity,     twsbState.targetLinVel,        twsbState.balanceAngle,
+                                                 twsbState.angularVelocity,    twsbState.targetAngularVel,    twsbState.steerDiff);
+            
+            
             // Handle RX Messages 
             if(comsGrabCmdMsg(&coms, &ser1)){
                 comsProcessCmdMsg(&coms, &ser1);

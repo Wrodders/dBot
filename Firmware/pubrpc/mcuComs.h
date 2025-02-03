@@ -63,8 +63,8 @@ enum Commands{
     NUM_CMDS
 }; // Command Type 
 
-static inline  char  comsEncodeID_(uint8_t id){return id + 'A';}
-static inline  char  comsDecodeID_(char id){return id - 'A';}
+static inline  char  comsEncodeID_(uint8_t id){return id + ID_ASCII_OFFSET;}
+static inline  char  comsDecodeID_(char id){return id - ID_ASCII_OFFSET;}
 
 //                                ±  100  .  999   /0            
 #define MAX_SERIALIZED_FLOAT_SIZE (1 + 3 + 1 + 3 + 1)
@@ -75,21 +75,6 @@ static inline  char  comsDecodeID_(char id){return id - 'A';}
 #define SERIALIZED_INFO_FMT   "%s"
 #define SERIALIZED_DEBUG_FMT  "%s"
 #define SERIALIZED_CMDRET_FTM "%s"
-
-struct TWSB_State{
-    float *leftShaftRPS,        *rightShaftRPS;
-    float *leftWheelTargetRPS,  *rightWheelTargetRPS;
-    float *voltageLeft,         *voltageRight;
-
-    float *linearVelocity,      *targetLinVel,      *balanceAngle;
-    float *angularVelocity,     *targetAngularVel,  *steerDiff;
-}; // State data publish structure
-
-struct TWSB_Imu{
-    float *pitch, *roll;
-    float *gyroX, *gyroY, *gyroZ;
-    float *accX, *accY, *accZ;
-}; // Imu data publish structure
 
 // *********** Parameters **************************** //
 
@@ -188,6 +173,23 @@ static const char* publisherString(enum Publishers pub){
         default: return "UNKNOWN PUBLISHER";
     }
 }
+
+
+// *********** Telemtry DATA STRUCTURES **************************** //
+struct TelemState{
+    float *leftShaftRPS,        *rightShaftRPS;
+    float *leftWheelTargetRPS,  *rightWheelTargetRPS;
+    float *voltageLeft,         *voltageRight;
+
+    float *linearVelocity,      *targetLinVel,      *balanceAngle;
+    float *angularVelocity,     *targetAngularVel,  *steerDiff;
+}; // State data publish structure
+
+struct TelemImu{
+    float *pitch, *roll;
+    float *gyroX, *gyroY, *gyroZ;
+    float *accX, *accY, *accZ;
+}; // Imu data publish structure
 
 // TELEMETRY ARGUMENTS SERIALIZATION HELPERS
 #define TELEMETRY_VARS(X)                              \

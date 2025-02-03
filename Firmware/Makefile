@@ -6,9 +6,22 @@ CFILES = firmware.c
 CFILES += ../modules/cUtils/printf.c
 #AFILES += api-asm.S
 
-# TODO - you will need to edit these two lines!
-DEVICE=stm32f411re
-OOCD_FILE = board/stm32f4discovery.cfg
+# Target device (default to stm32f401cc)
+TARGET ?= stm32f401cc
+
+# Set DEVICE and OOCD_FILE based on TARGET
+ifeq ($(TARGET),stm32f401cc)
+    DEVICE = stm32f401cc
+    OOCD_FILE = board/stm32f4discovery.cfg
+else ifeq ($(TARGET),stm32f411re)
+    DEVICE = stm32f411re
+    OOCD_FILE = board/stm32f4discovery.cfg  # Update this if you have a different OOCD file for stm32f411re
+else
+    $(error Unsupported TARGET: $(TARGET))
+endif
+
+# Adjust BUILD_DIR to include the target device name
+BUILD_DIR := $(BUILD_DIR)/$(TARGET)
 
 # You shouldn't have to edit anything below here.
 VPATH += $(SHARED_DIR)

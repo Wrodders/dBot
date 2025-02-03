@@ -9,10 +9,13 @@
 #include <libopencm3/stm32/memorymap.h>
 #include <libopencm3/stm32/syscfg.h>
 
+/* This developement Platform uses the STM32 Black Pill
+- Version 0.1  STM32F401cc : Uses 25Mhz HSE for Bootloader - AN2606 Bootloader configuration STM32F401xx
+- Version 0.2  STM32F411re : Uses 16Mhz HSI for Bootloader - AN2606 Bootloader configuration  STM32F411xx
+*/
 #define TICK			1000     // 1ms
 #define CPU_FREQ		84000000 // 84Mhz
 
-// ST LINK Ids Black Pill as STM32F411re Device id 0x0431
 #define SYSTEM_MEMORY_ADDRESSS 0x1FFF0000   // 29 Kbytes : AN2606 33.1 Bootloader configuration Table 64. STM32F411xx
 #define APPLICATION_ADDRESS 0x08000000      // 1MB Flash
 
@@ -24,7 +27,7 @@ void sys_tick_handler(void){
 	return;
 }
 
-static uint32_t sysGetMillis(void){return _millis;}
+static inline uint32_t sysGetMillis(void){return _millis;}
 
 static void delay(uint32_t milliseconds) {
     // @Brief Blocking delay
