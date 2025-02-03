@@ -22,15 +22,14 @@ cd build || error_exit "Failed to enter 'build' directory."
 cmake .. || error_exit "CMake configuration failed."
 
 # Build the project
-make twsbDriver || error_exit "Build process failed."
+make -j4 twsbDriver || error_exit "Build process failed."
 
-make zmqproxy || error_exit "Build process failed."
+make -j4 zmqproxy || error_exit "Build process failed."
 
-make zmqSubTest || error_exit "Build process failed."
+make -j4 zmqSubTest || error_exit "Build process failed."
 
-make opencv_rtsp || error_exit "Build process failed."
+make -j4 opencv_rtsp || error_exit "Build process failed."
 
-make camFilt || error_exit "Build process failed."
 
 
 echo "Build completed successfully!"

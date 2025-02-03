@@ -33,8 +33,11 @@ EOF
 flash_stm32flash() {
     BIN_FILENAME=$1
     echo "Flashing $REMOTE_BIN_DIR/$BIN_FILENAME using stm32flash on Raspberry Pi..."
+    echo "Entering FW update mode on the target..."
     ssh "$PI_USER@$PI_IP" << EOF
-        stm32flash -w "$REMOTE_BIN_DIR/$BIN_FILENAME" -v "$SERIAL_PORT"
+        echo "Entering FW update mode..."
+        echo '<BB5\n' > $SERIAL_PORT
+        stm32flash -R -w "$REMOTE_BIN_DIR/$BIN_FILENAME" -v "$SERIAL_PORT"
         if [ $? -ne 0 ]; then
             echo "Error: Flashing failed."
             exit 1

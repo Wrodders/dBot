@@ -20,7 +20,7 @@ struct TargetVelocities {
 };
 
 
-struct ROIData {
+struct ROIinfo {
     std::vector<cv::Point> points;  // Store selected points for the trapezium
     bool drawing = false;
     bool roiSelected = false;
@@ -33,7 +33,7 @@ int AP = 100;
 int KI = 0;
 int kd = 0;  
 int velScale = 0;
-ROIData roiData;
+ROIinfo roiData;
 
 void drawGridLines(cv::Mat& image, int numDivisions, int divisionHeight) {
     // vertical and horizontal lines
@@ -45,41 +45,6 @@ void drawGridLines(cv::Mat& image, int numDivisions, int divisionHeight) {
     }
 }
 
-
-
-void selectROI(int event, int x, int y, int flags, void* param) {
-    auto* data = static_cast<ROIData*>(param);
-
-    switch (event) {
-        case cv::EVENT_LBUTTONDOWN:
-            // If 4 points are selected, reset the points and start over
-            if (data->pointCount == 4) {
-                data->points.clear();  // Clear previous points
-                data->pointCount = 0;  // Reset point counter
-                data->roiSelected = false;  // Reset ROI selection
-            }
-
-            if (data->pointCount < 4) {  // Allow selecting up to 4 points
-                data->points.push_back(cv::Point(x, y));
-                data->pointCount++;
-            }
-            // If 4 points are selected, mark the ROI as selected
-            if (data->pointCount == 4) {
-                data->roiSelected = true;
-            }
-            break;
-
-        case cv::EVENT_MOUSEMOVE:
-            // Optional: Visual feedback for drawing (if needed)
-            break;
-
-        case cv::EVENT_LBUTTONUP:
-            break;
-
-        default:
-            break;
-    }
-}
 
 void applyROIToFrameWithPadding(cv::Mat& frame, const std::vector<cv::Point>& roiPoints, cv::Mat& result, int topPadding, int bottomPadding) {
     // Calculate the bounding rectangle for the points
@@ -105,7 +70,7 @@ void applyROIToFrameWithPadding(cv::Mat& frame, const std::vector<cv::Point>& ro
     cv::Mat croppedFrame = frame(adjustedROI);
     croppedFrame.copyTo(result, mask);
 }
-void processFrame(cv::Mat& frame, cv::Mat& result, ROIData roiData) {
+void processFrame(cv::Mat& frame, cv::Mat& result, ROIinfo roiData) {
     if (roiData.roiSelected && roiData.pointCount == 4) {
         // Define the source points (the corners of the ROI)
 
@@ -152,60 +117,6 @@ void method1(cv::Mat &roi, cv::Mat &result) {
 }
 
 
-// Update ROI (Region of Interest) display
-void updateROI(cv::Mat& frame, ROIData roiData) {
-    if (roiData.pointCount > 0) {
-        for (size_t i = 0; i < roiData.points.size(); ++i) {
-            cv::circle(frame, roiData.points[i], 5, cv::Scalar(0, 0, 255), -1);
-        }
-        if (roiData.pointCount == 4) {
-            cv::polylines(frame, roiData.points, true, cv::Scalar(0, 255, 0), 2);
-        }
-    }
-}
-
-
-void onThresholdSlider(int, void*) {
-    std::cout << "Threshold: " << threshold_value << std::endl;
-}
-
-void onKPSlider(int, void*) {
-    std::cout << "KP: " << AP << std::endl;
-}
-
-void onKISlider(int, void*) {
-    std::cout << "KI: " << KI << std::endl;
-}
-
-void onKDSlider(int, void*) {
-    std::cout << "KD: " << kd << std::endl;
-}
-
-void onVelScaleSlider(int, void*) {
-    std::cout << "Velocity Scale: " << velScale << std::endl;
-}
-
-
-
-
-void setupZMQPublisher(zmq::context_t &context, zmq::socket_t &publisher) {
-    publisher.bind("tcp://*:5556");  // Binding to TCP socket on port 5556
-    std::cout << "Publisher bound to tcp://*:5556\n";
-}
-
-
-
-
-
-
-
-
-
-
-#endif // VISION_H
-
-
-
 void zmqPublishWorker(zmq::socket_t& publisher) {
     while (!stopFlag) {
         // Sleep to maintain 30Hz sending rate
@@ -244,3 +155,4 @@ void zmqSubscriberWorker(zmq::socket_t& subscriber) {
         }
     }
 }
+#endif // VISION_H
