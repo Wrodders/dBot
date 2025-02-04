@@ -25,11 +25,13 @@ cmake .. || error_exit "CMake configuration failed."
 echo "[INFO] CMake configuration completed successfully!"
 echo "[INFO] Building the project..."
 # Build the project
-make -j4 zmqComs || error_exit "Build process failed."
+make -j4 twsbComs || error_exit "Build process failed."
 
 make -j4 zmqproxy || error_exit "Build process failed."
 
 make -j4 zmqSubTest || error_exit "Build process failed."
+
+make -j4 zmqPubTest || error_exit "Build process failed."
 
 #make -j4 opencv_rtsp || error_exit "Build process failed."
 

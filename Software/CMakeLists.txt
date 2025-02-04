@@ -45,12 +45,13 @@ set(COMMON_LIBRARIES
 # Add executables
 add_executable(main src/main.cpp)
 add_executable(zmqproxy tools/zmqProxy.cpp)
-add_executable(zmqComs tools/zmqComs.cpp)
+add_executable(twsbComs tools/twsbComs.cpp)
 add_executable(opencv_rtsp tools/opencv_rtsp.cpp)
 add_executable(zmqSubTest Test/zmqSubTest.cpp)
+add_executable(zmqPubTest Test/zmqPubTest.cpp)
 
 # Apply common properties to all targets
-foreach(target main zmqproxy zmqComs opencv_rtsp zmqSubTest)
+foreach(target main zmqproxy twsbComs opencv_rtsp zmqSubTest zmqPubTest)
     target_include_directories(${target} PRIVATE ${COMMON_INCLUDE_DIRS})
     target_link_libraries(${target} PRIVATE ${COMMON_LIBRARIES})
 endforeach()

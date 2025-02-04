@@ -16,6 +16,7 @@
 #include <queue>
 #include <array>
 #include <unordered_set>
+#include <zmq.hpp>
 
 namespace twsb {
 #ifdef __linux__
@@ -25,6 +26,12 @@ namespace twsb {
 #endif
 }
 
+//*** TWSB Coms Console */
+
+#define COMMAND_TOPIC "SERIAL"
+#define COMMAND_SOCKET_ADDRESS "ipc:///tmp/botcmds"
+#define TELEMETRY_SOCKET_ADDRESS "ipc:///tmp/botmsgs"
+#define TELEMETRY_TOPIC "TWSB"
 #define DEFAULT_PORT "/dev/ttyAMA0"
 #define DEFAULT_BAUD 115200
 const int SERIAL_RX_BUFFER_SIZE = 1024;
@@ -51,7 +58,7 @@ enum COMS_DECODE_STATE { COMS_DECODE_IDLE = 0, COMS_DECODE_ID, COMS_DECODE_DATA,
 struct TelemetryMsg {
     std::string topic;
     size_t data_size;
-    std::vector<uint8_t> data;
+    std::string data;
     std::chrono::time_point<std::chrono::system_clock> timestamp;
 };
 
@@ -104,6 +111,7 @@ void grabMsgFrame(int serialFd, Coms& coms ) {
                     coms.decodeState = COMS_DECODE_ERROR;
                 } else if (byte == coms.serial_protocol.eof_byte) {
                     coms.telemMsg.timestamp = std::chrono::system_clock::now();
+                    coms.telemMsg.data_size = coms.telemMsg.data.size();
                     coms.telemMsgQ.push(coms.telemMsg);
                     coms.decodeState = COMS_DECODE_IDLE;
                 } else {
@@ -119,7 +127,7 @@ void grabMsgFrame(int serialFd, Coms& coms ) {
 
 //@Brief: Configure the serial port non-canonical mode
 int configSerialPort(const std::string& port, int baud) {
-    fmt::print("[ZMQ Coms][INFO] Configuring Serial Port: {} at {} baud\n", port, baud);
+    fmt::print("[TWSB Coms][INFO] Configuring Serial Port: {} at {} baud\n", port, baud);
     int serial_port_fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (serial_port_fd == -1) {
         std::cerr << "Error: Unable to open serial port " << port << std::endl;
@@ -161,6 +169,24 @@ int configSerialPort(const std::string& port, int baud) {
     return serial_port_fd;
 }
 
+
+//@Brief: Forward the telemetry message to the ZMQ publisher socket
+//@Note: The message is packed as according to the delimeter in the protocol: <topic><data><timestamp>
+void publishTimeStampedMsg(zmq::socket_t& pubSocket, struct Coms& coms, const TelemetryMsg& msg) {
+    std::string packed_msg = msg.data + std::string(1, coms.serial_protocol.delim_byte) + std::to_string(msg.timestamp.time_since_epoch().count());
+    zmq::message_t topic(msg.topic.size());
+    memcpy(topic.data(), msg.topic.data(), msg.topic.size());
+    zmq::message_t data(packed_msg.size()); 
+    memcpy(data.data(), packed_msg.data(), packed_msg.size());
+    pubSocket.send(topic, zmq::send_flags::sndmore);
+    pubSocket.send(data, zmq::send_flags::none);
+}
+
+
+void displayMsgConsole(const TelemetryMsg& msg) {
+    fmt::print("[{}] {}: {}\n", formatTimestamp(msg.timestamp), msg.topic, std::string(msg.data.begin(), msg.data.end()));
+}
+
 // ********* MAIN ************************************************************************* //
 int main(int argc, char* argv[]) {
     if (argc < 4) {
@@ -176,7 +202,18 @@ int main(int argc, char* argv[]) {
         console_topics.insert(argv[i]);
     }
 
+    zmq::context_t context(1);
+    zmq::socket_t subSocket = zmq::socket_t(context, zmq::socket_type::sub);
+    subSocket.set(zmq::sockopt::linger, 0);
+    subSocket.set(zmq::sockopt::subscribe, COMMAND_TOPIC);
+    subSocket.connect(COMMAND_SOCKET_ADDRESS);
+    
+    int subSocketFd = subSocket.get(zmq::sockopt::fd);
 
+
+    zmq::socket_t pubSocket = zmq::socket_t(context, zmq::socket_type::pub);
+    pubSocket.set(zmq::sockopt::linger, 0);
+    pubSocket.bind(TELEMETRY_SOCKET_ADDRESS);
 
     Coms coms;
 
@@ -185,46 +222,58 @@ int main(int argc, char* argv[]) {
 
     fd_set read_fds;
 
-    fmt::print("[ZMQ Coms][INFO] Begin TWSB Console \n");
-    fmt::print("[ZMQ Coms][INFO] Console Topic Filter: ");
+    fmt::print("[TWSB Coms][INFO] Begin TWSB Console \n");
+    fmt::print("[TWSB Coms][INFO] Console Topic Filter: ");
     for (const auto& topic : console_topics) {
         fmt::print("{} ", topic);
     }
     fmt::print("\n");
-    fmt::print("[ZMQ Coms][INFO] Press 'exit' to quit\n");
+    fmt::print("[TWSB Coms][INFO] Press 'exit' to quit\n");
 
     while (true) {
         FD_ZERO(&read_fds);
         FD_SET(serial_fd, &read_fds);
         FD_SET(STDIN_FILENO, &read_fds);
+        FD_SET(subSocketFd, &read_fds);  
 
-        int max_fd = std::max(serial_fd, STDIN_FILENO);
+        int max_fd = std::max({serial_fd, STDIN_FILENO, subSocketFd});
         if (select(max_fd + 1, &read_fds, nullptr, nullptr, nullptr) < 0) {
             std::cerr << "Error in select\n";
             break;
         }
-
-        if (FD_ISSET(serial_fd, &read_fds)) { 
-            grabMsgFrame(serial_fd, coms);
+        if (FD_ISSET(serial_fd, &read_fds)) {  // Handle incoming telemetry messages from the serial port
+            grabMsgFrame(serial_fd, coms);  // decodes serial buffer inplace
             while (!coms.telemMsgQ.empty()) {
                 TelemetryMsg msg = coms.telemMsgQ.front();
-                coms.telemMsgQ.pop();
-                // if the msg topi is prsnet in the console topic map print it to the console
+                coms.telemMsgQ.pop(); 
+                publishTimeStampedMsg(pubSocket, coms, msg); // publish timestamped message
                 if (console_topics.find(msg.topic) != console_topics.end()) {
-                    // print the topic and data as a string
-                    fmt::print("[{}] {}: {}\n", formatTimestamp(msg.timestamp), msg.topic, std::string(msg.data.begin(), msg.data.end()));
-                }
-               
+                    displayMsgConsole(msg); // Debug console output
+                }   
             }
         }
-
         if (FD_ISSET(STDIN_FILENO, &read_fds)) { // Handle user input
             std::string cmd;
             std::getline(std::cin, cmd);
-            if (cmd == "exit") break;
+            if (cmd == "exit"){fmt::print("[TWSB_COMS] Exiting"); break;} 
             std::string packed_cmd = packCommand(cmd, coms.serial_protocol.sof_byte, coms.serial_protocol.eof_byte);
             write(serial_fd, packed_cmd.c_str(), packed_cmd.size());
         }
+        // Handle ZMQ Sub Msg
+        if (FD_ISSET(subSocketFd, &read_fds)) {  // Handle ZMQ subscription messages
+            zmq::message_t topic_msg;
+            zmq::message_t data_msg;
+            subSocket.recv(topic_msg, zmq::recv_flags::dontwait);
+            subSocket.recv(data_msg, zmq::recv_flags::dontwait);
+
+
+            std::string command(static_cast<char*>(data_msg.data()), data_msg.size());
+            fmt::print("[TWSB_COMS] Received Command: {}\n", command);
+
+            std::string packed_cmd = packCommand(command, coms.serial_protocol.sof_byte, coms.serial_protocol.eof_byte);
+            write(serial_fd, packed_cmd.c_str(), packed_cmd.size());
+        }
+        
     }
 
     close(serial_fd);

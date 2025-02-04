@@ -91,21 +91,7 @@ int main(void){
     struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
    
-   // ****************************** TELEMETRY VARIABLES ACCESS STRUCTURES ******************************************************** //
-    struct TelemState twsbState = {
-        .leftShaftRPS = &motorL.shaftRPS, .rightShaftRPS = &motorR.shaftRPS,
-        .leftWheelTargetRPS = &motorL.speedCtrl.ref, 
-        .rightWheelTargetRPS = &motorR.speedCtrl.ref,
-        .voltageLeft = &motorL.speedCtrl.out, .voltageRight = &motorR.speedCtrl.out,
 
-        .linearVelocity = &ddmr.linearVel, .targetLinVel = &velCtrl.ref, .balanceAngle = &balanceAngleCtrl.ref,
-        .angularVelocity = &ddmr.angularVel, .targetAngularVel = &steerCtrl.ref, .steerDiff = &steerCtrl.out
-    };
-    struct TelemImu twsbImu = {
-        .pitch = &imu.kal.pitch, .roll = &imu.kal.roll,
-        .accX = &imu.lpf.accel.x, .accY = &imu.lpf.accel.y, .accZ = &imu.lpf.accel.z,
-        .gyroX = &imu.lpf.gyro.x, .gyroY = &imu.lpf.gyro.y, .gyroZ = &imu.lpf.gyro.z
-    };
     // ***************************** COMMUNICATIONS ******************************************************** // 
     struct Coms coms = comsInit();
     // -------------------- TOPIC PUBLISHERS ---------------------- //
@@ -259,16 +245,16 @@ int main(void){
         if(CHECK_PERIOD(comsTask, loopTick)){
             // TX Publishing Topic
             
-            comsSendMsg(&coms, &ser1, PUB_IMU,  &twsbImu.pitch,     &twsbImu.roll, 
-                                                &twsbImu.accX,      &twsbImu.accY,  &twsbImu.accZ,
-                                                &twsbImu.gyroX,     &twsbImu.gyroY, &twsbImu.gyroZ);
+            comsSendMsg(&coms, &ser1, PUB_IMU,  imu.kal.pitch, imu.kal.roll, 
+                                                imu.lpf.accel.x, imu.lpf.accel.y, imu.lpf.accel.z,
+                                                imu.lpf.gyro.x, imu.lpf.gyro.y, imu.lpf.gyro.z);
             
             
             
-            comsSendMsg(&coms, &ser1, PUB_STATE, twsbState.leftShaftRPS,       twsbState.leftWheelTargetRPS,  twsbState.voltageLeft,
-                                                 twsbState.rightShaftRPS,      twsbState.rightWheelTargetRPS, twsbState.voltageRight,
-                                                 twsbState.linearVelocity,     twsbState.targetLinVel,        twsbState.balanceAngle,
-                                                 twsbState.angularVelocity,    twsbState.targetAngularVel,    twsbState.steerDiff);
+            comsSendMsg(&coms, &ser1, PUB_STATE, motorL.shaftRPS, motorL.speedCtrl.ref, motorL.speedCtrl.out,
+                                                motorR.shaftRPS, motorR.speedCtrl.ref, motorR.speedCtrl.out,
+                                                ddmr.linearVel, velCtrl.ref, balanceAngleCtrl.ref, 
+                                                ddmr.angularVel, steerCtrl.ref, steerCtrl.out);
             
             
             // Handle RX Messages 
