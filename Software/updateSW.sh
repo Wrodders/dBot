@@ -32,24 +32,24 @@ done
 
 # Get the current software directory
 SOFTWARE_DIR=$(pwd)
-echo "[INFO] Using software directory: $SOFTWARE_DIR"
+echo "[UPDATE_SW][INFO] Using software directory: $SOFTWARE_DIR"
 
 # Ensure remote directory exists
 ssh "$USER@$HOSTNAME" "mkdir -p prog/software/inc"
 
 # Sync project files, excluding unnecessary files
-echo "[INFO] Syncing software files to $USER@$HOSTNAME..."
-rsync -az --exclude 'mediamtx/mediamtx' --exclude 'mediamtx/mediamtx_v1.11.2_darwin_amd64.tar.gz' "$SOFTWARE_DIR/" "$USER@$HOSTNAME:prog/software"
+echo "[UPDATE_SW][INFO] Syncing software files to $USER@$HOSTNAME..."
+rsync -az --exclude 'mediamtx/' "$SOFTWARE_DIR/" "$USER@$HOSTNAME:prog/software"
 
 # Sync mcuComs.h file separately
-echo "[INFO] Syncing MCU headers..."
+echo "[UPDATE_SW][INFO] Syncing MCU headers..."
 rsync -az ../Firmware/pubrpc/mcuComs.h "$USER@$HOSTNAME:prog/software/inc"
 
 # Build the project remotely
-echo "[INFO] Running remote build script..."
+echo "[UPDATE_SW][INFO] Running remote build script..."
 ssh "$USER@$HOSTNAME" << EOF
     cd prog/software
     bash buildSW.sh
 EOF
 
-echo "[SUCCESS] Software build completed successfully on $HOSTNAME!"
+echo "[UPDATE_SW][SUCCESS] Software build completed successfully on $HOSTNAME!"

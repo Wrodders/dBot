@@ -30,13 +30,13 @@ if [[ $? -ne 0 ]]; then
 fi
 
 # PROGRAM BEGIN #
-echo "[INFO] TWSB DEBUG CONSOLE"
+echo "[DEBUG_CONSOLE][INFO] TWSB DEBUG CONSOLE"
 echo "-------------------------"
-echo "[INFO] Listening on $PORT at $BAUD baud. Filtering messages with '<$FILTER'."
-echo "[INFO] Type 'exit' to quit."
+echo "[DEBUG_CONSOLE][INFO] Listening on $PORT at $BAUD baud. Filtering messages with '<$FILTER'."
+echo "[DEBUG_CONSOLE][INFO] Type 'exit' to quit."
 echo "-------------------------"
-echo "[INFO] Listening on $PORT at $BAUD baud. Filtering messages with '$@'."
-echo "[INFO] Type 'exit' to quit."
+echo "[DEBUG_CONSOLE][INFO] Listening on $PORT at $BAUD baud. Filtering messages with '$@'."
+echo "[DEBUG_CONSOLE][INFO] Type 'exit' to quit."
 
 # Background listener process to filter incoming messages
 ( cat "$PORT" | grep -E --line-buffered "$FILTER_PATTERN" ) &  
@@ -47,7 +47,7 @@ while true; do
     echo -n "> "
     read CMD
     if [[ "$CMD" == "exit" ]]; then
-        echo "[INFO] Exiting console."
+        echo "[DEBUG_CONSOLE][INFO] Exiting console."
         kill "$LISTENER_PID"
         exit 0
     fi

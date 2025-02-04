@@ -64,7 +64,7 @@ enum Commands{
 }; // Command Type 
 
 static inline  char  comsEncodeID_(uint8_t id){return id + ID_ASCII_OFFSET;}
-static inline  char  comsDecodeID_(char id){return id - ID_ASCII_OFFSET;}
+static inline  uint8_t  comsDecodeID_(char id){return id - ID_ASCII_OFFSET;}
 
 //                                ±  100  .  999   /0            
 #define MAX_SERIALIZED_FLOAT_SIZE (1 + 3 + 1 + 3 + 1)
@@ -193,27 +193,27 @@ struct TelemImu{
 
 // TELEMETRY ARGUMENTS SERIALIZATION HELPERS
 #define TELEMETRY_VARS(X)                              \
-    X(1,   T_PITCH,                "PITCH")            \
-    X(2,   T_ROLL,                 "ROLL")             \
-    X(3,   T_ACCEL_X,              "ACCEL_X")          \
-    X(4,   T_ACCEL_Y,              "ACCEL_Y")          \
-    X(5,   T_ACCEL_Z,              "ACCEL_Z")          \
-    X(6,   T_GYRO_X,              "GYRO_X")            \
-    X(7,   T_GYRO_Y,              "GYRO_Y")            \
-    X(8,   T_GYRO_Z,              "GYRO_Z")            \
-    X(9,   T_LEFT_SHAFTS_RPS,    "LEFT_SHAFT_RPS")     \
-    X(10,  T_LEFT_WHEEL_TRGT,    "LEFT_WHEEL_TRGT")    \
-    X(11,  T_LEFT_VOLTAGE,       "LEFT_VOLTAGE")       \
-    X(12,  T_RIGHT_SHAFTS_RPS,   "RIGHT_SHAFT_RPS")    \
-    X(13,  T_RIGHT_WHEEL_TRGT,   "RIGHT_WHEEL_TRGT")   \
-    X(14,  T_RIGHT_VOLTAGE,      "RIGHT_VOLTAGE")      \
-    X(15,  T_LINEAR_VEL,         "LINEAR_VEL")         \
-    X(16,  T_LIN_VEL_TRGT,       "LIN_VEL_TRGT")       \
-    X(17,  T_BALANCE_ANGLE,      "BALANCE_ANGLE")      \
-    X(18,  T_ANGULAR_VEL,        "ANGULAR_VEL")        \
-    X(19,  T_ANG_VEL_TRGT,       "ANG_VEL_TRGT")       \
-    X(20,  T_STEER_DIFF,         "STEER_DIFF")         \
-    X(21,  T_NUM_SATE_VARS,      "NUM__STATE_VARS")    \
+    X(0,   T_PITCH,                "PITCH")            \
+    X(1,   T_ROLL,                 "ROLL")             \
+    X(2,   T_ACCEL_X,              "ACCEL_X")          \
+    X(3,   T_ACCEL_Y,              "ACCEL_Y")          \
+    X(4,   T_ACCEL_Z,              "ACCEL_Z")          \
+    X(5,   T_GYRO_X,              "GYRO_X")            \
+    X(6,   T_GYRO_Y,              "GYRO_Y")            \
+    X(7,   T_GYRO_Z,              "GYRO_Z")            \
+    X(8,   T_LEFT_SHAFTS_RPS,    "LEFT_SHAFT_RPS")     \
+    X(9,  T_LEFT_WHEEL_TRGT,    "LEFT_WHEEL_TRGT")    \
+    X(10,  T_LEFT_VOLTAGE,       "LEFT_VOLTAGE")       \
+    X(11,  T_RIGHT_SHAFTS_RPS,   "RIGHT_SHAFT_RPS")    \
+    X(12,  T_RIGHT_WHEEL_TRGT,   "RIGHT_WHEEL_TRGT")   \
+    X(13,  T_RIGHT_VOLTAGE,      "RIGHT_VOLTAGE")      \
+    X(14,  T_LINEAR_VEL,         "LINEAR_VEL")         \
+    X(15,  T_LIN_VEL_TRGT,       "LIN_VEL_TRGT")       \
+    X(16,  T_BALANCE_ANGLE,      "BALANCE_ANGLE")      \
+    X(17,  T_ANGULAR_VEL,        "ANGULAR_VEL")        \
+    X(18,  T_ANG_VEL_TRGT,       "ANG_VEL_TRGT")       \
+    X(19,  T_STEER_DIFF,         "STEER_DIFF")         \
+    X(20,  T_NUM_SATE_VARS,      "NUM__STATE_VARS")    \
 
 #define TELEMETRY_ENUM(ID, NAME, MSG) NAME = ID,
 #define TELEMETRY_STRING(ID, NAME, MSG) case NAME: return MSG;

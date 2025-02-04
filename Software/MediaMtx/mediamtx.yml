@@ -695,11 +695,8 @@ pathDefaults:
 # It's possible to use regular expressions by using a tilde as prefix,
 # for example "~^(test1|test2)$" will match both "test1" and "test2",
 # for example "~^prefix" will match all paths that start with "prefix".
-paths:
-  cam1 :
-    runOnInit: bash -c ' ./../build/opencv_rtsp | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x360 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
-    runOnInitRestart: yes
 
-  # Settings under path "all_others" are applied to all paths that
-  # do not match another entry.
-  all_others:
+paths:
+  cam1:
+     runOnDemand: bash -c 'ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x360 -r 30 -i ///tmp/video_out -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+     runOnDemandRestart: yes

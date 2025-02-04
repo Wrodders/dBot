@@ -4,25 +4,49 @@
 #include <opencv2/opencv.hpp> 
 #include <zmq.hpp>
 
-#include "../inc/twsbDriver.hpp"
+
+
+
+
 
 /************ OpenCV Camera Pipeline Filter Stage ***************************/
 /*
+
+YUV420p Serialized Frame Format
+----------------------
+|     Y      | Cb|Cr |
+----------------------
+
 |------------|--------|---------|--------|--------|
 | RPICAM-VID | yuv420 | camFilt | yuv420 | ffmpeg |
 */
 
+
+#define LIBCAMERA_PIPE "libcamera-vid -t 0 --camera 0 --nopreview --rotation 180 --codec yuv420 --width 640 --height 360 --inline --listen -o -"
+#define CMD_SOCKET_ADDRESS "ipc:///tmp/botcmds"
+#define CMD_SUB_TOPIC "VISION"
+
+#define OUTPUT_PIPE "///tmp/video_out"
+
 const int WIDTH = 640;   // Frame width
 const int HEIGHT = 360;  // Frame height
 const int FRAME_SIZE = WIDTH * HEIGHT * 3 / 2; // YUV420p (Y + U + V)
-
 const int THRESHOLD = 10;  // Threshold value for binary image
+
+
 int main() {
     // Command to capture video using rpicam-vid with YUV420p output
-    const char* rpicam_cmd = "rpicam-vid -t 0 --camera 0 --rotation 180  --autofocus-mode manual --nopreview --codec yuv420 --width 640 --height 360 --inline --listen -o -";
-    FILE* pipe = popen(rpicam_cmd, "r");
-    if (!pipe) {
-        std::cerr << "Failed to open pipe to rpicam-vid!" << std::endl;
+    const char* libcamera_cmd = LIBCAMERA_PIPE;
+    FILE* in_pipe = popen(libcamera_cmd, "r");
+    if (!in_pipe) {
+        std::cerr << "Failed to open pipe to libcamera-vid!" << std::endl;
+        return -1;
+    }
+
+    // open output pipe as write only
+    FILE* out_pipe = fopen(OUTPUT_PIPE, "w");
+    if(!out_pipe){
+        std::cerr << "Failed to open output pipe!" << std::endl;
         return -1;
     }
 
@@ -38,21 +62,19 @@ int main() {
     double grad_delta = 0; // Optional delta value that is added to the results prior to storing them
     enum {OUT_GRAY, OUT_WARP, OUT_GRAD, OUT_COST} output_mode = OUT_GRAD;
 
-   
 
     // create a zmq subscriber that listens for commands non blocking 
     zmq::context_t context(1);
     zmq::socket_t subSocket = zmq::socket_t(context, zmq::socket_type::sub);
     subSocket.set(zmq::sockopt::linger, 0);
-    subSocket.connect("ipc:///tmp/botCMDS"); // General Bot Commands Socket
-    subSocket.set(zmq::sockopt::subscribe, "VISON"); // Receive Commands for the vision system   
+    subSocket.connect(CMD_SOCKET_ADDRESS); // General Bot Commands Socket
+    subSocket.set(zmq::sockopt::subscribe, CMD_SUB_TOPIC); 
     //** ZMQ Command Server **//
     // Allocate buffer for YUV data
     std::vector<uint8_t> yuv_buffer(FRAME_SIZE);
     // apply birds eue view trasfrom 
     // Define source and destination points for perspective transform
     // coordinates are in (x, y) format
-
     std::vector<cv::Point2f> src_pts = {
         cv::Point2f(0, HEIGHT),  // Bottom-left
         cv::Point2f(WIDTH, HEIGHT),  // Bottom-right
@@ -65,17 +87,18 @@ int main() {
         cv::Point2f(0,0),  // Top-right
         cv::Point2f(WIDTH, 0)  // Top-left
     };
-
     // Compute the perspective transform matrix
     cv::Mat transform_matrix = cv::getPerspectiveTransform(src_pts, dst_pts);
    
     // Loop to continuously read and process frames
     while (true) {
-
         // Check for any incoming commands
         zmq::message_t topic, msg;
         subSocket.recv(topic, zmq::recv_flags::dontwait);
-        subSocket.recv(msg, zmq::recv_flags::dontwait);
+        if(topic.more()){
+            subSocket.recv(msg, zmq::recv_flags::none);
+            // Parse the command
+        }
 
         std::string topicStr = std::string(static_cast<char*>(topic.data()), topic.size());
         std::string msgStr = std::string(static_cast<char*>(msg.data()), msg.size());
@@ -83,7 +106,7 @@ int main() {
 
 
         // Read raw YUV420 frame from the pipe
-        size_t bytes_read = fread(yuv_buffer.data(), 1, FRAME_SIZE, pipe);
+        size_t bytes_read = fread(yuv_buffer.data(), 1, FRAME_SIZE, in_pipe);
         if (bytes_read != FRAME_SIZE) {
             std::cerr << "Error reading frame from rpicam-vid!" << std::endl;
             break;
@@ -133,20 +156,13 @@ int main() {
                 result = &y_plane;
                 break;
         }
-
-
         // scale the image to 640x360
         cv::resize(*result, *result, cv::Size(WIDTH, HEIGHT));
-
-
         std::memcpy(yuv_buffer.data(), result->data, WIDTH * HEIGHT);
-
-
-        // Stream the modified YUV420p frame to stdout
-        fwrite(yuv_buffer.data(), 1, FRAME_SIZE, stdout);
+        fwrite(yuv_buffer.data(), 1, FRAME_SIZE, out_pipe);        
     }
 
     // Cleanup and close the pipe
-    fclose(pipe);
+    fclose(in_pipe);
     return 0;
 }

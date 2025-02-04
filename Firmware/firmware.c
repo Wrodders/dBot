@@ -17,7 +17,11 @@
 // ********** GLOBAL STATIC BUFFERS ***************************************// ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[128] = {0};
 uint8_t tx1_buf_[256] = {0};
-float uuid = 3.14159;
+float uuid = 0;
+#ifdef stm32f401cc
+ uuid = 3.14159;
+#else uuid = 2.968;
+#endif
 // ********** CASCADED PID FUNCTIONS ***************************************//
 //@Brief: Motor Speed Control Loop
 static void runMotorSpeedLoop(struct Motor *m){
@@ -254,12 +258,12 @@ int main(void){
         // ********** Communications ********************************************************************** //
         if(CHECK_PERIOD(comsTask, loopTick)){
             // TX Publishing Topic
-            /*
+            
             comsSendMsg(&coms, &ser1, PUB_IMU,  &twsbImu.pitch,     &twsbImu.roll, 
                                                 &twsbImu.accX,      &twsbImu.accY,  &twsbImu.accZ,
                                                 &twsbImu.gyroX,     &twsbImu.gyroY, &twsbImu.gyroZ);
             
-            */
+            
             
             comsSendMsg(&coms, &ser1, PUB_STATE, twsbState.leftShaftRPS,       twsbState.leftWheelTargetRPS,  twsbState.voltageLeft,
                                                  twsbState.rightShaftRPS,      twsbState.rightWheelTargetRPS, twsbState.voltageRight,

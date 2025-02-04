@@ -36,7 +36,9 @@ flash_stm32flash() {
     echo "Entering FW update mode on the target..."
     ssh "$PI_USER@$PI_IP" << EOF
         echo "Entering FW update mode..."
+        stty -F "$SERIAL_PORT" 115200
         echo '<BB5\n' > $SERIAL_PORT
+        sleep 1
         stm32flash -R -w "$REMOTE_BIN_DIR/$BIN_FILENAME" -v "$SERIAL_PORT"
         if [ $? -ne 0 ]; then
             echo "Error: Flashing failed."
