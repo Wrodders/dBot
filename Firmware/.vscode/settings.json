@@ -3,6 +3,7 @@
     "C_Cpp.default.compilerPath": "/opt/homebrew/bin/arm-none-eabi-gcc",
     "files.associations": {
         "*.h": "c",
+        "*.hpp": "cpp",
         "gpio.h": "c",
         "vector.h": "c",
         "systick.h": "c",
@@ -26,7 +27,9 @@
         "bit": "c",
         "compare": "c",
         "limits": "c",
-        "new": "c"
+        "new": "c",
+        "type_traits": "c",
+        "cmath": "c"
     },
     "cSpell.words": [
         "acklogalged",

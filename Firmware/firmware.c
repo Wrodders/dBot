@@ -4,15 +4,13 @@
 #include "common/task.h"
 
 #include "inc/MPU6050.h"
-#include "inc/serComs.h"
+
 #include "inc/imu.h"
 #include "inc/pid.h"
 #include "inc/motor.h"
-
 #include "inc/ddmr.h"
 
-
-
+#include "pubrpc/serComs.h" // Serial Communications to PC
 
 // ********** GLOBAL STATIC BUFFERS ***************************************// ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[128] = {0};
@@ -49,11 +47,9 @@ static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PI
 }
 // ********** LQR FUNCTIONS ***************************************//
 
-
-
 // ********* SUPER LOOP **************** // 
 int main(void){
-     float nextMode = 0;
+    float nextMode = 0;
 	// ***************************** HARDWARE SETUP ******************************************************** //
 	systemClockSetup();      // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup();    // 1ms Tick
@@ -99,8 +95,7 @@ int main(void){
     comsRegisterPub(&coms, PUB_ERROR,   SERIALIZED_ERROR_FMT);
     comsRegisterPub(&coms, PUB_INFO,    SERIALIZED_INFO_FMT);
     comsRegisterPub(&coms, PUB_DEBUG,   SERIALIZED_DEBUG_FMT);
-    comsRegisterPub(&coms, PUB_STATE,   SERIALIZED_STATE_FMT);
-    comsRegisterPub(&coms, PUB_IMU,     SERIALIZED_IMU_FMT);
+    comsRegisterPub(&coms, PUB_TELEM,   SERIALIZED_TELEM_FMT);
     // --------------------PARAMETER REGISTERS ---------------------- //
     comsRegisterParam(&coms, P_ID,      "%0.3f", &uuid);
     comsRegisterParam(&coms, P_MODE,    "%0.3f", &nextMode);
@@ -191,18 +186,15 @@ int main(void){
                     comsSendMsg(&coms, &ser1, PUB_INFO, "RUN => PARK "); 
                     break;
                 }
-                // ** WHEEL SPEED CONTROL LOOP //
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
                     wspeedCntlTask.lastTick = loopTick;
                 }
-                // ** BALANCE CONTROL LOOP // 
                 if(CHECK_PERIOD(balanceCntrlTask, loopTick)){  
                     runBalanceLoop(&balanceAngleCtrl, &steerCtrl, &imu, &ddmr, &motorL, &motorR);
                     balanceCntrlTask.lastTick = loopTick;
                 }
-                // ** VELOCITY CONTROL LOOP //
                 if(CHECK_PERIOD(velCtrlTask, loopTick)){    
                     runVelocityLoop(&velCtrl, &steerCtrl, &balanceAngleCtrl, &ddmr, &motorL, &motorR);
                     velCtrlTask.lastTick= loopTick;
@@ -213,7 +205,6 @@ int main(void){
 
             case TUNE_MOTOR:
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
-                    // Motor Speed Control ISR 
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
                     wspeedCntlTask.lastTick = loopTick;
@@ -234,6 +225,7 @@ int main(void){
             default:
                 break;  
         };
+
         // ********** IMU ********************************************************************************* //
         if(CHECK_PERIOD(imuTask, loopTick)){
             mpu6050Read(&mpu6050);
@@ -243,23 +235,19 @@ int main(void){
         }
         // ********** Communications ********************************************************************** //
         if(CHECK_PERIOD(comsTask, loopTick)){
-            // TX Publishing Topic
-            
-            comsSendMsg(&coms, &ser1, PUB_IMU,  imu.kal.pitch, imu.kal.roll, 
-                                                imu.lpf.accel.x, imu.lpf.accel.y, imu.lpf.accel.z,
-                                                imu.lpf.gyro.x, imu.lpf.gyro.y, imu.lpf.gyro.z);
-            
-            
-            
-            comsSendMsg(&coms, &ser1, PUB_STATE, motorL.shaftRPS, motorL.speedCtrl.ref, motorL.speedCtrl.out,
-                                                motorR.shaftRPS, motorR.speedCtrl.ref, motorR.speedCtrl.out,
-                                                ddmr.linearVel, velCtrl.ref, balanceAngleCtrl.ref, 
-                                                ddmr.angularVel, steerCtrl.ref, steerCtrl.out);
+            // TX Publishing Telemetry
+            comsSendMsg(&coms, &ser1, PUB_TELEM,    imu.kal.pitch,      imu.kal.roll, 
+                                                    imu.lpf.accel.x,    imu.lpf.accel.y,        imu.lpf.accel.z,
+                                                    imu.lpf.gyro.x,     imu.lpf.gyro.y,         imu.lpf.gyro.z,
+                                                    motorL.shaftRPS,    motorL.speedCtrl.ref,   motorL.speedCtrl.out,
+                                                    motorR.shaftRPS,    motorR.speedCtrl.ref,   motorR.speedCtrl.out,
+                                                    ddmr.linearVel,     velCtrl.ref,            balanceAngleCtrl.ref, 
+                                                    ddmr.angularVel,    steerCtrl.ref,          steerCtrl.out);
             
             
             // Handle RX Messages 
             if(comsGrabCmdMsg(&coms, &ser1)){
-                comsProcessCmdMsg(&coms, &ser1);
+               comsExecuteRPC(&coms, &ser1);
             }
             comsTask.lastTick = loopTick;
         }
