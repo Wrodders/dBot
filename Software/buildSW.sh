@@ -33,7 +33,7 @@ make -j4 zmqSubTest || error_exit "Build process failed."
 
 make -j4 zmqPubTest || error_exit "Build process failed."
 
-#make -j4 opencv_rtsp || error_exit "Build process failed."
+make -j4 vision || error_exit "Build process failed."
 
 
 

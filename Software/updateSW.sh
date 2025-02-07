@@ -41,9 +41,7 @@ ssh "$USER@$HOSTNAME" "mkdir -p prog/software/inc"
 echo "[UPDATE_SW][INFO] Syncing software files to $USER@$HOSTNAME..."
 rsync -az --exclude 'mediamtx/' "$SOFTWARE_DIR/" "$USER@$HOSTNAME:prog/software"
 
-# Sync mcuComs.h file separately
-echo "[UPDATE_SW][INFO] Syncing MCU headers..."
-rsync -az ../Firmware/pubrpc/mcuComs.h "$USER@$HOSTNAME:prog/software/inc"
+
 
 # Build the project remotely
 echo "[UPDATE_SW][INFO] Running remote build script..."

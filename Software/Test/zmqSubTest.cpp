@@ -69,7 +69,9 @@ int main(int argc, char *argv[]) {
         std::string truncatedTopic = (topicStr.size() > 20) ? topicStr.substr(0, 17) + "..." : topicStr;
         std::string truncatedMsg = (msgStr.size() > 20) ? msgStr.substr(0, 17) + "..." : msgStr;
 
-       
+       // escabe codes above clear tthe screen 
+
+        std::cout << "\033[2J\033[1;1H"; // Clear the screen
 
         std::cout << "\033[1;34m" << "ZMQ Subscriber " << socket_address << "  " << topic_string << "\033[0m" << std::endl;
         std::cout << "\033[1;36m" << "+----------------------+----------------------+" << "\033[0m" << std::endl;
@@ -77,6 +79,8 @@ int main(int argc, char *argv[]) {
         std::cout << "\033[1;36m" << "+----------------------+----------------------+" << "\033[0m" << std::endl;
         std::cout << "| " << std::left << std::setw(20) << truncatedTopic << " | " << std::setw(20) << truncatedMsg << " |" << std::endl;
         std::cout << "\033[1;36m" << "+----------------------+----------------------+" << "\033[0m" << std::endl;
+
+        std::cout << std::flush;
     }
 
     std::cout << "Subscriber shutdown completed." << std::endl;
