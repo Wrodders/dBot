@@ -21,12 +21,24 @@
  
  ************************************************************************************/
 
+
+// Pi Camera V3 Parameters
+
+
+
+
 #include "../common/coms.hpp"
+
 
 #define NODE_NAME "VISION"
 #define LIBCAMERA_PIPE "libcamera-vid -t 0 --camera 0 --nopreview --autofocus-mode manual --codec yuv420 --width 640 --height 360 --inline --listen -o -"
 #define OUTPUT_PIPE "///tmp/video_out"
 
+// Type Definitions
+
+
+
+// ---------- Constants -------------- //
 const int WIDTH = 640;
 const int HEIGHT = 360;
 const int FRAME_SIZE = WIDTH * HEIGHT * 3 / 2;
@@ -37,24 +49,185 @@ const cv::Vec3b greenYUV = cv::Vec3b(145, 54, 34);
 const cv::Vec3b blueYUV = cv::Vec3b(41, 240, 110);
 const cv::Vec3b yellowYUV = cv::Vec3b(210, 16, 146);
 
+const float grad_dx = 1; // Sobel filter parameters
+const float grad_dy = 0;
+const float grad_ksize = 3;
+const float grad_scale = 1;
+const float grad_delta = 0;
 
+
+// -------- Runtime Parameters ------------ //
+float horizon_height = 340;
+float transfromPadding = 100;
+float hist_threshold = 0.5; // Normalized threshold for histogram peaks to be considered
+float window_margin = 50;
+float num_windows = 9;
+
+float nextOutput = 0;
+float nextMode = 0;
+
+//@Brief: Applies an Overlay Mask to an original roi maked frame to eliminate false edges
+//@param frame: The original frame to apply the mask to
+//@param dst_pts: The original points of the ROI in the frame
+//@param offset: The offset to apply to the ROI mask [pixels]
+void apply_internal_mask_roi(cv::Mat& frame, const std::vector<cv::Point2f>& dst_pts, int offset) {
+    // Compute centroid of the transformed points
+    cv::Point2f centroid(0, 0);
+    for (const auto& pt : dst_pts) {
+        centroid += pt;
+    }
+    centroid *= (1.0 / dst_pts.size()); // Normalize
+
+    // Offset each point inward along its vector to the centroid
+    std::vector<cv::Point> offset_pts;
+    for (const auto& pt : dst_pts) {
+        cv::Point2f direction = centroid - pt;
+        float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+        cv::Point2f unit_direction = direction * (1.0 / length); // Normalize
+
+        // Move point inward by `offset` pixels
+        cv::Point2f new_pt = pt + unit_direction * offset;
+        offset_pts.emplace_back(new_pt);
+    }
+
+    // Create and apply the mask
+    cv::Mat mask = cv::Mat::zeros(frame.size(), CV_8U);
+    std::vector<std::vector<cv::Point>> contours = {offset_pts};
+    cv::fillPoly(mask, contours, cv::Scalar(255));
+
+    // Remove false boundary edges
+    frame.setTo(0, mask == 0);
+}
+
+
+
+
+// Reads a frame from the input pipe.
+bool readFrame(FILE* in_pipe, std::vector<uint8_t>& buffer) {
+    size_t bytes_read = fread(buffer.data(), 1, FRAME_SIZE, in_pipe);
+    return (bytes_read == FRAME_SIZE);
+}
+
+// Writes a frame to the output pipe.
+bool writeFrame(FILE* out_pipe, const std::vector<uint8_t>& buffer) {
+    size_t bytes_written = fwrite(buffer.data(), 1, FRAME_SIZE, out_pipe);
+    return (bytes_written == FRAME_SIZE);
+}
+
+
+cv::Mat apply_birdsEyeView(const cv::Mat& roi, float transfromPadding, 
+                                     std::vector<cv::Point2f>& dst_pts) {
+    std::vector<cv::Point2f> src_pts = {
+        cv::Point2f(0, HEIGHT), cv::Point2f(WIDTH, HEIGHT),
+        cv::Point2f(0, 0), cv::Point2f(WIDTH, 0)
+    };
+    
+    dst_pts = {
+        cv::Point2f(WIDTH/2 - transfromPadding, HEIGHT),
+        cv::Point2f(WIDTH/2 + transfromPadding, HEIGHT),
+        cv::Point2f(0, 0), cv::Point2f(WIDTH, 0)
+    };
+    
+    cv::Mat homography_matrix = cv::findHomography(src_pts, dst_pts);
+    cv::Mat transformed_roi;
+    cv::warpPerspective(roi, transformed_roi, homography_matrix, 
+                       cv::Size(WIDTH, HEIGHT), cv::INTER_LINEAR, 
+                       cv::BORDER_CONSTANT, cv::WARP_FILL_OUTLIERS);
+    return transformed_roi;
+}
+
+
+// @brief: Applies a series of image processing techniques to the input frame.
+// @param y_plane: The Y-plane of the input YUV420 frame.
+// @param output_mode: The output mode to use.
+enum ALGO1_OUT {ALGO1_GRAY = 0, ALGO1_ROI, ALGO1_WRAP, ALGO1_GRAD, ALGO1_LINEHIST, ALGO1_NUM_OUT};
+cv::Mat filter_algo1(const cv::Mat& y_plane ) {
+    // Clamp horizon_height to a valid range.
+    horizon_height = std::clamp(horizon_height, 0.0f, float(HEIGHT));
+    cv::Mat roi = y_plane(cv::Rect(0, HEIGHT - horizon_height, WIDTH, horizon_height));
+    //  Dynamic RPC Apply Birds Eye View Transformation to the ROI - TODO Mode to calibrate
+    std::vector<cv::Point2f> src_pts = {cv::Point2f(0, HEIGHT),cv::Point2f(WIDTH, HEIGHT),
+                                        cv::Point2f(0, 0),cv::Point2f(WIDTH, 0)
+    };
+    std::vector<cv::Point2f> dst_pts = {cv::Point2f(WIDTH / 2 - transfromPadding, HEIGHT),
+                                        cv::Point2f(WIDTH / 2 + transfromPadding, HEIGHT),
+                                        cv::Point2f(0, 0), cv::Point2f(WIDTH, 0)
+    };
+
+    cv::Mat bev_frame = apply_birdsEyeView(roi, transfromPadding, dst_pts);
+
+    // Apply Sobel filter to the transformed ROI.
+    cv::Mat edge_frame;
+    cv::Sobel(bev_frame, edge_frame, CV_8U,grad_dx, grad_dy, grad_ksize, grad_scale, grad_delta, cv::BORDER_DEFAULT);
+    apply_internal_mask_roi(edge_frame, dst_pts, 10); // Apply internal mask to eliminate false edges from the ROI
+
+
+    // Sliding Window Warm Start for Line Detection with Histogram
+    
+    // Compute histogram of the sobel image to help warm start the window search
+    // Histogram along the x axis for eahc collums intensity value 
+    cv::Mat hist; // 1D Array of the sum of the intensity values of the sobel image for each column 
+    cv::reduce(edge_frame, hist, 0, cv::REDUCE_SUM, CV_32F); // Sum along the x-axis to get a histogram
+    // Normalize the histogram
+    cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);
+
+    // Map the histogram to a visualization image for debugging
+    cv::Mat hist_image = cv::Mat::zeros(edge_frame.size(), CV_8UC1);
+    for (int i = 0; i < hist.cols; i++) {
+        cv::line(hist_image, cv::Point(i, HEIGHT), cv::Point(i, HEIGHT - hist.at<float>(0, i)), cv::Scalar(255), 1);
+    }
+    // Take the left and right peaks to warm start the sliding window search
+    int midpoint = hist.cols / 2;
+    // split the array into tow halfs down th emiddle and for the left and right halfs
+    cv::Mat left_hist = hist.colRange(0, midpoint); // 1D array of the left half of the histogram
+    cv::Mat right_hist = hist.colRange(midpoint, hist.cols); // 1D array of the right half of the histogram
+    // sort descending order
+    cv::Mat sorted_left_hist;
+    cv::sort(left_hist, sorted_left_hist, cv::SORT_DESCENDING);
+    cv::Mat sorted_right_hist;
+    cv::sort(right_hist, sorted_right_hist, cv::SORT_DESCENDING);
+
+
+    // for the left and right peak 
+
+
+
+    cv::Mat output;
+    enum ALGO1_OUT output_mode = static_cast<ALGO1_OUT>(std::clamp(int(nextOutput), 0, int(ALGO1_NUM_OUT)));
+    switch (output_mode) {
+        case ALGO1_GRAY:
+            output = y_plane;
+            break;
+        case ALGO1_ROI:
+            output = roi;
+            break;
+        case ALGO1_WRAP:
+            output = bev_frame;
+            break;
+        case ALGO1_GRAD:
+            output = edge_frame;
+            break;
+        case ALGO1_LINEHIST:
+            // For example, you could add histogram visualization here.
+            output = hist_image;
+            break;
+        default:
+            output = y_plane;
+            break;
+    }
+
+    // Resize the output to the full frame size.
+    cv::Mat resized_output;
+    cv::resize(output, resized_output, cv::Size(WIDTH, HEIGHT));
+    return resized_output;
+}
+
+
+
+enum MODE {CALLIBRATE_CHESS, RUN, NUM_MODE}; // Program modes
 int main(int argc, char* argv[]) {
-
-    enum {OUT_GRAY, OUT_WARP, OUT_GRAD, OUT_COST } output_mode = OUT_WARP;
-    enum {MODE_RUN, CALIBRATE } mode = MODE_RUN;
-
-    //  **************** Runtime Parameters **************** //
-    // Register Parameters
-    float horizon_height = HEIGHT / 2;
-    float threshold_value = 63;
-    float transfromPadding = 100;
-    float grad_dx = 1;
-    float grad_dy = 0;
-    float grad_ksize = 3;
-    float grad_scale = 1;
-    float grad_delta = 0;
-    float nextOutput = 0;
-    float nextMode = 0;
+    // -------------- Program Mode FSM ----------------- //
+   enum MODE program_mode = RUN;
     // --------- Communication Setup --------------------- //
     Protocol proto = {'<', '\n', ':', 'A'};
     Command cmd; // Working command variable
@@ -63,14 +236,8 @@ int main(int argc, char* argv[]) {
     TelemetryMsg telem; // Working telemetry variable
     NodeConfigManager config("robotConfig.json", NODE_NAME);
     config.register_parameter(0,&horizon_height);
-    config.register_parameter(1,&threshold_value);
-    config.register_parameter(2,&transfromPadding);
-    config.register_parameter(3,&grad_dx);
-    config.register_parameter(4,&grad_dy);
-    config.register_parameter(5,&grad_ksize);
-    config.register_parameter(6,&grad_scale);
-    config.register_parameter(7,&grad_delta);
-    config.register_parameter(8,&nextOutput);
+    config.register_parameter(1,&transfromPadding);
+    config.register_parameter(2,&nextOutput);
     //  -------------- IO Setup  ----------------- //
     // Command to capture video using rpicam-vid with YUV420p output
     const char* libcamera_cmd = LIBCAMERA_PIPE;
@@ -102,21 +269,16 @@ int main(int argc, char* argv[]) {
     zmq::socket_t msg_pubsock = zmq::socket_t(context, zmq::socket_type::pub);
     msg_pubsock.set(zmq::sockopt::linger, 0);
     msg_pubsock.connect(MSG_PUB_ADDRESS); // Connect to the message socket proxy
-
     // ------------- Pipeline Preprocessing ----------------- //
     std::vector<uint8_t> yuv_buffer(FRAME_SIZE); // Input YUV420 frame buffer
-    // Define source and destination points for perspective transform
-    std::vector<cv::Point2f> src_pts = {
-        cv::Point2f(0, HEIGHT), cv::Point2f(WIDTH, HEIGHT), cv::Point2f(0, 0), cv::Point2f(WIDTH, 0)};
-    std::vector<cv::Point2f> dst_pts = {
-        cv::Point2f(WIDTH / 2 - transfromPadding, HEIGHT),
-        cv::Point2f(WIDTH / 2 + transfromPadding, HEIGHT),
-        cv::Point2f(0, 0),
-        cv::Point2f(WIDTH, 0)};
-    // Precompute the perspective transform matrix
-    cv::Mat transform_matrix = cv::getPerspectiveTransform(src_pts, dst_pts);
-    
-    // ------------- Console Preprocessing ----------------- //
+    // Horizontal Histogram of Intensity of the edges in the frame
+    cv::Mat edge_Hist;
+
+    // ------------ Calibration ----------------- //
+    cv::Mat camera_matrix, dist_coeffs;
+    cv::Mat map1, map2; // Undistortion maps
+
+    // ----------- Console Preprocessing ----------------- //
     fmt::print("[VISIO]Begin Console\n");
     std::cout << std::flush; 
     // -------------- Event Setup  ----------------- //
@@ -134,63 +296,35 @@ int main(int argc, char* argv[]) {
         }        
         /* ********* VISION PIPELINE *********
         @brief: Read YUV420 frame from the pipe
+        @description: Reads a frame from the input pipe and processes it using the selected algorithm.
+        @returns: coeffiencts of polynomial that describe the line these are sampled based on the pure pursuit algorithm
         @note: Outputs frame to video out pipe 
         */
         if (poll_items[0].revents & ZMQ_POLLIN) { // Frame Available
-            // Read raw YUV420 frame from the pipe
-            size_t bytes_read = fread(yuv_buffer.data(), 1, FRAME_SIZE, in_pipe);
-            if (bytes_read != FRAME_SIZE) {
-                std::cerr << "Error reading frame from rpicam-vid!" << std::endl;
+            if (!readFrame(in_pipe, yuv_buffer)) {
+                std::cerr << "[VISION] Error: Unable to read a complete frame." << std::endl;
                 break;
             }
-            // Fill U and V planes with constant values (e.g., 128)
+            // Proccess Raw Buffer into OpenCV Mat YUV420 Frame
+            cv::Mat y_plane(HEIGHT, WIDTH, CV_8UC1, yuv_buffer.data()); // opperate on the Y plane only
+
+
+            cv::Mat processed_frame;
+            processed_frame = filter_algo1(y_plane);
+
+            // Serialize the processed frame to a YUV420 buffer.
+            std::memcpy(yuv_buffer.data(), processed_frame.data, WIDTH * HEIGHT);
             uint8_t* u_plane = yuv_buffer.data() + (WIDTH * HEIGHT);
             uint8_t* v_plane = u_plane + (WIDTH * HEIGHT / 4);
-            std::fill(u_plane, u_plane + (WIDTH * HEIGHT / 4), 128);
+            std::fill(u_plane, u_plane + (WIDTH * HEIGHT / 4), 128); // blank out the U and V planes
             std::fill(v_plane, v_plane + (WIDTH * HEIGHT / 4), 128);
-
-            // Process Y plane
-            cv::Mat y_plane(HEIGHT, WIDTH, CV_8UC1, yuv_buffer.data());
-            cv::Mat roi = y_plane(cv::Rect(0, HEIGHT - horizon_height, WIDTH, horizon_height));
-
-            // Apply perspective transform to the ROI
-            cv::Mat transformed_roi;
-            cv::warpPerspective(roi, transformed_roi, transform_matrix, roi.size());
-
-            // Apply Sobel filter to the transformed ROI
-            cv::Mat sobel_image;
-            cv::Sobel(transformed_roi, sobel_image, CV_8U, grad_dx, grad_dy, grad_ksize, grad_scale, grad_delta, cv::BORDER_DEFAULT);
-
-            // Apply Distance Transform
-            cv::Mat distance_transform;
-            cv::distanceTransform(sobel_image, distance_transform, cv::DIST_C, cv::DIST_MASK_PRECISE);
-            cv::normalize(distance_transform, distance_transform, 0, 1.0, cv::NORM_MINMAX);
-
-            // Choose output frame based on the mode
-            cv::Mat* output_frame;
-            switch (output_mode) {
-                case OUT_GRAY:
-                    output_frame = &y_plane;
-                    break;
-                case OUT_WARP:
-                    output_frame = &transformed_roi;
-                    break;
-                case OUT_GRAD:
-                    output_frame = &sobel_image;
-                    break;
-                case OUT_COST:
-                    output_frame = &distance_transform;
-                    break;
-                default:
-                    output_frame = &y_plane;
-                    break;
+            // 6. Write the processed frame to the output pipe.
+            if (!writeFrame(out_pipe, yuv_buffer)) {
+                fmt::print("[VISION] Error: Failed to write output bytes (expected {} bytes).\n", FRAME_SIZE);
+                break;
             }
-            // Resize the image to 640x360
-            cv::resize(*output_frame, *output_frame, cv::Size(WIDTH, HEIGHT));
-            std::memcpy(yuv_buffer.data(), output_frame->data, WIDTH * HEIGHT);
-            fwrite(yuv_buffer.data(), 1, FRAME_SIZE, out_pipe);
+
         }
-        
         // ------- Command Processing -------- //
         if (poll_items[1].revents & ZMQ_POLLIN) { // Console Input
             handle_cmdconsole(cmd, cmd_pubsock, config, proto);
@@ -198,8 +332,13 @@ int main(int argc, char* argv[]) {
         if (poll_items[2].revents & ZMQ_POLLIN) { // Command Message Available
             handle_zmqcmd(cmd, cmd_subsock, msg_pubsock, config, proto);
         }
+
     }
+
+    // Cleanup
     pclose(in_pipe);
     fclose(out_pipe);
     return 0;
 }
+
+

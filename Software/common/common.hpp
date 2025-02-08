@@ -49,6 +49,4 @@ std::string formatTimestamp(std::chrono::time_point<std::chrono::system_clock> t
 
 
 
-
-
 #endif // COMMON_H

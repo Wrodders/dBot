@@ -135,8 +135,6 @@ public:
 };
 
 // *********  Utils ********* //
-
-
 void display_console( const std::string& topic, const std::string& msg, const std::string& timestring) {
     std::cout << "\033[2J\033[1;1H"; // Clear the screen
     fmt::print("[{}] {}: {}\n", timestring, topic, msg);
