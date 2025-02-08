@@ -56,15 +56,32 @@ const float grad_scale = 1;
 const float grad_delta = 0;
 
 
+
+
+
 // -------- Runtime Parameters ------------ //
 float horizon_height = 340;
 float transfromPadding = 100;
-float hist_threshold = 0.5; // Normalized threshold for histogram peaks to be considered
-float window_margin = 50;
-float num_windows = 9;
-
+int nwindows = 9;                     // Number of sliding windows
+int margin = 50;                      // Width of the window +/- margin
+int minpix = 50;                      // Minimum number of pixels to recenter window
+int window_height = HEIGHT / nwindows; // Height of the windowss
 float nextOutput = 0;
 float nextMode = 0;
+
+
+// Reads a frame from the input pipe.
+bool readFrame(FILE* in_pipe, std::vector<uint8_t>& buffer) {
+    size_t bytes_read = fread(buffer.data(), 1, FRAME_SIZE, in_pipe);
+    return (bytes_read == FRAME_SIZE);
+}
+
+// Writes a frame to the output pipe.
+bool writeFrame(FILE* out_pipe, const std::vector<uint8_t>& buffer) {
+    size_t bytes_written = fwrite(buffer.data(), 1, FRAME_SIZE, out_pipe);
+    return (bytes_written == FRAME_SIZE);
+}
+
 
 //@Brief: Applies an Overlay Mask to an original roi maked frame to eliminate false edges
 //@param frame: The original frame to apply the mask to
@@ -98,22 +115,6 @@ void apply_internal_mask_roi(cv::Mat& frame, const std::vector<cv::Point2f>& dst
     // Remove false boundary edges
     frame.setTo(0, mask == 0);
 }
-
-
-
-
-// Reads a frame from the input pipe.
-bool readFrame(FILE* in_pipe, std::vector<uint8_t>& buffer) {
-    size_t bytes_read = fread(buffer.data(), 1, FRAME_SIZE, in_pipe);
-    return (bytes_read == FRAME_SIZE);
-}
-
-// Writes a frame to the output pipe.
-bool writeFrame(FILE* out_pipe, const std::vector<uint8_t>& buffer) {
-    size_t bytes_written = fwrite(buffer.data(), 1, FRAME_SIZE, out_pipe);
-    return (bytes_written == FRAME_SIZE);
-}
-
 
 cv::Mat apply_birdsEyeView(const cv::Mat& roi, float transfromPadding, 
                                      std::vector<cv::Point2f>& dst_pts) {
@@ -167,7 +168,9 @@ cv::Mat filter_algo1(const cv::Mat& y_plane ) {
     // Compute histogram of the sobel image to help warm start the window search
     // Histogram along the x axis for eahc collums intensity value 
     cv::Mat hist; // 1D Array of the sum of the intensity values of the sobel image for each column 
-    cv::reduce(edge_frame, hist, 0, cv::REDUCE_SUM, CV_32F); // Sum along the x-axis to get a histogram
+    // take historgrab of bottom half of the image to get edges close to the car
+    cv::Mat bottom_half = edge_frame(cv::Rect(0, HEIGHT / 2, WIDTH, HEIGHT / 2));
+    cv::reduce(bottom_half, hist, 0, cv::REDUCE_SUM, CV_32F);
     // Normalize the histogram
     cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);
 
@@ -178,20 +181,43 @@ cv::Mat filter_algo1(const cv::Mat& y_plane ) {
     }
     // Take the left and right peaks to warm start the sliding window search
     int midpoint = hist.cols / 2;
-    // split the array into tow halfs down th emiddle and for the left and right halfs
-    cv::Mat left_hist = hist.colRange(0, midpoint); // 1D array of the left half of the histogram
-    cv::Mat right_hist = hist.colRange(midpoint, hist.cols); // 1D array of the right half of the histogram
-    // sort descending order
-    cv::Mat sorted_left_hist;
-    cv::sort(left_hist, sorted_left_hist, cv::SORT_DESCENDING);
-    cv::Mat sorted_right_hist;
-    cv::sort(right_hist, sorted_right_hist, cv::SORT_DESCENDING);
+    cv::Point left_peak, right_peak; // (x, y) coordinates of the left and right peaks
+    cv::minMaxLoc(hist(cv::Rect(0, 0, midpoint, 1)), nullptr, nullptr, nullptr, &left_peak);
+    cv::minMaxLoc(hist(cv::Rect(midpoint, 0, midpoint, 1)), nullptr, nullptr, nullptr, &right_peak);
+
+
+    int left_current = left_peak.x;
+    int right_current = right_peak.x;
+    // Create Windows using corners
+    std::vector<cv::Rect> left_windows;
+    for (int i = 0; i < nwindows; i++) {
+        int win_y_low = HEIGHT - (i + 1) * window_height;
+        int win_y_high = HEIGHT - i * window_height;
+        int win_xleft_low = left_current - margin;
+        int win_xleft_high = left_current + margin;
+        left_windows.emplace_back(cv::Rect(win_xleft_low, win_y_low, win_xleft_high - win_xleft_low, win_y_high - win_y_low));
+    }
+    std::vector<cv::Rect> right_windows;
+    for (int i = 0; i < nwindows; i++) {
+        int win_y_low = HEIGHT - (i + 1) * window_height;
+        int win_y_high = HEIGHT - i * window_height;
+        int win_xright_low = right_current - margin;
+        int win_xright_high = right_current + margin;
+        right_windows.emplace_back(cv::Rect(win_xright_low, win_y_low, win_xright_high - win_xright_low, win_y_high - win_y_low));
+    }
+
+
+    // Sliding window earhc for lane liens
+    // Attempts to find edges inside a window. If enough are found, the window is recentered to the average position of the edges.
+    // the window is slid from bottom to top of the image, and the positions of the center of the window are recorded in a vector 
+    // 
+    // 
+
+
+
 
 
     // for the left and right peak 
-
-
-
     cv::Mat output;
     enum ALGO1_OUT output_mode = static_cast<ALGO1_OUT>(std::clamp(int(nextOutput), 0, int(ALGO1_NUM_OUT)));
     switch (output_mode) {
@@ -309,15 +335,20 @@ int main(int argc, char* argv[]) {
             cv::Mat y_plane(HEIGHT, WIDTH, CV_8UC1, yuv_buffer.data()); // opperate on the Y plane only
 
 
+
             cv::Mat processed_frame;
             processed_frame = filter_algo1(y_plane);
 
-            // Serialize the processed frame to a YUV420 buffer.
+            // Combine the grayscale processed frame with the U and V planes, grayed out.
             std::memcpy(yuv_buffer.data(), processed_frame.data, WIDTH * HEIGHT);
             uint8_t* u_plane = yuv_buffer.data() + (WIDTH * HEIGHT);
             uint8_t* v_plane = u_plane + (WIDTH * HEIGHT / 4);
-            std::fill(u_plane, u_plane + (WIDTH * HEIGHT / 4), 128); // blank out the U and V planes
+            std::fill(u_plane, u_plane + (WIDTH * HEIGHT / 4), 128);
             std::fill(v_plane, v_plane + (WIDTH * HEIGHT / 4), 128);
+
+            // 2. Write the processed frame to the output pipe.
+
+
             // 6. Write the processed frame to the output pipe.
             if (!writeFrame(out_pipe, yuv_buffer)) {
                 fmt::print("[VISION] Error: Failed to write output bytes (expected {} bytes).\n", FRAME_SIZE);

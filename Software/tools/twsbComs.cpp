@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
     int baud_rate = std::stoi(argv[2]);
 
     // Store console topics in a set
-    std::unordered_set<std::string> console_topics;
+    std::unordered_set<std::string> console_topics; // group of topics to display on the console
     for (int i = 3; i < argc; i++) {
         console_topics.insert(argv[i]);
     }
@@ -146,10 +146,10 @@ int main(int argc, char* argv[]) {
                 Also displays select messages on te debug console
         */
         if (poll_items[0].revents & ZMQ_POLLIN) { // SerialPort
-            sercoms_grab_telemetry(serial_fd, coms, proto, config); 
+            sercoms_grab_telemetry(serial_fd, coms, proto, config);  // read and half parse messages from the serial port
             while (!coms.telemMsgQ.empty()) { // Publish all messages in the queue
-                struct TelemetryMsg telem_msg = coms.telemMsgQ.front(); // get the message to the working variable
-                coms.telemMsgQ.pop();
+                struct TelemetryMsg telem_msg = coms.telemMsgQ.front(); // grab the message from the queue
+                coms.telemMsgQ.pop(); 
                 zmqcoms_publish_tsmp_msg(msg_pubsock,telem_msg); // bridge the message to the ZMQ
                 if (console_topics.find(telem_msg.topic) != console_topics.end()) {
                     display_console(telem_msg.topic, telem_msg.data, formatTimestamp(telem_msg.timestamp));
@@ -160,13 +160,14 @@ int main(int argc, char* argv[]) {
             std::string cmd_input;
             std::getline(std::cin, cmd_input);
             if (cmd_input.empty()) { return 0; }
+            cmd_input = proto_pack_asciicmd(cmd_input, proto);
+            fmt::print("\033[2J\033[1;1H"); // Clear the screen
             if (cmd_input == "exit") {
                 fmt::print("[TWSB_COMS] Exiting\n");
                 break;
             }
-            // Send the command to the TWSB
-            std::string packed_cmd = proto_pack_asciicmd(cmd_input, proto);
-            write(serial_fd, packed_cmd.c_str(), packed_cmd.size());
+            // Send the command to the TWSB 
+            write(serial_fd, cmd_input.c_str(), cmd_input.size());
         }
 
         if (poll_items[2].revents & ZMQ_POLLIN) { // Command Message Available 

@@ -332,7 +332,7 @@ int handle_cmdconsole(struct Command& cmd, zmq::socket_t& msg_pubsock, NodeConfi
     std::getline(std::cin, cmd_input);
     if (cmd_input.empty()) { return 0; }
     cmd_input = proto_pack_asciicmd(cmd_input, proto);
-    std::cout << "\033[2J\033[1;1H"; // Clear the screen
+    fmt::print("\033[2J\033[1;1H"); // Clear the screen
     if (cmd_input == "exit") {
         fmt::print("[CONSOLE] Exiting\n");
         return -1;
