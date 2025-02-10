@@ -31,7 +31,7 @@
 
 
 #define NODE_NAME "VISION"
-#define LIBCAMERA_PIPE "libcamera-vid -t 0 --camera 0 --nopreview --autofocus-mode manual --codec yuv420 --width 640 --height 360 --inline --listen -o -"
+#define LIBCAMERA_PIPE "sudo libcamera-vid -t 0 --camera 0 --nopreview --autofocus-mode manual --codec yuv420 --width 640 --height 360 --inline --listen -o -"
 #define OUTPUT_PIPE "///tmp/video_out"
 
 // Type Definitions
@@ -260,7 +260,7 @@ int main(int argc, char* argv[]) {
     std::string cmd_msg; // Command message string
     std::string cmdret_msg; // Command return message string
     TelemetryMsg telem; // Working telemetry variable
-    NodeConfigManager config("robotConfig.json", NODE_NAME);
+    NodeConfigManager config("configs/robotConfig.json", NODE_NAME);
     config.register_parameter(0,&horizon_height);
     config.register_parameter(1,&transfromPadding);
     config.register_parameter(2,&nextOutput);
@@ -334,11 +334,8 @@ int main(int argc, char* argv[]) {
             // Proccess Raw Buffer into OpenCV Mat YUV420 Frame
             cv::Mat y_plane(HEIGHT, WIDTH, CV_8UC1, yuv_buffer.data()); // opperate on the Y plane only
 
-
-
             cv::Mat processed_frame;
             processed_frame = filter_algo1(y_plane);
-
             // Combine the grayscale processed frame with the U and V planes, grayed out.
             std::memcpy(yuv_buffer.data(), processed_frame.data, WIDTH * HEIGHT);
             uint8_t* u_plane = yuv_buffer.data() + (WIDTH * HEIGHT);

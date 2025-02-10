@@ -39,15 +39,13 @@ ssh "$USER@$HOSTNAME" "mkdir -p prog/software/inc"
 
 # Sync project files, excluding unnecessary files
 echo "[UPDATE_SW][INFO] Syncing software files to $USER@$HOSTNAME..."
-rsync -az --exclude 'mediamtx/' "$SOFTWARE_DIR/" "$USER@$HOSTNAME:prog/software"
-
-
+rsync -az --exclude 'mediamtx/'  --exclude 'build/' "$SOFTWARE_DIR/" "$USER@$HOSTNAME:prog/software"
 
 # Build the project remotely
 echo "[UPDATE_SW][INFO] Running remote build script..."
 ssh "$USER@$HOSTNAME" << EOF
     cd prog/software
-    bash buildSW.sh
+    bash scripts/buildSW.sh
 EOF
 
 echo "[UPDATE_SW][SUCCESS] Software build completed successfully on $HOSTNAME!"

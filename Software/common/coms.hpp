@@ -1,7 +1,7 @@
 #ifndef COMS_H
 #define COMS_H
 /* PUB_RPC COMS PROTOCOL PC Application Definitions ***************
-/*
+
 Pub-RPC Specification Protocol Frame Structure
           |-----------Packet------------|
           ********|---------Frame-------|
@@ -270,73 +270,17 @@ bool zmqcoms_receive_telem(zmq::socket_t& telemSumSocket, TelemetryMsg& telem) {
     return true;
 }
 
-// ********* SERIAL Implementation Pub-RPC
-enum SERCOMS_DECODE_TELEM { COMS_TELEM_IDLE = 0, COMS_TELEM_ID, COMS_TELEM_DATA, COMS_TELEM_ERROR};
-
-struct SerComs {
-    TelemetryMsg _telem_msg_rx;
-    std::queue<TelemetryMsg> telemMsgQ;
-    SERCOMS_DECODE_TELEM telemDecodeState;
-    std::vector<uint8_t> rxBuffer; // Now owned by SerComs
-
-    // Constructor that initializes the vector with a given size.
-    SerComs()
-        : rxBuffer(SERCOMS_RX_BUFFER_SIZE) {
-        // Additional initialization if needed.
-    }
-};
-//@Brief: Grab the ASCII message frame from the serial port read buffer
-//@Description: Parses inplace teh xMacro string mapped to the decoded Publisher ID
-//@Note: Multiple messages are pared and pushed to the message queue
-//@Note: Partial Messages are completed and verified in the next read
-void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol& proto, 
-                            NodeConfigManager& config) {
-    ssize_t bytesRead = read(serialFd, coms.rxBuffer.data(), coms.rxBuffer.size());
-    size_t idx = 0;
-    while ((bytesRead - static_cast<ssize_t>(idx)) > 0) {
-        uint8_t byte = coms.rxBuffer[idx++];
-        switch (coms.telemDecodeState) {
-            case COMS_TELEM_IDLE:
-                if (byte == proto.sof_byte) {
-                    coms._telem_msg_rx = {};  // Reset message
-                    coms.telemDecodeState = COMS_TELEM_ID;
-                }
-                break;
-            case COMS_TELEM_ID:
-                byte = byte - proto.offset;
-                coms._telem_msg_rx.topic = config.get_pub_name(byte);
-                coms.telemDecodeState = COMS_TELEM_DATA;
-                break;
-            case COMS_TELEM_DATA:
-                if (byte == proto.sof_byte) {
-                    coms.telemDecodeState = COMS_TELEM_ERROR;
-                } else if (byte == proto.eof_byte) {
-                    coms._telem_msg_rx.timestamp = std::chrono::system_clock::now();
-                    coms.telemMsgQ.push(coms._telem_msg_rx);
-                    coms.telemDecodeState = COMS_TELEM_IDLE;
-                } else {
-                    coms._telem_msg_rx.data.push_back(byte);
-                }
-                break;
-            case COMS_TELEM_ERROR:
-                coms.telemDecodeState = COMS_TELEM_IDLE;
-                break;
-        }
-    }
-}
-
-
 //@Brief: Parse and Execute RPC commands from the console
 int handle_cmdconsole(struct Command& cmd, zmq::socket_t& msg_pubsock, NodeConfigManager& config, Protocol& proto) {
     std::string cmd_input;
     std::getline(std::cin, cmd_input);
     if (cmd_input.empty()) { return 0; }
-    cmd_input = proto_pack_asciicmd(cmd_input, proto);
-    fmt::print("\033[2J\033[1;1H"); // Clear the screen
     if (cmd_input == "exit") {
         fmt::print("[CONSOLE] Exiting\n");
         return -1;
     }
+    fmt::print("\033[2J\033[1;1H"); // Clear the screen
+    cmd_input = proto_pack_asciicmd(cmd_input, proto);
     TelemetryMsg cmdret_msg;
     fmt::print("<< {}\n", cmd_input);
     if (proto_deserialize_cmd(cmd_input, proto, cmd)) {

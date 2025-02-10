@@ -1,0 +1,78 @@
+{
+    "VISION": {
+        "parameters": [
+            {"name": "OUTPUT_MODE",     "address": 0, "format": "%d", "description": "Video Stream Output Mode"},
+            {"name": "HORIZON_HEIGHT",  "address": 1, "format": "%d", "description": "ROI Horizon height [px]"},
+            {"name": "IMG_WIDTH",       "address": 2, "format": "%d", "description": "Src Camera width [px]"},
+            {"name": "IMG_HEIGHT",      "address": 3, "format": "%d", "description": "Src Camera height [px]"},
+            {"name": "THRESHOLD",       "address": 4, "format": "%d", "description": "Binary Threshold Level"},
+            {"name": "GRAD_DX",         "address": 5, "format": "%d", "description": "Sobel dx"},
+            {"name": "GRAD_DY",         "address": 6, "format": "%d", "description": "Sobel dy"},
+            {"name": "GRAD_SCALE",      "address": 7, "format": "%d", "description": "Sobel scale"},
+            {"name": "GRAD_KSIZE",      "address": 8, "format": "%d", "description": "Sobel ksize"},
+            {"name": "GRAD_DELTA",      "address": 9, "format": "%d", "description": "Sobel delta"}
+        ],
+
+        "publishers": [
+            {"socket": "ipc:///tmp/botmsgs", "name": "CMD_RET", "address": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
+            {"socket": "ipc:///tmp/botmsgs", "name": "ERROR", "address": 1, "description": "Error Message", "format": "%s:%d", "args": "msg, timestamp"},
+            {"socket": "ipc:///tmp/botmsgs", "name": "INFO", "address": 2, "description": "Info Log", "format": "%s:%d", "args": "msg, timestamp"},
+            {"socket": "ipc:///tmp/botmsgs", "name": "DEBUG", "address": 3, "description": "Debug Log", "format": "%s:%d", "args": "msg, timestamp"},
+            {"socket": "ipc:///tmp/botcmds", "name": "TWSB", "address": 4, "description": "Trajecotry Commands", "format": "<%c%c%f\n", "args": "cmd, id, value"}
+        ]
+    },
+    "TWSB": {
+        "parameters": [
+            {"name": "P_ID",            "address": 0,   "access": "R",  "format": "%f",     "description":  "Unique Device Id"},
+            {"name": "P_MODE",          "address": 1,   "access": "W",  "format": "%f",     "description":  "Operation Mode"},
+            {"name": "P_LTRGT",         "address": 2,   "access": "W",  "format": "%f",     "description":  "Left Motor Target RPS"},
+            {"name": "P_LKP",           "address": 3,   "access": "W",  "format": "%f",     "description":  "Left Motor Kp"},
+            {"name": "P_LKI",           "address": 4,   "access": "W",  "format": "%f",     "description":  "Left Motor Ki"},
+            {"name": "P_RTRGT",         "address": 5,   "access": "W",  "format": "%f",     "description":  "Right Motor Target RPS"},
+            {"name": "P_RKP",           "address": 6,   "access": "W",  "format": "%f",     "description":  "Right Motor Kp"},
+            {"name": "P_RKI",           "address": 7,   "access": "W",  "format": "%f",     "description":  "Right Motor Ki"},
+            {"name": "P_BTRGT",         "address": 8,   "access": "W",  "format": "%f",     "description":  "Balance Target Angle"},
+            {"name": "P_BKP",           "address": 9,   "access": "W",  "format": "%f",     "description":  "Balance Kp"},
+            {"name": "P_BKI",           "address": 10,  "access": "W",  "format": "%f",     "description":  "Balance Ki"},
+            {"name": "P_BKD",           "address": 11,  "access": "W",  "format": "%f",     "description":  "Balance Kd"},
+            {"name": "P_VTRGT",         "address": 12,  "access": "W",  "format": "%f",     "description":  "Voltage Target"},
+            {"name": "P_VKP",           "address": 13,  "access": "W",  "format": "%f",     "description":  "Voltage Kp"},
+            {"name": "P_VKI",           "address": 14,  "access": "W",  "format": "%f",     "description":  "Voltage Ki"},
+            {"name": "P_VKD",           "address": 15,  "access": "W",  "format": "%f",     "description":  "Voltage Kd"},
+            {"name": "P_VALPHA",        "address": 16,  "access": "W",  "format": "%f",     "description":  "Voltage Alpha"},
+            {"name": "P_ATRGT",         "address": 17,  "access": "W",  "format": "%f",     "description":  "Angular Vel Target"},
+            {"name": "P_AKP",           "address": 18,  "access": "W",  "format": "%f",     "description":  "Angular Vel Kp"},
+            {"name": "P_AKI",           "address": 19,  "access": "W",  "format": "%f",     "description":  "Angular Vel Ki"},
+            {"name": "P_AKD",           "address": 20,  "access": "W",  "format": "%f",     "description":  "Angular Vel Kd"},
+            {"name": "P_AALPHA",        "address": 21,  "access": "W",  "format": "%f",     "description":  "Angular Vel Alpha"},
+            {"name": "P_IMU_AALPHA",    "address": 22,  "access": "W",  "format": "%f",    "description":  "IMU Acceleration LPF Coefficient"},
+            {"name": "P_IMU_GALPHA",    "address": 23,  "access": "W",   "format":"%f",     "description":  "IMU Gyroscope LPF Alpha Coefficient"},
+            {"name": "P_IMU_KAL_Q",     "address": 24,  "access": "W",   "format":"%f",     "description":  "IMU Kalman Q Value"},
+            {"name": "P_IMU_KAL_R",     "address": 25,  "access": "W",   "format":"%f",     "description":  "IMU Kalman R Value"},
+            {"name": "P_IMU_KAL_QB",    "address": 26,  "access": "W",   "format":"%f",     "description":  "IMU Kalman Q Bias"},
+            {"name": "P_IMU_A_XOFFSET", "address": 27,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer X Offset"},
+            {"name": "P_IMU_A_YOFFSET", "address": 28,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer Y Offset"},
+            {"name": "P_IMU_A_ZOFFSET", "address": 29,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer Z Offset"}
+        ],
+        "publishers": [
+            {"socket":"ipc:///tmp/botmsgs", "name": "CMD_RET",     "address": 0,   "description": "Return Cmd Value",  "format": "%s:%d", "args": "retval, timestamp"},
+            {"socket":"ipc:///tmp/botmsgs", "name": "ERROR",       "address": 1,   "description": "Error Message",     "format": "%s:%d", "args": "msg, timestamp"},
+            {"socket":"ipc:///tmp/botmsgs", "name": "INFO",        "address": 2,   "description": "Info Log",          "format": "%s:%d", "args": "msg, timestamp"},
+            {"socket":"ipc:///tmp/botmsgs", "name": "DEBUG",       "address": 3,   "description": "Debug Log",         "format": "%s:%d", "args": "msg, timestamp"},
+            {"socket":"ipc:///tmp/botmsgs", "name": "TELEM",       
+                "address": 4,   
+                "description": "State variables",   
+                "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%d", 
+                "args":  ["ROLL",    "PITCH",
+                         "ACCEL_X", "ACCEL_Y",  "ACCEL_Z",
+                         "GYRO_X",  "GYRO_Y",   "GYRO_Z", 
+                         "LEFT_SHAFT_RPS",  "LEFT_WHEEL_TRGT",  "LEFT_VOLTAGE", 
+                          "RIGHT_SHAFT_RPS", "RIGHT_WHEEL_TRGT", "RIGHT_VOLTAGE", 
+                          "LINEAR_VEL",      "LIN_VEL_TRGT",     "BALANCE_ANGLE",
+                          "ANGULAR_VEL",     "ANG_VEL_TRGT",     "STEER_DIFF",
+                         "timestamp"]
+            }
+        ]
+        
+    }
+}
