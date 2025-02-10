@@ -40,7 +40,7 @@ void cli_display_help(const std::string& program_name) {
 //@Brief: Configure the serial port non-canonical mode
 int config_serial_port(const std::string& port, int baud) {
     fmt::print("[TWSB Coms][INFO] Configuring Serial Port: {} at {} baud\n", port, baud);
-    int serial_port_fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY); 
+    int serial_port_fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK); 
     if (serial_port_fd == -1) {
         std::cerr << "Error: Unable to open serial port " << port << std::endl;
         return -1;
@@ -72,7 +72,7 @@ int config_serial_port(const std::string& port, int baud) {
     options.c_cflag &= ~CRTSCTS;   // No flow control
     options.c_cflag |= CS8; // 8 data bits
     options.c_cc[VMIN] = 0; // Read doesn't block
-    options.c_cc[VTIME] = 10; // 0.5 sec intra character timeout
+    options.c_cc[VTIME] = 10; 
 
     if (tcsetattr(serial_port_fd, TCSANOW, &options) != 0) {
         close(serial_port_fd);
@@ -246,13 +246,8 @@ int main(int argc, char* argv[]) {
                 fmt::print("[TWSB_COMS] Exiting\n");
                 break;
             }
-            fmt::print("\033[2J\033[1;1H"); // Clear the screen
-            fmt::print("[TWSB_COMS] << {}\n", cmd_input);   
             cmd_input = proto_pack_asciicmd(cmd_input, proto);
-            // Send the command to the TWSB 
-            write(serial_fd, cmd_input.c_str(), cmd_input.size());
-            std::cout << std::flush; // Keep Latests message at top of screen for UX
-        }
+            write(serial_fd, cmd_input.c_str(), cmd_input.size());        }
 
         if (poll_items[2].revents & ZMQ_POLLIN) { // ZMQ Command Message Available 
             std::tuple<std::string, std::string> cmd_msg_packet = zmqcoms_receive_asciicmd(cmd_subsock);
@@ -264,7 +259,6 @@ int main(int argc, char* argv[]) {
             // Send the command msg to the TWSB transparently
             display_console(std::get<0>(cmd_msg_packet), cmd_msg, formatTimestamp(std::chrono::system_clock::now()));
             write(serial_fd, cmd_msg.c_str(), cmd_msg.size());
-           
         }
     }
 

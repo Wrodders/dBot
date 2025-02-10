@@ -15,6 +15,7 @@ struct Encoder {
     uint32_t lastCount; // encoder count
 }Encoder;
 
+//@Breif: Initialize the encoder in Hardware Quadrature mode
 static struct Encoder encoderInit(uint32_t timPerif,  uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
     struct Encoder e;
     // Store the timer peripheral in the encoder structure
@@ -33,8 +34,8 @@ static struct Encoder encoderInit(uint32_t timPerif,  uint32_t period, uint32_t 
     timer_continuous_mode(e.timPerif);
     timer_set_period(e.timPerif, period - 1);
     timer_slave_set_mode(e.timPerif, TIM_SMCR_SMS_EM3); // Encoder mode 3
-    timer_ic_set_input(e.timPerif, TIM_IC1, TIM_IC_IN_TI1);
-    timer_ic_set_input(e.timPerif, TIM_IC2, TIM_IC_IN_TI2);
+    timer_ic_set_input(e.timPerif, TIM_IC1, TIM_IC_IN_TI1); // Phase A
+    timer_ic_set_input(e.timPerif, TIM_IC2, TIM_IC_IN_TI2); // Phase B
     timer_enable_counter(e.timPerif);
     TIM_CNT(e.timPerif) = 0x0000; // reset counter
 
