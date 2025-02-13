@@ -1,3 +1,12 @@
+/*************************************************
+ *  @file    zmqsub.cpp
+ *  @brief   zmq topic subscriber CLI tool   
+ *  @date    2025-01-10
+ *  @version 1.0.0
+ * CLI tool connects to an endpoint and subscribes to a topic
+ * Formatted table using ASCII escape codes
+ * Receives multipart messages Topic MsgData Timestamp 
+*/
 
 #include <zmq.hpp>
 #include <iostream>
@@ -5,6 +14,10 @@
 #include <csignal>
 #include <iomanip>
 #include <atomic>
+#include <chrono>
+#include <fmt/core.h>
+
+#include "../common/common.hpp"
 
 void printUsage(const std::string &programName) {
     std::cerr << "Usage: " << programName << " [options]" << std::endl;
@@ -45,44 +58,37 @@ int main(int argc, char *argv[]) {
     subSocket.set(zmq::sockopt::subscribe, topic_string.c_str());
     subSocket.connect(socket_address);
 
-    std::cout << "Subscribed to " << socket_address << " on topic \"" << topic_string << "\"" << std::endl;
+    fmt::print("[ZMQ Subscriber] Connected to {}\n", socket_address);
+    fmt::print("[ZMQ Subscriber] Subscribed to {}\n", topic_string);
 
     while (true) {
-        zmq::message_t topic, msg;
-        
-        zmq::recv_result_t result_topic = subSocket.recv(topic, zmq::recv_flags::none);
-        if (!result_topic) {
-            std::cerr << "Failed to receive topic" << std::endl;
-            break;
-        }
-
-        zmq::recv_result_t result_msg = subSocket.recv(msg, zmq::recv_flags::none);
-        if (!result_msg) {
-            std::cerr << "Failed to receive message" << std::endl;
-            break;
-        }
+        zmq::message_t topic, msg, timestamp;
+        (void) subSocket.recv(topic, zmq::recv_flags::none);
+        (void) subSocket.recv(msg, zmq::recv_flags::none);
+        (void) subSocket.recv(timestamp, zmq::recv_flags::none);
 
         std::string topicStr(static_cast<char *>(topic.data()), topic.size());
         std::string msgStr(static_cast<char *>(msg.data()), msg.size());
-
+        std::string timestampStr(static_cast<char *>(timestamp.data()), timestamp.size());
+        // convert to formatted timestamp from chrono stead clock 
+        std::chrono::time_point<std::chrono::system_clock> timestampPoint;
+        timestampPoint = std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(std::stoll(timestampStr)));
+        std::time_t timestampTime = std::chrono::system_clock::to_time_t(timestampPoint);
+        timestampStr = std::ctime(&timestampTime);
+        timestampStr.pop_back(); // Remove newline character
         // Optionally truncate long messages for table formatting
         std::string truncatedTopic = (topicStr.size() > 20) ? topicStr.substr(0, 17) + "..." : topicStr;
         std::string truncatedMsg = (msgStr.size() > 20) ? msgStr.substr(0, 17) + "..." : msgStr;
-
-       // escabe codes above clear tthe screen 
-
+        // Table formatting
         std::cout << "\033[2J\033[1;1H"; // Clear the screen
-
         std::cout << "\033[1;34m" << "ZMQ Subscriber " << socket_address << "  " << topic_string << "\033[0m" << std::endl;
-        std::cout << "\033[1;36m" << "+----------------------+----------------------+" << "\033[0m" << std::endl;
-        std::cout << "\033[1;36m" << "| Topic                | Message              |" << "\033[0m" << std::endl;
-        std::cout << "\033[1;36m" << "+----------------------+----------------------+" << "\033[0m" << std::endl;
-        std::cout << "| " << std::left << std::setw(20) << truncatedTopic << " | " << std::setw(20) << truncatedMsg << " |" << std::endl;
-        std::cout << "\033[1;36m" << "+----------------------+----------------------+" << "\033[0m" << std::endl;
-
+        std::cout << "----------------------------------------" << std::endl;
+        std::cout << std::setw(20) << std::left << "Topic:" << std::setw(20) << std::left << truncatedTopic << std::endl;
+        std::cout << std::setw(20) << std::left << "Message:" << std::setw(20) << std::left << truncatedMsg << std::endl;
+        std::cout << std::setw(20) << std::left << "Timestamp:" << std::setw(20) << std::left << timestampStr << std::endl;
+        std::cout << "----------------------------------------" << std::endl;
         std::cout << std::flush;
     }
-
     std::cout << "Subscriber shutdown completed." << std::endl;
     return 0;
 }

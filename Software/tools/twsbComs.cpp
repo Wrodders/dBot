@@ -217,7 +217,7 @@ int main(int argc, char* argv[]) {
     };
     // -------------- Event Loop ----------------- //
     while (true) {
-        int rc = zmq::poll(poll_items, 3, std::chrono::milliseconds(-1));
+        int rc = zmq::poll(poll_items, 3, std::chrono::milliseconds(10));
         if (rc == -1) {
             fmt::print("[TWSB_COMS] Error: Polling Error\n");
             break;
@@ -232,7 +232,7 @@ int main(int argc, char* argv[]) {
             while (!coms.telemMsgQ.empty()) { // Publish all messages in the 
                 struct TelemetryMsg telem_msg = coms.telemMsgQ.front(); // grab the message from the queue
                 coms.telemMsgQ.pop(); 
-                zmqcoms_publish_tsmp_msg(msg_pubsock,telem_msg); // bridge the message to the ZMQ
+                zmqcoms_publish_tsmp_msg(msg_pubsock,telem_msg, NODE_NAME );// bridge the message to the ZMQ
                 if (console_topics.find(telem_msg.topic) != console_topics.end()) {
                     display_console(telem_msg.topic, telem_msg.data, formatTimestamp(telem_msg.timestamp));
                 }
@@ -246,8 +246,8 @@ int main(int argc, char* argv[]) {
                 fmt::print("[TWSB_COMS] Exiting\n");
                 break;
             }
-            cmd_input = proto_pack_asciicmd(cmd_input, proto);
-            write(serial_fd, cmd_input.c_str(), cmd_input.size());        }
+            write(serial_fd, cmd_input.c_str(), cmd_input.size());        
+        }
 
         if (poll_items[2].revents & ZMQ_POLLIN) { // ZMQ Command Message Available 
             std::tuple<std::string, std::string> cmd_msg_packet = zmqcoms_receive_asciicmd(cmd_subsock);

@@ -1,0 +1,31 @@
+[VISION] Begin Vision
+[VISIO]Begin Console
+ >> Invalid Command
+ >> Invalid Command
+[CONSOLE] Exiting
+Process 24225 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+Process:         vision [24225]
+Path:            /Users/USER/*/vision
+Load Address:    0x104f38000
+Identifier:      vision
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  leaks [24223]
+
+Date/Time:       2025-02-13 12:14:19.796 +0000
+Launch Time:     2025-02-13 12:12:55.460 +0000
+OS Version:      macOS 13.5.1 (22G90)
+Report Version:  7
+Analysis Tool:   /usr/bin/leaks
+
+Physical footprint:         16.0M
+Physical footprint (peak):  19.0M
+Idle exit:                  untracked
+----
+
+leaks Report Version: 4.0, multi-line stacks
+Process 24225: 2083 nodes malloced for 518 KB
+Process 24225: 0 leaks for 0 total leaked bytes.
+

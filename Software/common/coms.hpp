@@ -60,9 +60,13 @@ private:
     // Mapping for parameter values: address -> Parameter 
     std::unordered_map<int, Parameter> param_map;
 
+    
+
 public:
+    const std::string NODE_NAME;
     // Constructor that reads the configuration file and extracts the specified section.
-    NodeConfigManager(const std::string& filename, const std::string& section) {
+    NodeConfigManager(const std::string& filename, const std::string& NODE_NAME) : NODE_NAME(NODE_NAME) {
+      
         std::ifstream file(filename);
         if (!file.is_open()) {
             throw std::runtime_error("Failed to open config file");
@@ -70,24 +74,24 @@ public:
         json config;
         file >> config;
 
-        if (config.contains(section)) {
+        if (config.contains(NODE_NAME)) {
             // Load publisher information into map
-            if (config[section].contains("publishers")) {
-                for (const auto& publisher : config[section]["publishers"]) {
+            if (config[NODE_NAME].contains("publishers")) {
+                for (const auto& publisher : config[NODE_NAME]["publishers"]) {
                     int address = publisher["address"]; // Get the publisher address
                     std::string name = publisher["name"]; // Get the publisher name
                     address_to_name[address] = name; // Store the publisher name
                 }
             }
             // Load parameter configurations into map
-            if (config[section].contains("parameters")) {
-                for (const auto& param : config[section]["parameters"]) {
+            if (config[NODE_NAME].contains("parameters")) {
+                for (const auto& param : config[NODE_NAME]["parameters"]) {
                     int address = param["address"]; // Get the parameter address
                     parameter_configs[address] = param; // Store the parameter configuration
                 }
             }
         } else {
-            throw std::runtime_error("Section '" + section + "' not found in config file");
+            throw std::runtime_error("Section '" + NODE_NAME + "' not found in config file");
         }
     }
 
@@ -144,13 +148,12 @@ inline char proto_encode_id(struct Protocol& proto, uint8_t id) {return id + pro
 inline uint8_t proto_decode_id(struct Protocol& proto, char id) {return id - proto.offset;}
 
 //@Brief: Packs the cmd string to a cmd frame as per the pub-rpc protocol
-std::string proto_pack_asciicmd(const std::string& cmd, struct Protocol& proto) {
-    std::string packed_cmd;
+
+
+void proto_pack_asciicmd(std::string& cmd, const struct Protocol& proto) {
     // SOF | DATA | EOF
-    packed_cmd.push_back(proto.sof_byte);
-    packed_cmd.append(cmd);
-    packed_cmd.push_back(proto.eof_byte);
-    return packed_cmd;
+    cmd.insert(0, 1, proto.sof_byte);
+    cmd.push_back(proto.eof_byte);
 }
 
 //@Brief: deserializes the command string into a Command struct
@@ -164,7 +167,7 @@ bool proto_deserialize_cmd(const std::string& cmd_msg, Protocol &proto, Command&
     if (cmd_msg.size() < 3) { //  CMDID PARAMID
         return false; // Invalid command message needs atleast 3 bytes SOF CMDID PARAMID
     }
-    cmd.cmdID = proto_decode_id(proto, cmd_msg[1]);
+    cmd.cmdID = proto_decode_id(proto, cmd_msg[1]);  
     cmd.paramID = proto_decode_id(proto, cmd_msg[2]);
     if (cmd_msg.size() > 3) {
         std::string data = cmd_msg.substr(3); // Extract the data payload
@@ -179,19 +182,23 @@ bool proto_deserialize_cmd(const std::string& cmd_msg, Protocol &proto, Command&
 }
 //@Brief: Forward the telemetry message to the ZMQ publisher socket
 //@Note: It is a multipart zmq message <topic><data><timestamp> serialized to ASCII
-void zmqcoms_publish_tsmp_msg(zmq::socket_t& pubSocket, const TelemetryMsg& telem) {
+void zmqcoms_publish_tsmp_msg(zmq::socket_t& pubSocket, const TelemetryMsg& telem, std::string nodeName) {
     auto duration = telem.timestamp.time_since_epoch();
-    auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-    zmq::message_t topic(telem.topic.size());
-    memcpy(topic.data(), telem.topic.data(), telem.topic.size());
+    // Prepend node name 
+    std::string topicstr = nodeName + "/" + telem.topic;
+    zmq::message_t topic(topicstr.size());
+    memcpy(topic.data(), topicstr.data(), topicstr.size());
     zmq::message_t data(telem.data.size());
     memcpy(data.data(), telem.data.data(), telem.data.size());
-    zmq::message_t timestamp(sizeof(uint64_t));
-    memcpy(timestamp.data(), &timestamp_ms, sizeof(timestamp_ms));
+    // format timestamp as ascii string
+    auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    std::string timestamp = std::to_string(timestamp_ms);
+    zmq::message_t timestamp_msg(timestamp.size());
+    memcpy(timestamp_msg.data(), timestamp.data(), timestamp.size());
     // Send the multipart message (topic, data, timestamp)
     pubSocket.send(topic, zmq::send_flags::sndmore);
     pubSocket.send(data, zmq::send_flags::sndmore);
-    pubSocket.send(timestamp, zmq::send_flags::none);
+    pubSocket.send(timestamp_msg, zmq::send_flags::none);
 }
 
 
@@ -219,7 +226,7 @@ void coms_exec_rpc(const Command& cmd, NodeConfigManager& config, zmq::socket_t&
             cmdret_msg.topic = "CMD_RET" + cmd.topic; // Append CMD_RET to the topic
             cmdret_msg.data = std::to_string(value);
             cmdret_msg.timestamp = std::chrono::system_clock::now();
-            zmqcoms_publish_tsmp_msg(msg_pubsock, cmdret_msg);
+            zmqcoms_publish_tsmp_msg(msg_pubsock, cmdret_msg, config.NODE_NAME);    
             break;
         default:
             std::cerr << " >> Invalid command ID: " << cmd.cmdID << std::endl;
@@ -270,34 +277,12 @@ bool zmqcoms_receive_telem(zmq::socket_t& telemSumSocket, TelemetryMsg& telem) {
     return true;
 }
 
-//@Brief: Parse and Execute RPC commands from the console
-int handle_cmdconsole(struct Command& cmd, zmq::socket_t& msg_pubsock, NodeConfigManager& config, Protocol& proto) {
-    std::string cmd_input;
-    std::getline(std::cin, cmd_input);
-    if (cmd_input.empty()) { return 0; }
-    if (cmd_input == "exit") {
-        fmt::print("[CONSOLE] Exiting\n");
-        return -1;
-    }
-    fmt::print("\033[2J\033[1;1H"); // Clear the screen
-    cmd_input = proto_pack_asciicmd(cmd_input, proto);
-    TelemetryMsg cmdret_msg;
-    fmt::print("<< {}\n", cmd_input);
-    if (proto_deserialize_cmd(cmd_input, proto, cmd)) {
-        coms_exec_rpc(cmd, config, msg_pubsock);
-    } else {
-        fmt::print(" >> Invalid Command\n");
-    }
-
-    std::cout << std::flush; // Keep Latests message at top of screen for UX
-    return 0;
-}
 //@Breif:Parse and Execute RPC commands from the ZMQ socket
 int handle_zmqcmd(struct Command& cmd, zmq::socket_t& cmd_subsock, zmq::socket_t& msg_pubsock,  
                  NodeConfigManager& config, struct Protocol& proto) {
     std::tuple<std::string, std::string> cmd_msg_packet = zmqcoms_receive_asciicmd(cmd_subsock);
     std::string cmd_msg = std::get<1>(cmd_msg_packet);
-    display_console(cmd.topic, cmd_msg, formatTimestamp(std::chrono::system_clock::now()));
+   
     if (cmd_msg == "exit") {
         fmt::print("[ZMQ CMD] Exiting\n");
         return -1;
@@ -309,6 +294,8 @@ int handle_zmqcmd(struct Command& cmd, zmq::socket_t& cmd_subsock, zmq::socket_t
         fmt::print("Invalid Command\n");
     }
     return 0;
+
+    display_console(cmd.topic, cmd_msg, formatTimestamp(std::chrono::system_clock::now()));
 }
 
 
