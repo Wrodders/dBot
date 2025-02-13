@@ -12,13 +12,26 @@
  * Processes the frames in birds eye view format usign a series of selectable image processing techniques for comparison
  * Selects output frame to pipe as output; this is used to stream the processed video to a web interface
  *                          
- * -----------------------------------------------------------------------------------| 
- * ----> |cmd  | VISION   | ----> |---------|
- * ----> |   stdio        | ----> |         |<---- | pipe | libcamera-vid
- * ----> | msg | TWSB/IMU | ----> | Vision  | 
- * <---- | cmd | TWSB     | <---- |         |----> | ///tmp/video_out | ffmpeg | RTMP | Web Browser 
- * <---- | msg | VISION   | <---- |---------|
- 
+ * ------------------------------------------------|
+ * ----> |cmd  | VISION   | ----> |---------|      |-----------------------------------|
+ * ----> |   stdio        | ----> |         |<---- | pipe | libcamera-vid or GStreamer |
+ * ----> | msg | TWSB/IMU | ----> | Vision  |      |-----------------------------------|
+ * <---- | cmd | TWSB     | <---- |         |----> | pipe | ffmpeg or GStreamer        | 
+ * <---- | msg | VISION   | <---- |---------|      |-----------------------------------|
+ * 
+ * 
+ * output frame for visualization
+ * 
+ *              640px           
+ * |--------------------------|
+ * | yuv  | Birds| Edge | Hist| 
+ * |------|      |      |-----| 300px
+ * | ROI  | Eye  |      | yuv |
+ * ----------------------------
+ * 
+ * 
+ * 
+ * 
  ************************************************************************************/
 #include "../common/coms.hpp"
 
@@ -29,7 +42,6 @@
 #include <thread>
 
 #define NODE_NAME "VISION"
-#define LIBCAMERA_PIPE "sudo libcamera-vid -t 0 --camera 0 --nopreview --rotation 180 --autofocus-mode manual --codec yuv420 --width 640 --height 360 --inline --listen -o -"
 #define INPUT_PIPE "///tmp/video_in"
 #define OUTPUT_PIPE "///tmp/video_out"
 
@@ -219,23 +231,30 @@ int main(int argc, char* argv[]) {
         @returns: coeffs of polynomial that describe the line these are sampled based on the pure pursuit algorithm
         @note: Outputs frame to video out pipe 
         */
-        if (poll_items[0].revents & ZMQ_POLLIN) { // Frame Available
+       if (poll_items[0].revents & ZMQ_POLLIN) { // Frame Available
             size_t bytes_read = fread(yuv_buffer.data(), 1, yuv_buffer.size(), in_pipe);
             if (bytes_read != FRAME_SIZE) {
                 std::cerr << "[VISION] Error: Unable to read a complete frame." << std::endl;
-                continue;; // skip frame if not complete
+                continue; // skip frame if not complete
             }
-            // Process only the gray scale Y plane of the YUV420 frame
-            cv::Mat y_plane(HEIGHT, WIDTH, CV_8UC1, yuv_buffer.data());            // Birds eye view edge detection
+        
+            // Process the gray scale Y plane of the YUV420 frame
+            cv::Mat y_plane(HEIGHT, WIDTH, CV_8UC1, yuv_buffer.data());
             _horizon_height_px = std::clamp(_horizon_height_px, 20.0f, float(HEIGHT));
             cv::Mat floor_segment_roi = y_plane(cv::Rect(0, HEIGHT - _horizon_height_px, WIDTH, _horizon_height_px));
-            const std::vector<cv::Point2f> dst_pts = {  cv::Point2f((WIDTH / 2 - _transform_bottom_padding_px), HEIGHT),
-                                                        cv::Point2f((WIDTH / 2 + _transform_bottom_padding_px), HEIGHT),
-                                                        cv::Point2f(0, 0), cv::Point2f(WIDTH, 0)};
+            
+            const std::vector<cv::Point2f> dst_pts = {  
+                cv::Point2f((WIDTH / 2 - _transform_bottom_padding_px), HEIGHT),
+                cv::Point2f((WIDTH / 2 + _transform_bottom_padding_px), HEIGHT),
+                cv::Point2f(0, 0), 
+                cv::Point2f(WIDTH, 0)
+            };
+            // Apply perspective transformation to the ROI
             cv::Mat wrap_frame = apply_birdsEyeView(floor_segment_roi, dst_pts);
+        
             // Apply Sobel filter to the transformed ROI.
-            cv::Mat edge_frame; // cast netex edge to enum  clamp it to number of edge algorithms
-            edge_mode = static_cast<EDGE_ALGOMODE>(std::clamp(int(_next_edgemode), 0, int(NUM_EDGEALGO)));
+            cv::Mat edge_frame;
+            edge_mode = static_cast<EDGE_ALGOMODE>(std::clamp(int(_next_edgemode), 0, int(NUM_EDGEALGO -1)));
             switch(edge_mode) {
                 case EDGE_CANNY:
                     cv::Canny(wrap_frame, edge_frame, 50, 150, 3);
@@ -251,13 +270,13 @@ int main(int argc, char* argv[]) {
                     break;
             }
             apply_internal_mask_roi(edge_frame, dst_pts, 10); // Apply internal mask to eliminate false edges from the ROI
-            // Sliding Window Warm Start for Line Detection with Histogram
-            // Compute histogram of the sobel image to help warm start the window search
-            // Histogram along the x axis for each column intensity value 
-            cv::Mat hist(edge_frame.size().width, 1, CV_32F); // 1D array of float
-            cv::Mat bottom_half = edge_frame(cv::Rect(0, HEIGHT / 2, WIDTH, HEIGHT / 2)); // extract the bottom half of the frame
+        
+            // Compute histogram of the sobel image for warm start
+            cv::Mat hist(edge_frame.size().width, 1, CV_32F); 
+            cv::Mat bottom_half = edge_frame(cv::Rect(0, HEIGHT / 2, WIDTH, HEIGHT / 2)); 
             cv::reduce(bottom_half, hist, 0, cv::REDUCE_SUM, CV_32F);
-            cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);  // map the histogram to 0-255
+            cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);  
+        
             // Map the histogram to a visualization image for debugging
             cv::Mat hist_image = cv::Mat::zeros(edge_frame.size(), CV_8UC1);
             for (int i = 0; i < hist.cols; i++) {
@@ -270,37 +289,58 @@ int main(int argc, char* argv[]) {
             cv::minMaxLoc(hist(cv::Rect(midpoint, 0, midpoint, 1)), nullptr, nullptr, nullptr, &right_peak);
             int left_current = left_peak.x; // initialize window search start points
             int right_current = right_peak.x;
-            // Instead of selecting a single output, composite all stages side-by-side.
-            std::vector<cv::Mat> stages = { y_plane, floor_segment_roi, wrap_frame, edge_frame, hist_image };
-            int numStages = stages.size();
-            int subWidth = WIDTH / numStages;  // each stage gets an equal portion (640/5 = 128)
 
-            cv::Mat composite(HEIGHT, WIDTH, CV_8UC1); // Composite image to hold all stages
-            // Fill the grid cells (row‑major order). If a cell doesn't have an image, it remains black.
-            for (int i = 0; i < numStages; i++) {
-                cv::Mat stage = letterboxImage(stages[i], subWidth, HEIGHT); // Letterbox the image
-                cv::Rect roi(i * subWidth, 0, subWidth, HEIGHT); // Define the region of interest
-                stage.copyTo(composite(roi)); // Copy the letterboxed image to the composite
+            const cv::Size targetSize(WIDTH/4, HEIGHT/2);
+            cv::Mat composite_y(HEIGHT, WIDTH, CV_8UC1, cv::Scalar(0));
+            int tile_width = WIDTH / 4;
+            int tile_height = HEIGHT / 2;
+            // Resize and tile the Y-plane images
+            std::vector<cv::Mat> out_planes = {y_plane, wrap_frame, edge_frame, hist_image};
+            for (int i = 0; i < 4; i++) {
+                cv::Mat resized_tile;
+                cv::resize(out_planes[i], resized_tile, cv::Size(tile_width, tile_height));
+                // Determine placement position in the grid
+                int row = i / 4;
+                int col = i % 4;
+                cv::Rect roi(col * tile_width, row * tile_height, tile_width, tile_height);
+                resized_tile.copyTo(composite_y(roi));
             }
 
-            // Copy the composite debug image into the Y (luminance) plane of the YUV buffer.
-            std::memcpy(yuv_buffer.data(), composite.data, WIDTH * HEIGHT);
+            cv::line(composite_y, cv::Point(WIDTH / 4, 0), cv::Point(WIDTH / 4, HEIGHT), blueYUV, 1);
+            cv::line(composite_y, cv::Point(WIDTH / 2, 0), cv::Point(WIDTH / 2, HEIGHT), blueYUV, 1);
+            cv::line(composite_y, cv::Point(3 * WIDTH / 4, 0), cv::Point(3 * WIDTH / 4, HEIGHT), blueYUV, 1);
+            cv::line(composite_y, cv::Point(0, HEIGHT / 2), cv::Point(WIDTH, HEIGHT / 2), blueYUV, 1);
+            cv::line(composite_y, cv::Point(0, HEIGHT - _horizon_height_px), cv::Point(WIDTH, HEIGHT - _horizon_height_px), blueYUV, 1);
+            cv::line(composite_y, cv::Point(WIDTH / 2 - _transform_bottom_padding_px, HEIGHT), cv::Point(WIDTH / 2 - _transform_bottom_padding_px, 0), blueYUV, 1);
+            cv::line(composite_y, cv::Point(WIDTH / 2 + _transform_bottom_padding_px, HEIGHT), cv::Point(WIDTH / 2 + _transform_bottom_padding_px, 0), blueYUV, 1);
+            // Copy the composite Y-plane into the YUV buffer
+            std::memcpy(yuv_buffer.data(), composite_y.data, WIDTH * HEIGHT);
+            
             // Fill the U and V planes with 128 (neutral chroma)
             uint8_t* u_plane = yuv_buffer.data() + (WIDTH * HEIGHT);
             uint8_t* v_plane = u_plane + (WIDTH * HEIGHT / 4);
             std::fill(u_plane, u_plane + (WIDTH * HEIGHT / 4), 128);
             std::fill(v_plane, v_plane + (WIDTH * HEIGHT / 4), 128);
+
+            // draw grid lines in blue using the YUV color space
+
+            // Draw the sliding windows on the composite image
+
+
+
+            // Write to output pipe (assuming write_frame is defined elsewhere)
             try {
                 write_frame(out_pipe, yuv_buffer);
             } catch (const std::exception& e) {
-                fmt::print("[VISION] Error: Unable to write frame to output pipe\n");
-                continue;
+                std::cerr << "[VISION] Error: Unable to write frame to output pipe\n";
             }
         }
-        
+    
         // ------------ ZMQ COMMAND EVENT ------------ //
         if (poll_items[1].revents & ZMQ_POLLIN) { // Command Message Available
-            handle_zmqcmd(_cmd, cmd_subsock, msg_pubsock, config, _proto);
+            if(handle_zmqcmd(_cmd, cmd_subsock, msg_pubsock, config, _proto) == -1) {
+                break;
+            }
         }
         // ------------ CONSOLE COMMAND QUEUE HANDLER ------------ //
         while(!cmd_queue.empty()){
@@ -309,8 +349,12 @@ int main(int argc, char* argv[]) {
             std::string cmd_input = cmd_queue.front();
             cmd_queue.pop();
             if (cmd_input == "exit") {
-                fmt::print("[CONSOLE] Exiting\n");
-                break;
+                fmt::print("[VISION] Exiting\n");
+                // Cleanup
+                fclose(in_pipe);
+                fclose(out_pipe);
+                exit_thread = true;                
+                return 0;
             }
             if(cmd_input.length() < 2) { 
                 fmt::print(" >> Invalid Command\n");
@@ -325,6 +369,7 @@ int main(int argc, char* argv[]) {
     // Cleanup
     fclose(in_pipe);
     fclose(out_pipe);
+    exit_thread = true;
     return 0;
 }
 
