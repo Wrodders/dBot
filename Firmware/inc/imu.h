@@ -1,6 +1,16 @@
+/**************************************************
+ * @brief: IMU Sensor Fusion Library
+ * @details: Estimates Pitch and Roll from Accelerometer and Gyroscope Data
+ *           Applies 1st order IIR Low Pass Filter to Accelerometer and Gyroscope Data
+ *           Provides Kalman and Complementary Filter to Estimate Pitch and Roll
+ * @date: 2020/05/31
+ * @version: 1.0.0
+ * @file: imu.h
+ **************************************************/
+
+
 #ifndef IMU_H
 #define IMU_H
-
 #define RAD_TO_DEG 57.295779513082320876798154814105
 /* Inertial Measurement State Estimator
 Accelerometer and Gyroscope Data Low Pass Filtered. 

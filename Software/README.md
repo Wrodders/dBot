@@ -7,7 +7,7 @@
     - [zmqComs](#zmqcoms)
   - [VISION](#vision)
     - [Vision Based Trajectory Planning](#vision-based-trajectory-planning)
-- [Tools](#tools)
+- [Vision Perforamnce Testing](#vision-perforamnce-testing)
 
 
 ## twsbComs: 
@@ -81,4 +81,14 @@ graph LR
 *  Inverse Transform the trajectory to the original image space
 *  Draw the trajectory on the image in green
 
-# Tools
+
+
+# Vision Perforamnce Testing
+
+
+Pipeline     | Memory | CPU % |
+-------------|--------|-------|
+libcamera-udp| 42M    | 7.7   |
+libcam-mtx   | 
+
+

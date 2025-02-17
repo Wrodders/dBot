@@ -3,37 +3,35 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+
 #include <iostream>
-#include <vector>
-#include <chrono>
-#include <zmq.h>
 #include <fstream>
 #include <iomanip>
-#include <unordered_map>
 #include <stdexcept>
 #include <sstream>
-#include <iomanip>
-#include <ctime>
-#include <chrono>
-#include <iostream>
-#include <cstdio>
-#include <vector>
-#include <opencv2/opencv.hpp> 
-#include <zmq.hpp>
+
 #include <fcntl.h>
 #include <unistd.h>
-#include <fmt/format.h>
-#include <queue>
 
+#include <chrono>
+#include <ctime>
+
+#include <string.h>
+#include <unordered_map>
 #include <unordered_set>
+#include <queue>
+#include <vector>
 
+#include <zmq.hpp>
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
 
 #define CMD_SOCKET_ADDRESS "ipc:///tmp/botcmds"
 #define MSG_PUB_ADDRESS "ipc:///tmp/botmsgs"
+
+#define PC_VIDEO_ADDRESS "192.168.0.32"
 #define SERCOMS_RX_BUFFER_SIZE 1024
 
 //@Brief: Format timestamps in human-readable format
@@ -46,8 +44,6 @@ std::string formatTimestamp(std::chrono::time_point<std::chrono::system_clock> t
     oss << "." << std::setw(9) << std::setfill('0') << ns;
     return oss.str();
 }
-
-
 
 
 #endif // COMMON_H

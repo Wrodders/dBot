@@ -45,6 +45,6 @@ echo "[INFO] Uploading firmware..."
 bash ../scripts/upload.sh -f firmware.bin -d downloads -u "$USER" -i "$HOSTNAME" || { echo "[ERROR] Firmware upload failed! Exiting."; exit 1; }
 
 echo "[INFO] Programming MCU..."
-bash ../scripts/rprog_mcu.sh -f firmware.bin -d downloads -u "$USER" -i "$HOSTNAME" -m stm32flash -p "$DEVICE" || { echo "[ERROR] MCU programming failed! Exiting."; exit 1; }
+bash rprog_mcu.sh -f firmware.bin -d downloads -u "$USER" -i "$HOSTNAME" -m stm32flash -p "$DEVICE" || { echo "[ERROR] MCU programming failed! Exiting."; exit 1; }
 
 echo "[SUCCESS] Firmware successfully uploaded and MCU programmed!"

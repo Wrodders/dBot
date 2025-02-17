@@ -1,24 +1,19 @@
 {
     "VISION": {
         "parameters": [
-            {"name": "OUTPUT_MODE",     "address": 0, "format": "%d", "description": "Video Stream Output Mode"},
-            {"name": "HORIZON_HEIGHT",  "address": 1, "format": "%d", "description": "ROI Horizon height [px]"},
-            {"name": "IMG_WIDTH",       "address": 2, "format": "%d", "description": "Src Camera width [px]"},
-            {"name": "IMG_HEIGHT",      "address": 3, "format": "%d", "description": "Src Camera height [px]"},
-            {"name": "THRESHOLD",       "address": 4, "format": "%d", "description": "Binary Threshold Level"},
-            {"name": "GRAD_DX",         "address": 5, "format": "%d", "description": "Sobel dx"},
-            {"name": "GRAD_DY",         "address": 6, "format": "%d", "description": "Sobel dy"},
-            {"name": "GRAD_SCALE",      "address": 7, "format": "%d", "description": "Sobel scale"},
-            {"name": "GRAD_KSIZE",      "address": 8, "format": "%d", "description": "Sobel ksize"},
-            {"name": "GRAD_DELTA",      "address": 9, "format": "%d", "description": "Sobel delta"}
-        ],
+            {"name": "HORIZON_HEIGHT_PX", "address": 0, "format": "%d", "description": "Video Stream Output Mode"},
+            {"name": "TRANSFORM_PAD_PX",  "address": 1, "format": "%d", "description": "ROI Horizon height [px]"},
+            {"name": "EDGE_FILT",         "address": 2, "format": "%d", "description": "Src Camera width [px]"},
+            {"name": "N_WINDOWS",         "address": 3, "format": "%d", "description": "Src Camera height [px]"},
+            {"name": "WIN_MARGIN_PX",     "address": 4, "format": "%d", "description": "Binary Threshold Level"},
+            {"name": "WIN_MIN_PX",        "address": 5, "format": "%d", "description": "Sobel dx"}
+            ],
 
         "publishers": [
-            {"socket": "ipc:///tmp/botmsgs", "name": "CMD_RET", "address": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
-            {"socket": "ipc:///tmp/botmsgs", "name": "ERROR", "address": 1, "description": "Error Message", "format": "%s:%d", "args": "msg, timestamp"},
-            {"socket": "ipc:///tmp/botmsgs", "name": "INFO", "address": 2, "description": "Info Log", "format": "%s:%d", "args": "msg, timestamp"},
-            {"socket": "ipc:///tmp/botmsgs", "name": "DEBUG", "address": 3, "description": "Debug Log", "format": "%s:%d", "args": "msg, timestamp"},
-            {"socket": "ipc:///tmp/botcmds", "name": "TWSB", "address": 4, "description": "Trajecotry Commands", "format": "<%c%c%f\n", "args": "cmd, id, value"}
+            {"name": "CMD_RET",         "address": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
+            {"name": "ERROR",           "address": 1, "description": "Error Message", "format": "%s:%d", "args": "msg, timestamp"},
+            {"name": "INFO",            "address": 2, "description": "Info Log", "format": "%s:%d", "args": "msg, timestamp"},
+            {"name": "DEBUG",           "address": 3, "description": "Debug Log", "format": "%s:%d", "args": "msg, timestamp"},
         ]
     },
     "TWSB": {
@@ -55,11 +50,11 @@
             {"name": "P_IMU_A_ZOFFSET", "address": 29,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer Z Offset"}
         ],
         "publishers": [
-            {"socket":"ipc:///tmp/botmsgs", "name": "CMD_RET",     "address": 0,   "description": "Return Cmd Value",  "format": "%s:%d", "args": "retval, timestamp"},
-            {"socket":"ipc:///tmp/botmsgs", "name": "ERROR",       "address": 1,   "description": "Error Message",     "format": "%s:%d", "args": "msg, timestamp"},
-            {"socket":"ipc:///tmp/botmsgs", "name": "INFO",        "address": 2,   "description": "Info Log",          "format": "%s:%d", "args": "msg, timestamp"},
-            {"socket":"ipc:///tmp/botmsgs", "name": "DEBUG",       "address": 3,   "description": "Debug Log",         "format": "%s:%d", "args": "msg, timestamp"},
-            {"socket":"ipc:///tmp/botmsgs", "name": "TELEM",       
+            {"name": "CMD_RET",     "address": 0,   "description": "Return Cmd Value",  "format": "%s:%d", "args": "retval, timestamp"},
+            { "name": "ERROR",       "address": 1,   "description": "Error Message",     "format": "%s:%d", "args": "msg, timestamp"},
+            { "name": "INFO",        "address": 2,   "description": "Info Log",          "format": "%s:%d", "args": "msg, timestamp"},
+            { "name": "DEBUG",       "address": 3,   "description": "Debug Log",         "format": "%s:%d", "args": "msg, timestamp"},
+            { "name": "TELEM",       
                 "address": 4,   
                 "description": "State variables",   
                 "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%d", 

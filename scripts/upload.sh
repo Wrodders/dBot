@@ -1,4 +1,9 @@
 #!/bin/bash
+# -------------------------------------------------- 
+#  @file    upload.sh
+#  @brief   Script to upload binary files to the Raspberry Pi using rsync
+#  @date    2025-01-05
+#  @version 1.0
 
 # Function to display help message
 show_help() {

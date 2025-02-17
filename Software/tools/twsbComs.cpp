@@ -10,7 +10,6 @@
  *  Publishes Timestamped Serialized Telemetry Messages to the ZMQ IPC socket
  * 
  *          ----> | ZMQ SUB | ----> | TWSB UART WRITE | ----> | TWSB |
- *          ----> | Console | ----> | TWSB UART WRITE | ----> | TWSB |
  *          <---- | ZMQ PUB | <---- | TWSB UART READ  | <---- | TWSB |
  ************************************************************************************/
 
@@ -83,7 +82,7 @@ int config_serial_port(const std::string& port, int baud) {
 }
 
 
-int get_bytes_available(int fd) {
+inline int get_bytes_available(int fd) {
     int num_bytes;
     ioctl(fd, FIONREAD, &num_bytes);
     return num_bytes;
@@ -113,11 +112,7 @@ void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol&
                             NodeConfigManager& config) {
     // read line from serial port until new line 
     int bytesAvailable = get_bytes_available(serialFd);
-    if (bytesAvailable == 0) {
-        fmt::print(" >> Error: No Bytes Available\n"); // this should not happen as we are in a poll loop
-        return;
-    }
-    bytesAvailable = std::min(bytesAvailable, static_cast<int>(coms.rxBuffer.size()));
+    bytesAvailable = std::min(bytesAvailable, static_cast<int>(coms.rxBuffer.size())); 
     ssize_t bytesRead = read(serialFd, coms.rxBuffer.data(), bytesAvailable);
     size_t idx = 0; // index into the buffer
     while ((bytesRead - static_cast<ssize_t>(idx)) > 0) {
@@ -156,9 +151,6 @@ void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol&
     }
 }
 
-
-
-
 // ********* MAIN ************************************************************************* //
 int main(int argc, char* argv[]) {
     // --------------- CLI Parsing ----------------- //
@@ -178,7 +170,7 @@ int main(int argc, char* argv[]) {
 
     // ---------- Communication Setup -------------- //
     Protocol proto = {.sof_byte = '<', .eof_byte = '\n', .delim_byte = ':', .offset = 'A'};
-    Command cmd; // Working command variable
+    CommandMsg cmd; // Working command variable
     NodeConfigManager config("configs/robotConfig.json", NODE_NAME); // Load the robots general configuration file
     struct SerComs coms;
     /* Note this Node is a transparent bridge between the ZMQ and the TWSB
@@ -217,7 +209,7 @@ int main(int argc, char* argv[]) {
     };
     // -------------- Event Loop ----------------- //
     while (true) {
-        int rc = zmq::poll(poll_items, 3, std::chrono::milliseconds(10));
+        int rc = zmq::poll(poll_items, 2, std::chrono::milliseconds(-1));
         if (rc == -1) {
             fmt::print("[TWSB_COMS] Error: Polling Error\n");
             break;
@@ -238,27 +230,10 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
-        if (poll_items[1].revents & ZMQ_POLLIN) { // Console Input
-            std::string cmd_input;
-            std::getline(std::cin, cmd_input);
-            if (cmd_input.empty()) { continue; }
-            if (cmd_input == "exit") {
-                fmt::print("[TWSB_COMS] Exiting\n");
-                break;
-            }
-            write(serial_fd, cmd_input.c_str(), cmd_input.size());        
-        }
-
-        if (poll_items[2].revents & ZMQ_POLLIN) { // ZMQ Command Message Available 
-            std::tuple<std::string, std::string> cmd_msg_packet = zmqcoms_receive_asciicmd(cmd_subsock);
-            std::string cmd_msg = std::get<1>(cmd_msg_packet);
-            if (cmd_msg == "exit") {
-                fmt::print("[TWSB_COMS] Exiting\n");
-                break;
-            }
+        if (poll_items[1].revents & ZMQ_POLLIN) { // ZMQ Command Message Available 
+            zmqcoms_receive_asciicmd(cmd_subsock, cmd); // Receive the command message
             // Send the command msg to the TWSB transparently
-            display_console(std::get<0>(cmd_msg_packet), cmd_msg, formatTimestamp(std::chrono::system_clock::now()));
-            write(serial_fd, cmd_msg.c_str(), cmd_msg.size());
+            write(serial_fd, cmd.data.c_str(), cmd.data.size());
         }
     }
 

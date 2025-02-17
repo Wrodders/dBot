@@ -1,4 +1,9 @@
 #!/bin/bash
+# -------------------------------------------------- 
+#  @file    twsbConsole.cpp
+#  @brief   A simple console for debugging TWSB messages.
+#  @date    2025-01-05
+#  @version 1.0
 
 # Ensure correct usage
 if [[ $# -lt 3 ]]; then

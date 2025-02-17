@@ -1,11 +1,14 @@
 #!/bin/bash
-
-# Exit on any error
+# -------------------------------------------------- 
+#  @file    update_sw.cpp
+#  @brief   Deploys and builds software on the robot remotely.
+#  @date    2025-01-05
+#  @version 1.0
 set -e
 
 # Help function
 function show_help {
-    echo "Usage: $0 [-h] [-u USER] [-i HOSTNAME] [-p DEVICE]"
+    echo "Usage: $0 [-h] [-u USER] [-i HOSTNAME]"
     echo
     echo "Options:"
     echo "  -u USER        Specify the username (default: pi)."
@@ -19,7 +22,6 @@ function show_help {
 USER="pi"
 HOSTNAME="bot.local"
 
-
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -30,16 +32,7 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# Get the current software directory
-SOFTWARE_DIR=$(pwd)
-echo "[UPDATE_SW][INFO] Using software directory: $SOFTWARE_DIR"
-
-# Ensure remote directory exists
-ssh "$USER@$HOSTNAME" "mkdir -p prog/software/inc"
-
-# Sync project files, excluding unnecessary files
-echo "[UPDATE_SW][INFO] Syncing software files to $USER@$HOSTNAME..."
-rsync -az --exclude 'mediamtx/'  --exclude 'build/' "$SOFTWARE_DIR/" "$USER@$HOSTNAME:prog/software"
+bash scripts/syncSW.sh -u $USER -i $HOSTNAME
 
 # Build the project remotely
 echo "[UPDATE_SW][INFO] Running remote build script..."
