@@ -1,8 +1,6 @@
 /************************************************************************************
  *  @file    twsbComs.cpp
  *  @brief   Implementation of pub-rpc protocol for the TWSB over ZMQ
- *  @date    2025-01-05
- *  @version 1.1.0
  *  Single-threaded Event Driven IO loop
  *  Parses in-place the xMacro string mapped to the decoded Publisher ID
  *  Bridges commands send over the ZMQ IPC socket to the TWSB over UART
@@ -13,7 +11,6 @@
  *          <---- | ZMQ PUB | <---- | TWSB UART READ  | <---- | TWSB |
  ************************************************************************************/
 
-
 #include <unistd.h>
 #include <termios.h>
 #include <fcntl.h>
@@ -23,17 +20,17 @@
 #include "../common/common.hpp"
 #include "../common/coms.hpp"
 
-
 //*** TWSB Coms Console */
 #define NODE_NAME "TWSB"
+#define DEBUG_MODE true
 
 #define DEFAULT_PORT "/dev/ttyAMA0"
 #define DEFAULT_BAUD 115200
 
 // ********* CLI UTILS ************************************************************************* //
 void cli_display_help(const std::string& program_name) {
-    fmt::print("Usage: {} <serial_port> <baud_rate> <topic1> <topic2> ...\n", program_name);
-    fmt::print("Example: {} /dev/ttyUSB0 115200 IMU STATE\n", program_name);
+    fmt::print("Usage: {} <serial_port> <baud_rate> \n", program_name);
+    fmt::print("Example: {} /dev/ttyUSB0 115200\n", program_name);
 }
 
 //@Brief: Configure the serial port non-canonical mode
@@ -64,7 +61,7 @@ int config_serial_port(const std::string& port, int baud) {
     options.c_cflag &= ~CSTOPB; // 1 stop bit 
     options.c_cflag &= ~CSIZE; // Mask the character size bits
     options.c_oflag &= ~OPOST; // raw output
-    options.c_iflag &= ~ICANON; // Non Cannonical mode
+    options.c_iflag &= ~ICANON; // Non Canonical mode
     options.c_iflag &= ~ECHO;  // No echo
     options.c_iflag &= ~ECHOE; // No erasure
     options.c_iflag &= ~ISIG; // No interpretation of INTR, QUIT and SUSP
@@ -174,7 +171,7 @@ int main(int argc, char* argv[]) {
     NodeConfigManager config("configs/robotConfig.json", NODE_NAME); // Load the robots general configuration file
     struct SerComs coms;
     /* Note this Node is a transparent bridge between the ZMQ and the TWSB
-    // All Parameters and Publishers are of the TWSB MCU as implemented inthe Firmware
+    // All Parameters and Publishers are of the TWSB MCU as implemented in the Firmware
     // The Config is just loaded to provide a means of maping the publisher id to the
     // string name as required by the ZMQ IPC message */
     
@@ -192,47 +189,32 @@ int main(int argc, char* argv[]) {
     cmd_subsock.connect(CMD_SOCKET_ADDRESS); // Connect to the command socket proxy
     zmq::socket_t msg_pubsock(context, zmq::socket_type::pub);
     msg_pubsock.set(zmq::sockopt::linger, 0);
-    msg_pubsock.bind(MSG_PUB_ADDRESS); // Bind to the telemetry socket proxy
+    msg_pubsock.bind(MSG_PUB_ADDRESS); 
     // --------------- Console Setup ----------------- //
     fmt::print("[TWSB Coms][INFO] Begin TWSB Console\n");
-    fmt::print("[TWSB Coms][INFO] Console Topic Filter: ");
-    for (const auto& topic : console_topics) {
-        fmt::print("{} ", topic);
-    }
-    fmt::print("\n");
-    fmt::print("[TWSB Coms][INFO] Press 'exit' to quit\n");
-    // ------------- Event Setup ----------------- //
     zmq::pollitem_t poll_items[] = {
-        { nullptr, serial_fd, ZMQ_POLLIN, 0 }, // Serial input
-        { nullptr, STDIN_FILENO, ZMQ_POLLIN, 0 }, // Console input
-        { static_cast<void*>(cmd_subsock), 0, ZMQ_POLLIN, 0 } // ZeroMQ subscription
+        { nullptr, serial_fd, ZMQ_POLLIN, 0 }, 
+        { static_cast<void*>(cmd_subsock), 0, ZMQ_POLLIN, 0 } 
     };
     // -------------- Event Loop ----------------- //
     while (true) {
         int rc = zmq::poll(poll_items, 2, std::chrono::milliseconds(-1));
         if (rc == -1) {
-            fmt::print("[TWSB_COMS] Error: Polling Error\n");
+            fmt::print("[{}}] Error: Polling Error\n", NODE_NAME);
             break;
         } 
-        /* Serial Telemetry Bridge
-        @brief: Publishes Timestamped, ascii serialized messages from the serial port
-                under string topic names over ZMQ IPC. 
-                Also displays select messages on te debug console
-        */
-        if (poll_items[0].revents & ZMQ_POLLIN) { // SerialPort
+        if (poll_items[0].revents & ZMQ_POLLIN) { // SerialPort Data Available
             sercoms_grab_telemetry(serial_fd, coms, proto, config);  // read and half parse messages from the serial port
             while (!coms.telemMsgQ.empty()) { // Publish all messages in the 
                 struct TelemetryMsg telem_msg = coms.telemMsgQ.front(); // grab the message from the queue
                 coms.telemMsgQ.pop(); 
                 zmqcoms_publish_tsmp_msg(msg_pubsock,telem_msg, NODE_NAME );// bridge the message to the ZMQ
-                if (console_topics.find(telem_msg.topic) != console_topics.end()) {
-                    display_console(telem_msg.topic, telem_msg.data, formatTimestamp(telem_msg.timestamp));
-                }
             }
         }
         if (poll_items[1].revents & ZMQ_POLLIN) { // ZMQ Command Message Available 
             zmqcoms_receive_asciicmd(cmd_subsock, cmd); // Receive the command message
-            // Send the command msg to the TWSB transparently
+            if(DEBUG_MODE) {fmt::print("[{}][INFO] Received Command: {}\n",NODE_NAME,cmd.data);}
+            // Send the command msg to the TWSB MCU transparently
             write(serial_fd, cmd.data.c_str(), cmd.data.size());
         }
     }
@@ -240,6 +222,3 @@ int main(int argc, char* argv[]) {
     close(serial_fd);
     return 0;
 }
-
-
-

@@ -4,8 +4,6 @@
  *  @date    2025-01-10
  *  @version 1.0.0
  * CLI tool connects to an endpoint and subscribes to a topic
- * Formatted table using ASCII escape codes
- * Receives multipart messages Topic MsgData Timestamp 
 */
 
 #include <zmq.hpp>
@@ -18,6 +16,8 @@
 #include <fmt/core.h>
 
 #include "../common/common.hpp"
+
+#define NODE_NAME "ZMQSUB"
 
 void printUsage(const std::string &programName) {
     std::cerr << "Usage: " << programName << " [options]" << std::endl;
@@ -62,33 +62,12 @@ int main(int argc, char *argv[]) {
     fmt::print("[ZMQ Subscriber] Subscribed to {}\n", topic_string);
 
     while (true) {
-        zmq::message_t topic, msg, timestamp;
-        (void) subSocket.recv(topic, zmq::recv_flags::none);
+        zmq::message_t msg;
         (void) subSocket.recv(msg, zmq::recv_flags::none);
-        (void) subSocket.recv(timestamp, zmq::recv_flags::none);
-
-        std::string topicStr(static_cast<char *>(topic.data()), topic.size());
-        std::string msgStr(static_cast<char *>(msg.data()), msg.size());
-        std::string timestampStr(static_cast<char *>(timestamp.data()), timestamp.size());
-        // convert to formatted timestamp from chrono stead clock 
-        std::chrono::time_point<std::chrono::system_clock> timestampPoint;
-        timestampPoint = std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(std::stoll(timestampStr)));
-        std::time_t timestampTime = std::chrono::system_clock::to_time_t(timestampPoint);
-        timestampStr = std::ctime(&timestampTime);
-        timestampStr.pop_back(); // Remove newline character
-        // Optionally truncate long messages for table formatting
-        std::string truncatedTopic = (topicStr.size() > 20) ? topicStr.substr(0, 17) + "..." : topicStr;
-        std::string truncatedMsg = (msgStr.size() > 20) ? msgStr.substr(0, 17) + "..." : msgStr;
-        // Table formatting
-        std::cout << "\033[2J\033[1;1H"; // Clear the screen
-        std::cout << "\033[1;34m" << "ZMQ Subscriber " << socket_address << "  " << topic_string << "\033[0m" << std::endl;
-        std::cout << "----------------------------------------" << std::endl;
-        std::cout << std::setw(20) << std::left << "Topic:" << std::setw(20) << std::left << truncatedTopic << std::endl;
-        std::cout << std::setw(20) << std::left << "Message:" << std::setw(20) << std::left << truncatedMsg << std::endl;
-        std::cout << std::setw(20) << std::left << "Timestamp:" << std::setw(20) << std::left << timestampStr << std::endl;
-        std::cout << "----------------------------------------" << std::endl;
-        std::cout << std::flush;
+        zmq::recv_result_t recv = subSocket.recv(msg, zmq::recv_flags::none);
+        // print the message
+        fmt::print("[{}] {}\n", topic_string, std::string(static_cast<char*>(msg.data()), msg.size()));
     }
-    std::cout << "Subscriber shutdown completed." << std::endl;
+   fmt::print("[{}] Exiting\n", NODE_NAME);
     return 0;
 }

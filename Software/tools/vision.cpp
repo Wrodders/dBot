@@ -50,17 +50,18 @@ const int WIDTH = 640;
 const int HEIGHT = 480;
 const int FRAME_SIZE = WIDTH * HEIGHT * 3 / 2;
 
+// Color Constants
 const cv::Vec3b redYUV = cv::Vec3b(81, 90, 240);
 const cv::Vec3b greenYUV = cv::Vec3b(145, 54, 34);
 const cv::Vec3b blueYUV = cv::Vec3b(41, 240, 110);
 const cv::Vec3b yellowYUV = cv::Vec3b(210, 16, 146);
-
-const float grad_dx = 1; // Sobel filter parameters
-const float grad_dy = 0;
-const float grad_ksize = 3;
-const float grad_scale = 1;
-const float grad_delta = 0;
-
+// ------ Sobel Filter Parameters ------ //
+const float grad_dx = 1;    //
+const float grad_dy = 0;    //
+const float grad_ksize = 3; //
+const float grad_scale = 1; //
+const float grad_delta = 0; //
+// 
 const std::vector<cv::Point2f> src_pts = {
 cv::Point2f(0, HEIGHT), cv::Point2f(WIDTH, HEIGHT),
     cv::Point2f(0, 0), cv::Point2f(WIDTH, 0)
@@ -129,19 +130,15 @@ void command_server(){
     // --------- Communication Setup --------------------- //
     Protocol _proto = {'<', '\n', ':', 'A'};
     CommandMsg _cmd; // Working command variable
-    std::string _cmd_msg; // Command message string
-    std::string _cmdret_msg; // Command return message string
-    TelemetryMsg _telem; // Working telemetry variable
     NodeConfigManager config("configs/robotConfig.json", NODE_NAME);
+    ZmqCmdServer cmd_server(NODE_NAME, CMD_SOCKET_ADDRESS, MSG_PUB_ADDRESS);
     config.register_parameter(0,&_params.horizon_height_px);
     config.register_parameter(1,&_params.transform_bottom_padding_px);
     config.register_parameter(2,&_params.next_edgemode);
     
-
-
     // ---------------  Event Loop ----------------- //
     zmq::pollitem_t poll_items[] = {
-        {static_cast<void*>(cmd_subsock), 0, ZMQ_POLLIN, 0},
+        {static_cast<void*>(cmd_server.cmd_subsock), 0, ZMQ_POLLIN, 0},
         {static_cast<void*>(STDIN_FILENO), 0, ZMQ_POLLIN, 0}    
     };
     while(_exit_coms_thread == false){
@@ -152,7 +149,7 @@ void command_server(){
         }   
         // ------------ ZMQ COMMAND EVENT ------------ //
         if (poll_items[0].revents & ZMQ_POLLIN) { // Command Message Available
-            if(handle_zmqcmd(_cmd, cmd_subsock, msg_pubsock, cmd_pubsock, config, _proto) < 0){
+            if(handle_zmqcmd(_cmd, cmd_server.cmd_subsock, cmd_server.msg_pubsock, cmd_server.cmd_pubsock, config, _proto) < 0){
                 _exit_coms_thread = true;
                 break;
             }
@@ -282,11 +279,10 @@ int main(int argc, char* argv[]) {
         uint8_t* v_plane = u_plane + (WIDTH * HEIGHT / 4);
         std::fill(u_plane, u_plane + (WIDTH * HEIGHT / 4), 128);
         std::fill(v_plane, v_plane + (WIDTH * HEIGHT / 4), 128);
-        // Write to output pipe (assuming write_frame is defined elsewhere)
         try {
             write_frame(out_pipe, yuv_buffer);
         } catch (const std::exception& e) {
-            std::cerr << "[VISION] Error: Unable to write frame to output pipe\n";
+            fmt::print("[{}] Error: {}\n", NODE_NAME, e.what());
         }
         auto processing_time = std::chrono::system_clock::now() - loop_start;
         auto sleep_time = TARGET_FRAME_TIME - processing_time;
@@ -296,7 +292,8 @@ int main(int argc, char* argv[]) {
     fclose(in_pipe);
     fclose(out_pipe);
     _exit_coms_thread = true;
-    cmd_thread.join();
+    cmd_thread.join(); 
+    fmt::print("[{}] Exiting\n", NODE_NAME);
     return 0;
 }
 

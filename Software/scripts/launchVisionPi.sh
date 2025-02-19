@@ -1,4 +1,9 @@
 #!/bin/bash
+#--------------------------------------------------
+#  @file    launchVisionPi.sh
+#  @brief   Launches the vision Pipeline on Raspberry Pi.
+
+
 # Define named pipes
 VIDEO_IN="/tmp/video_in"
 VIDEO_OUT="/tmp/video_out"

@@ -3,8 +3,6 @@
 #  @file     syncSW.cpp
 #  @brief   Synchronizes software files to the robot remotely.
 #  @details Used as part of the build and deploy process.
-#  @date    2025-01-05
-#  @version 1.0
 
 set -e
 

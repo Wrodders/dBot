@@ -2,8 +2,7 @@
 # -------------------------------------------------- 
 #  @file    update_sw.cpp
 #  @brief   Deploys and builds software on the robot remotely.
-#  @date    2025-01-05
-#  @version 1.0
+
 set -e
 
 # Help function

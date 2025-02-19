@@ -18,6 +18,8 @@ Note that Command and Telemetry messages are framed differently
 
 #include "common.hpp"
 #include <shared_mutex>
+#include <mutex>
+#include <atomic>  // Add this line to include the atomic operations header
 
 
 enum RPC {GET = 0, SET, NUM_RPC}; // Command IDs
@@ -36,12 +38,9 @@ struct TelemetryMsg {
 };
 struct CommandMsg {
     std::string topic;
-    std::string data;
-
-
+    std::string data; // ASCII serialized data
     uint8_t cmdID;
     uint8_t paramID;
-   
 };
 
 struct Parameter{
@@ -51,20 +50,23 @@ struct Parameter{
 };
 
 
-struct ZMQServer{
+struct ZmqCmdServer{
     zmq::context_t context;
     zmq::socket_t cmd_subsock;
     zmq::socket_t msg_pubsock;
     zmq::socket_t cmd_pubsock;
 
-    ZMQServer(const std::string cmd_substr, const std::string& cmd_socket_address, const std::string& msg_pub_address) 
+    ZmqCmdServer(const std::string cmd_substr, const std::string& cmd_socket_address, const std::string& msg_pub_address) 
         : context(1), cmd_subsock(context, zmq::socket_type::sub), 
         msg_pubsock(context, zmq::socket_type::pub), cmd_pubsock(context, zmq::socket_type::pub) {
+        
         cmd_subsock.set(zmq::sockopt::linger, 0);
         cmd_subsock.set(zmq::sockopt::subscribe, cmd_substr);
         cmd_subsock.connect(cmd_socket_address); 
         msg_pubsock.set(zmq::sockopt::linger, 0);
         msg_pubsock.connect(msg_pub_address);
+        cmd_pubsock.set(zmq::sockopt::linger, 0);
+        cmd_pubsock.connect(cmd_socket_address);
     }
 };
 
@@ -145,6 +147,7 @@ class NodeConfigManager {
             std::shared_lock<std::shared_mutex> lock(param_mutex);
             if (auto it = param_map.find(address); it != param_map.end()) {
                 it->second.reg->store(value, std::memory_order_release);
+                fmt::print("[{}] Set {} to {}\n", NODE_NAME, it->second.name, value);
             } else {
                 std::cerr << "Parameter at address " << address 
                          << " not registered.\n";
@@ -240,7 +243,11 @@ void coms_exec_rpc(const CommandMsg& cmd, NodeConfigManager& config, zmq::socket
     switch(cmd.cmdID) {
         case GET:
             value = config.get_param(cmd.paramID);
-            // Publish the telemetry message
+            // build the cmd return message
+            cmdret_msg.topic = "CMD_RET" + cmd.topic; // Append CMD_RET to the topic
+            cmdret_msg.data = std::to_string(value);
+            cmdret_msg.timestamp = std::chrono::system_clock::now();
+            zmqcoms_publish_tsmp_msg(msg_pubsock, cmdret_msg, config.NODE_NAME);
             break;
         case SET:
             try{
@@ -250,10 +257,8 @@ void coms_exec_rpc(const CommandMsg& cmd, NodeConfigManager& config, zmq::socket
                 return;
             }
             config.set_param(cmd.paramID, value);
-            cmdret_msg.topic = "CMD_RET" + cmd.topic; // Append CMD_RET to the topic
-            cmdret_msg.data = std::to_string(value);
-            cmdret_msg.timestamp = std::chrono::system_clock::now();
-            zmqcoms_publish_tsmp_msg(msg_pubsock, cmdret_msg, config.NODE_NAME);    
+            
+  
             break;
         default:
             std::cerr << " >> Invalid command ID: " << cmd.cmdID << std::endl;
@@ -266,7 +271,6 @@ void coms_exec_rpc(const CommandMsg& cmd, NodeConfigManager& config, zmq::socket
 void zmqcoms_receive_asciicmd(zmq::socket_t& cmdSubSocket, struct CommandMsg& cmdFrame) {
     zmq::message_t topic_msg;
     zmq::message_t cmd_ret_data;
-    zmq::message_t cmd_ret_addr;
     (void) cmdSubSocket.recv(topic_msg, zmq::recv_flags::none);
     (void) cmdSubSocket.recv(cmd_ret_data, zmq::recv_flags::none); 
     // pack the data into the cmd frame

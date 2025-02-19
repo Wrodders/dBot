@@ -2,8 +2,7 @@
 # -------------------------------------------------- 
 #  @file    udpCamStreamViz.sh
 #  @brief   Visualizes the video stream from the robot, over udp.
-#  @date    2025-01-05
-#  @version 1.0
+
 
 echo "[UDP CAM VIZ]Begin Camera Stream Vizulaization"
 

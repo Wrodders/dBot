@@ -2,8 +2,6 @@
 # -------------------------------------------------- 
 #  @file    vizualizer.sh
 #  @brief   Visualizes the video stream from the robot.
-#  @date    2025-01-05
-#  @version 1.0
 
 echo "[VISION PIPELINE VISUALIZER]"
 echo "----------------------------"

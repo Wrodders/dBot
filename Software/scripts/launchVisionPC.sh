@@ -1,4 +1,9 @@
 #!/bin/bash
+#--------------------------------------------------
+#  @file    launchVisionPC.sh
+#  @brief   Launches the vision Pipeline on Mac. 
+
+
 
 # Define named pipes
 VIDEO_IN="/tmp/video_in"

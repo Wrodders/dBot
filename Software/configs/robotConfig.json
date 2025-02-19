@@ -1,19 +1,19 @@
 {
     "VISION": {
         "parameters": [
-            {"name": "HORIZON_HEIGHT_PX", "address": 0, "format": "%d", "description": "Video Stream Output Mode"},
-            {"name": "TRANSFORM_PAD_PX",  "address": 1, "format": "%d", "description": "ROI Horizon height [px]"},
-            {"name": "EDGE_FILT",         "address": 2, "format": "%d", "description": "Src Camera width [px]"},
-            {"name": "N_WINDOWS",         "address": 3, "format": "%d", "description": "Src Camera height [px]"},
-            {"name": "WIN_MARGIN_PX",     "address": 4, "format": "%d", "description": "Binary Threshold Level"},
-            {"name": "WIN_MIN_PX",        "address": 5, "format": "%d", "description": "Sobel dx"}
+            {"name": "HORIZON_HEIGHT_PX", "address": 0, "format": "%d", "description": "ROI Horizon height [px]"},
+            {"name": "TRANSFORM_PAD_PX",  "address": 1, "format": "%d", "description": "Center Bottom Padding [px]"},
+            {"name": "EDGE_FILT",         "address": 2, "format": "%d", "description": "Edge Filter Algorithm"},
+            {"name": "N_WINDOWS",         "address": 3, "format": "%d", "description": "Number of Sliding Windows"},
+            {"name": "WIN_MARGIN_PX",     "address": 4, "format": "%d", "description": "Window Margin [px]"},
+            {"name": "WIN_MIN_PX",        "address": 5, "format": "%d", "description": "Window Threshold level"}
             ],
 
         "publishers": [
             {"name": "CMD_RET",         "address": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
             {"name": "ERROR",           "address": 1, "description": "Error Message", "format": "%s:%d", "args": "msg, timestamp"},
             {"name": "INFO",            "address": 2, "description": "Info Log", "format": "%s:%d", "args": "msg, timestamp"},
-            {"name": "DEBUG",           "address": 3, "description": "Debug Log", "format": "%s:%d", "args": "msg, timestamp"},
+            {"name": "DEBUG",           "address": 3, "description": "Debug Log", "format": "%s:%d", "args": "msg, timestamp"}
         ]
     },
     "TWSB": {
@@ -40,7 +40,7 @@
             {"name": "P_AKI",           "address": 19,  "access": "W",  "format": "%f",     "description":  "Angular Vel Ki"},
             {"name": "P_AKD",           "address": 20,  "access": "W",  "format": "%f",     "description":  "Angular Vel Kd"},
             {"name": "P_AALPHA",        "address": 21,  "access": "W",  "format": "%f",     "description":  "Angular Vel Alpha"},
-            {"name": "P_IMU_AALPHA",    "address": 22,  "access": "W",  "format": "%f",    "description":  "IMU Acceleration LPF Coefficient"},
+            {"name": "P_IMU_AALPHA",    "address": 22,  "access": "W",  "format": "%f",     "description":  "IMU Acceleration LPF Coefficient"},
             {"name": "P_IMU_GALPHA",    "address": 23,  "access": "W",   "format":"%f",     "description":  "IMU Gyroscope LPF Alpha Coefficient"},
             {"name": "P_IMU_KAL_Q",     "address": 24,  "access": "W",   "format":"%f",     "description":  "IMU Kalman Q Value"},
             {"name": "P_IMU_KAL_R",     "address": 25,  "access": "W",   "format":"%f",     "description":  "IMU Kalman R Value"},
@@ -50,24 +50,30 @@
             {"name": "P_IMU_A_ZOFFSET", "address": 29,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer Z Offset"}
         ],
         "publishers": [
-            {"name": "CMD_RET",     "address": 0,   "description": "Return Cmd Value",  "format": "%s:%d", "args": "retval, timestamp"},
-            { "name": "ERROR",       "address": 1,   "description": "Error Message",     "format": "%s:%d", "args": "msg, timestamp"},
-            { "name": "INFO",        "address": 2,   "description": "Info Log",          "format": "%s:%d", "args": "msg, timestamp"},
-            { "name": "DEBUG",       "address": 3,   "description": "Debug Log",         "format": "%s:%d", "args": "msg, timestamp"},
-            { "name": "TELEM",       
-                "address": 4,   
-                "description": "State variables",   
-                "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%d", 
-                "args":  ["ROLL",    "PITCH",
-                         "ACCEL_X", "ACCEL_Y",  "ACCEL_Z",
-                         "GYRO_X",  "GYRO_Y",   "GYRO_Z", 
-                         "LEFT_SHAFT_RPS",  "LEFT_WHEEL_TRGT",  "LEFT_VOLTAGE", 
-                          "RIGHT_SHAFT_RPS", "RIGHT_WHEEL_TRGT", "RIGHT_VOLTAGE", 
-                          "LINEAR_VEL",      "LIN_VEL_TRGT",     "BALANCE_ANGLE",
-                          "ANGULAR_VEL",     "ANG_VEL_TRGT",     "STEER_DIFF",
-                         "timestamp"]
-            }
+            {"name": "CMD_RET",         "address":0,  "description": "Return Cmd Value",                "format": "%s:%d", "args": "retval, timestamp"},
+            {"name": "ERROR",           "address":1,  "description": "Error Message",                   "format": "%s:%d", "args": "msg, timestamp"},
+            {"name": "INFO",            "address":2,  "description": "Info Log",                        "format": "%s:%d", "args": "msg, timestamp"},
+            {"name": "DEBUG",           "address":3,  "description": "Debug Log",                       "format": "%s:%d", "args": "msg, timestamp"},
+            {"name": "PITCH",           "address":4,  "description": "Pitch [deg]",                     "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "ROLL",            "address":5,  "description": "Roll [deg]",                      "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "ACCEL_X",         "address":6,  "description": "Acceleration X [m/s^2]",          "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "ACCEL_Y",         "address":7,  "description": "Acceleration Y [m/s^2]",          "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "ACCEL_Z",         "address":8,  "description": "Acceleration Z [m/s^2]",          "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "GYRO_X",          "address":9,  "description": "Gyroscope X [deg/s]",             "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "GYRO_Y",          "address":10, "description": "Gyroscope Y [deg/s]",             "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "GYRO_Z",          "address":11, "description": "Gyroscope Z [deg/s]",             "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "LEFT RPS",        "address":12, "description": "Left Motor Speed [RPS]",          "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "LEFT_REF",        "address":13, "description": "Left Motor Reference [RPS]",      "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "LEFT_VOLT",       "address":14, "description": "Left Motor [V]",                  "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "RIGHT RPS",       "address":15, "description": "Right Motor Speed [RPS]",         "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "RIGHT_REF",       "address":16, "description": "Right Motor Reference [RPS]",     "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "RIGHT_VOLT",      "address":17, "description": "Right Motor [V]",                 "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "LINEAR_VEL",      "address":18, "description": "Linear Velocity [m/s]",           "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "LIN_VEL_REF",     "address":19, "description": "Linear Velocity reference [m/s]", "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "BALANCE ANGLE",   "address":20, "description": "Balance Angle [deg]",             "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "ANGULAR_VEL",     "address":21, "description": "Angular Velocity [rps]",          "format": "%f:%d", "args": "data, timestamp"},
+            {"name": "ANG_VEL_REF",     "address":22, "description": "Angular Velocity reference [rps]","format": "%f:%d", "args": "data, timestamp"},
+            {"name": "STEER_DIFF",      "address":23, "description": "Steering Difference correction [V]","format":"%f:%d", "args":"data, timestamp"}
         ]
-        
     }
 }
