@@ -39,7 +39,7 @@ static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PI
     ddmrEstimateOdom(ddmr, motorL, motorR);
     velCtrl->out = pidRun(velCtrl, ddmr->linearVel); // Reference - odometry velocity 
     steerCtrl->out = pidRun(steerCtrl,ddmr->angularVel); // Reference - odometry angular velocity
-    pidSetRef(balanceAngleCtrl, BAL_OFFSET-velCtrl->out); // Sets Balance Reference point to reach desired velocity
+    pidSetRef(balanceAngleCtrl, BAL_OFFSET+velCtrl->out); // Sets Balance Reference point to reach desired velocity
 }
 // ********** LQR FUNCTIONS ***************************************//
 
@@ -50,8 +50,10 @@ int main(void){
 	systemClockSetup();      // Main System external XTAL 25MHz Init Peripheral Clocks
 	systick_setup();    // 1ms Tick
 	struct GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
+    struct GPIO drvMode = initGPIO(DRV_MODE_PIN, DRV_MODE_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLDOWN); // Set DRV8876 Mode
+    gpio_clear(drvMode.port, drvMode.pin); // Gnd == PWM Mode
 
-    // Serial /*
+    // Serial 
     struct Serial ser1 = serialInit( DEBUG_USART, DEBUG_PORT, DEBUG_RX, DEBUG_TX, GPIO_AF7, 
                             NVIC_USART1_IRQ, 
                             rx1_buf_, ARRAY_SIZE(rx1_buf_), 
@@ -64,16 +66,14 @@ int main(void){
     struct IMU imu = imuInit(IMU_A_ACCEL, IMU_A_GYRO,IMU_A_COMP, (IMU_PERIOD * MS_TO_S));
     imuLinkSensor(&imu, &mpu6050);
     // MOTORS 
-    struct Encoder encR = encoderInit(ENC_2_TIM, UINT16_MAX, ENC_2_A, ENC_1_PORT, ENC_2_B, ENC_2_PORT, ENC_2_AF);
-    struct Encoder encL = encoderInit(ENC_1_TIM, UINT16_MAX, ENC_1_A, ENC_2_PORT, ENC_1_B, ENC_1_PORT, ENC_1_AF);
+    struct Encoder encL = encoderInit(ENC_L_TIM, UINT16_MAX, ENC_L_B, ENC_L_PORT, ENC_L_A, ENC_L_PORT, ENC_L_AF, true);
+    struct Encoder encR = encoderInit(ENC_R_TIM, UINT16_MAX, ENC_R_B, ENC_R_PORT, ENC_R_A, ENC_R_PORT, ENC_R_AF, false);
     struct Motor motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT);
     struct Motor motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA, TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT);
     motorDisable(&motorL); // Ensure Driver is Disabled Before Configuration
     motorDisable(&motorR); //
-    motorConfig(&motorL, &encL, VSYS, MOTOR_DEADBAND, true, SPEED_ALPHA, RPS_MAX);
-    motorConfig(&motorR, &encR, VSYS, MOTOR_DEADBAND, false,  SPEED_ALPHA, RPS_MAX);
-    motorEnable(&motorL);
-    motorEnable(&motorR);
+    motorConfig(&motorL, &encL, VSYS, MOTOR_DEADBAND,VMOTOR_MAX, true, SPEED_ALPHA, RPS_MAX);
+    motorConfig(&motorR, &encR, VSYS, MOTOR_DEADBAND,VMOTOR_MAX, false,  SPEED_ALPHA, RPS_MAX );
 
     // BALANCE CONTROLLER
     struct PID balanceAngleCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
@@ -140,15 +140,28 @@ int main(void){
     struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);            // Velocity Control Loop
 
     // ****** Loop Parameters **************************************************************************** // 
-    enum MODE {INIT = 0,PARK, CASCADE, LQR, TUNE_MOTOR, FW_UPDATE} mode;
-    nextMode = INIT;
+    enum MODE {FW_UPDATE=0, INIT,PARK, CASCADE, LQR, TUNE_MOTOR, COMMISSION} mode;
+    nextMode = COMMISSION;
+    motorEnable(&motorL);
+    motorEnable(&motorR);
 
     uint16_t loopTick = 0;
 	for(;;){
-        
         loopTick = sysGetMillis(); // Update Loop Time
         mode = nextMode;
         switch (mode){
+            case FW_UPDATE:
+                comsSendMsg(&coms, &ser1, PUB_INFO, "FW_UPDATE");
+                // Disable Motors, safety disable drivers
+                motorDisable(&motorL);
+                motorDisable(&motorR);
+                // Set GPIO Values High Z
+                gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
+                gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
+                gpio_mode_setup(GPIOC, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
+                // Jump to Bootloader
+                systemReflash();
+                break;
             case INIT: // Initialize System 
                 // State Transition
                 if(sysGetMillis() >= 3000){ // 3s Startup helps stabilize Kalman Filter
@@ -206,18 +219,11 @@ int main(void){
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 break;
-            case FW_UPDATE:
-                comsSendMsg(&coms, &ser1, PUB_INFO, "FW_UPDATE");
-                // Disable Motors, safety disable drivers
-                motorDisable(&motorL);
-                motorDisable(&motorR);
-                // Set GPIO Values High Z
-                gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
-                gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
-                gpio_mode_setup(GPIOC, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO_ALL);
-                // Jump to Bootloader
-                systemReflash();
+            case COMMISSION:
+                motorSetVoltage(&motorL,motorL.speedCtrl.ref);
+                motorSetVoltage(&motorR,motorR.speedCtrl.ref);
                 break;
+               
             default:
                 break;  
         };

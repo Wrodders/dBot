@@ -1,4 +1,6 @@
 #!/bin/bash
+#--------------------------------------------------------------------------------
+# RPROG_MCU: Remote Flash binary file to MCU using Raspberry Pi
 
 # Function to display help message
 show_help() {
@@ -29,7 +31,8 @@ flash_stlink() {
 EOF
 }
 
-# Function to flash using stm32flash
+
+#@brief: Triggers FW update Event and flashes the binary file using stm32flash serial bootloader
 flash_stm32flash() {
     BIN_FILENAME=$1
     echo "Flashing $REMOTE_BIN_DIR/$BIN_FILENAME using stm32flash on Raspberry Pi..."
@@ -37,7 +40,7 @@ flash_stm32flash() {
     ssh "$PI_USER@$PI_IP" << EOF
         echo "Entering FW update mode..."
         stty -F "$SERIAL_PORT" 115200
-        echo '<BB5\n' > $SERIAL_PORT
+        echo '<BB0\n' > $SERIAL_PORT 
         sleep 1
         stm32flash -R -w "$REMOTE_BIN_DIR/$BIN_FILENAME" -v "$SERIAL_PORT"
         if [ $? -ne 0 ]; then

@@ -6,7 +6,7 @@
 #include <libopencm3/cm3/vector.h>
 #include <libopencm3/cm3/nvic.h>
 // ********* PERIPHERAL DEFINITIONS ************************ //
-#include "pinnmap.h"
+#include "pinnmapV1.h"
 // ********* COMMON LIBRARIES ****************************** //
 #include "../drivers/system.h"
 #include "../../modules/cutils/ringbuffer.h"
@@ -33,11 +33,11 @@
 #define EDGE_NUM            4.00f     // Quaducore Encoder
 #define WHEEL_BASE          0.12f     // m
 #define WHEEL_RADIUS        0.04f     // m
-#define VBAT_MIN            7.40f     // Volts
-#define VBAT_MAX            8.40f     // Volts
-#define VSYS                7.00f     // Volts
+
+#define VSYS                10.00f    // Nominal System Voltage [3s Li ion 10.2-12.6V]
+#define VMOTOR_MAX          7.00      // Scale duty to nominal motor voltage
 #define BAT_CAPACITY        2300      // mAh
-#define MOTOR_DEADBAND      1.2f      // Volts
+#define MOTOR_DEADBAND      0.5f      // Volts
 // *********** UNIT CONVERSIONS *************************** //
 const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 const float MS_TO_S         = 0.001f; // s
@@ -62,24 +62,24 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 #define IMU_A_ZOFFSET   0.133658f
 // Motor Speed Control
 #define SPEED_KP    2.0f
-#define SPEED_KI    12.0f
+#define SPEED_KI    8.0f
 #define SPEED_KD    0.00f
 #define SPEED_ALPHA 0.95f
 // Balance Control 
 #define BAL_OFFSET  -7.50f  // deg
 #define BAL_CUTOFF  35       
 #define BAL_KP      0.16
-#define BAL_KI      2.0f 
-#define BAL_KD      0.002f
+#define BAL_KI      3
+#define BAL_KD      0.003f
 // Linear Velocity Control
-#define VEL_P       12  
-#define VEL_I       8
-#define VEL_D       0.03
+#define VEL_P       0  
+#define VEL_I       0
+#define VEL_D       0
 #define VEL_ALPHA   1.0
 // Angular Velocity Control
-#define STEER_KP    0.89
-#define STEER_KI    0.01
-#define STEER_KD    0.000
+#define STEER_KP    0
+#define STEER_KI    0
+#define STEER_KD    0
 #define STEER_ALPHA 1.0
 // *********** GLOBAL VARIABLES ******************************************** //
 static float vbat_val_ = VSYS;     

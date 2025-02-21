@@ -89,7 +89,6 @@ static void imuLPF(struct IMU* imu, const struct vector_t* accel, const struct v
 
 static void imuCalcRawAngle(struct IMU* imu){
     //@Brief: Computes Euler from raw accelerometer data
-    // roll (x-axis rotation)
     float ax2 = imu->lpf.accel.x * imu->lpf.accel.x;
     float ay2 = imu->lpf.accel.y * imu->lpf.accel.y;
     float az2 = imu->lpf.accel.z * imu->lpf.accel.z;

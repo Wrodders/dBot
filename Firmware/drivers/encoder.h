@@ -11,16 +11,18 @@ struct Encoder {
     struct GPIO chB;
     uint32_t timPerif;
     uint16_t period; // counts per revolution
+    int flipDir; // 1 or -1
     
     uint32_t lastCount; // encoder count
 }Encoder;
 
 //@Breif: Initialize the encoder in Hardware Quadrature mode
-static struct Encoder encoderInit(uint32_t timPerif,  uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
+static struct Encoder encoderInit(uint32_t timPerif,  uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction, bool flipDir) {
     struct Encoder e;
     // Store the timer peripheral in the encoder structure
     e.timPerif = timPerif;
     e.lastCount = 0;
+    e.flipDir = flipDir  ? -1 : 1;
     // Configure pins for alternate function mode
     gpio_mode_setup(portA, GPIO_MODE_AF, GPIO_PUPD_NONE, pinA);
     gpio_set_af(portA, alternateFunction, pinA);

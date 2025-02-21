@@ -11,7 +11,7 @@
             {"name": "P_RKI",           "address": 7,   "access": "W",  "format": "%f",     "description":  "Right Motor Ki"},
             {"name": "P_BTRGT",         "address": 8,   "access": "W",  "format": "%f",     "description":  "Balance Target Angle"},
             {"name": "P_BKP",           "address": 9,   "access": "W",  "format": "%f",     "description":  "Balance Kp"},
-            {"name": "P_BKI",           "address": 10,  "access": "W",  "format": "%f",     "description":  "Balance Ki"},
+            {"name": "BKI0",           "address": 10,  "access": "W",  "format": "%f",     "description":  "Balance Ki"},
             {"name": "P_BKD",           "address": 11,  "access": "W",  "format": "%f",     "description":  "Balance Kd"},
             {"name": "P_VTRGT",         "address": 12,  "access": "W",  "format": "%f",     "description":  "Voltage Target"},
             {"name": "P_VKP",           "address": 13,  "access": "W",  "format": "%f",     "description":  "Voltage Kp"},

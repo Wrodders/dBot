@@ -26,6 +26,7 @@ struct HBridgeDriver{
     struct GPIO en;         // Enable Pin
     float vPSU;             // PSU Voltage   
     float vMin;             // Minimum Voltage to Drive Motor
+    struct GPIO mode;       // Mode Pin (DRV8876 only)
 }HBridgeDriver;             // PWM H Bridge Motor Driver 
 
 struct Motor {
@@ -37,6 +38,7 @@ struct Motor {
     float shaftRPS;         // Estimated angular speed rps
     float alpha;            // speed lowpass filter parameter
     float maxVel;           // Saturation
+    float vMax;             // Maximum Voltage
 }Motor;
 
 
@@ -56,7 +58,7 @@ static struct Motor motorInit(const uint32_t timPerif,const uint32_t pwmPort,
         .drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE),
         .speedCtrl = pidInit(-VSYS, VSYS, SPEED_KP, SPEED_KI, SPEED_KD, (WSPEED_CNTRL_PERIOD * MS_TO_S))
     };
-    pwmInit(m.drv.timPerif,84,25000); // set freq to 1Hz period to 25000 ARR reg
+    pwmInit(m.drv.timPerif,25000); 
 	pwmConfig(m.drv.timPerif, m.drv.timCH_A, m.drv.pwmA.port, m.drv.pwmA.pin, GPIO_AF1); 
 	pwmConfig(m.drv.timPerif, m.drv.timCH_B, m.drv.pwmB.port, m.drv.pwmB.pin, GPIO_AF1); 
     pwmStart(m.drv.timPerif);
@@ -68,7 +70,7 @@ static struct Motor motorInit(const uint32_t timPerif,const uint32_t pwmPort,
 
 
 static void motorConfig(struct Motor *m,struct Encoder* enc, const float vPSU, const float vMin,
-                        const int flipDir, float alpha, float maxVel){
+                        const float vMax, const int flipDir, float alpha, float maxVel){
     //@Brief: Configs Motor parameters
     m->enc = enc;
     m->drv.vPSU = vPSU;
@@ -76,6 +78,7 @@ static void motorConfig(struct Motor *m,struct Encoder* enc, const float vPSU, c
     m->flipDir = flipDir == false ? 1 : -1;
     m->alpha = alpha;
     m->maxVel = maxVel;
+    m->vMax = vMax;
 }
 
 //@Brief: Starts Motor Driver 
@@ -109,6 +112,22 @@ static void motorSetUnipolarPWM(const struct Motor* motor, const float duty, con
     }
 }
 
+
+static void motorSetBipolarPWM(const struct Motor* motor, const float duty, const int dir){
+    pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_B, duty); 
+    if(dir == motor->flipDir){
+        // Fwds = (1) flipped = (1) ||  BCK = (0) nFlipped = (0) -> PWM B
+        // DRIVE BACKWARDS
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 0); // drive low
+        
+    }
+    else{
+        // Fwds = (1) flipped = (0) ||  BCK = (0) Flipped = (1) -> PWM A
+        // DRIVE FORWARDS
+        pwmSetDuty(motor->drv.timPerif, motor->drv.timCH_A, 1);
+    }
+}
+
 /*
 @Brief: Sets PWM Duty Cycle as voltage vector
 @Description: Applies voltage to H bridge according to motor configuration
@@ -116,9 +135,11 @@ static void motorSetUnipolarPWM(const struct Motor* motor, const float duty, con
 static void motorSetVoltage(const struct Motor* motor, const float voltage){
     int dir = _sign(voltage);
     float v = _fabs(voltage);
-    v = v <= motor->drv.vMin ? motor->drv.vMin*dir : v;
-    float dc = _clamp(v/motor->drv.vPSU, 0, 1.0f); // convert to % of battery
-    motorSetUnipolarPWM(motor, dc, dir); // apply to unipolar H bridge
+    v = v <= motor->drv.vMin ? motor->drv.vMin : v; // deadband
+    v = v >= motor->vMax ? motor->vMax : v; // saturation
+    float duty = _clamp(v / motor->drv.vPSU, 0, 1); // normalize to PSU voltage
+    //motorSetUnipolarPWM(motor, duty, dir); // apply to unipolar H bridge
+    motorSetBipolarPWM(motor, duty, dir); // apply to bipolar H bridge
 }
 
 //@Brief: Sets H Bridge Inputs High
@@ -147,11 +168,10 @@ Applies low-pass filter to smooth quantization errors
 static void motorEstSpeed(struct Motor* motor) {
     uint32_t mCount = encoderRead(motor->enc);
     int32_t dCount = (int32_t)(mCount - motor->enc->lastCount); 
-    // Handle overflow and underflow
-    dCount = (dCount + (UINT16_MAX + 1)) % (UINT16_MAX + 1);
+    dCount = (dCount + (UINT16_MAX + 1)) % (UINT16_MAX + 1); // wrap around on overflow
     if (dCount > (UINT16_MAX / 2)) { dCount -= (UINT16_MAX + 1);}  // Convert to signed range [-32768, 32767]
     motor->enc->lastCount = mCount; 
-    float measuredRPS = (float)dCount * TICKS_TO_RPS * motor->flipDir; // convert to rotations per second
+    float measuredRPS = (float)dCount * TICKS_TO_RPS * -motor->flipDir * motor->enc->flipDir; // convert to rotations per second
     motor->shaftRPS = iirLPF(motor->alpha, measuredRPS, motor->shaftRPS); 
 }
 
