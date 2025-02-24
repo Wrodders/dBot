@@ -10,7 +10,7 @@
 % This is where the document title and author are set. Other details for the title page are set later
 % Note that if/when you edit these you may need to 'Recompile from scratch' to get the changes to display in the PDF. (In Overleaf, select the down arrow to the right of the 'Recompile' button)
 \begin{filecontents*}{\jobname.xmpdata}
-    \Title{Vision Based Trajectory Tracking of a Low Cost Two Wheel Self Balancing Robot Platform} % title of your thesis
+    \Title{Development of Two Wheel Self Balancing Platform for Monocular Vision Based Trajectory Tracking} % title of your thesis
     \Author{Winston Scott 107067151} % should be student number rather than name to help with annoymous marking
     \Language{en-GB}
     \Copyrighted{True}
@@ -75,7 +75,7 @@
   % Set the below yourself
   \course{Mechatronics and Robotics Engineering}  % "Master of Science in" is added automatically
                                                      % Our courses are: Advanced Control and Systems Engineering, Advanced Control and Systems Engineering with Extended Research, Communications and Signal Processing, Communications and Signal Processing with Extended Research, Electrical Power Systems Engineering, Advanced Electrical Power Systems Engineering, Renewable Energy and Clean Technology, Renewable Energy and Clean Technology with Extended Research
-  \submitdate{2024}                                  % regulations ask only for the year, not month
+  \submitdate{2025}                                  % regulations ask only for the year, not month
   \wordcount{1000}		                            % use \wordcount{} to set the count, \thewordcount to print in the text
   \maketitle
 
@@ -85,65 +85,65 @@
 
   %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
   \begin{abstract} % put abstract here. Limit is 1 page.
-    This is abstract text.
+    Abstract goes here.
   \end{abstract}%
   \clearpage
   %%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
   \section{Introduction}
     \subsection{Background and motivation}
     \subsection{Aims and objectives}
-    \subsection{Report structure}
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
   \section{Literature review} % edit section heading as appropriate
     \subsection{Introduction}
-      \subsection{Summary}
+    \subsection{Summary}
   %%%%%%%%%%%%%%%%%% SECTION 3 %%%%%%%%%%%%%%%%%%
   \pagebreak{}
   \section{Methodology } % edit section heading as appropriate
-    \subsection{System Design and Modeling }
-    \includegraphics[width=\textwidth]{bBotV2TechDraw.jpg}
-    
-    
-   
+    \subsection{System Design and Modeling}
+        \includegraphics[width=\textwidth]{bBotV2TechDraw.jpg}
+        \subsection{Key Design Decisions}
+        \subsection{{BOM and Cost Analysis}}
     \subsection{State Space Model}
-        \subsection{2D Kinematics}
-        \subsection{3D Dynamics}
-        \subsection{DC Motor Model}
-        \subsection(Parameter Estimation)
+        \subsubsection{2D Kinematics}
+        \subsubsection{3D Dynamics}
+        \subsubsection{DC Motor Model}
+        \subsubsection{Parameter Estimation}
     \subsection{Software Architecture}
-        \subsection{Compute Systems Overview }
+        \subsubsection{Compute Systems Overview }
+        \subsubsection{Test Bench Programs}
     \subsection{State Estimation}
-        \subsection{Sensor Overview}
-        \subsection{Kalman Filter}
-        \subsection{Extended Kalman Filter}
-        \subsection{DataDriven Techniques}
-        \subsection{Adaptive Filter Estimation}
-        \subsection{Curvilinear Transformation}
-            The planar two wheel self balancing robot, now moddled as a point P, subject to the differential drive constraints, 
-            can be instantaneously described as follwing some segment or radius r. This arc seggment forms part of a coninuous spline. 
-            The curvature of the spline is given by the inverse of the radius of the circle that best fits the arc segment.
-            Where a positive curvature indicates a right turn and a negative curvature indicates a left turn.
-            The forward direction is x, and left if y. using the side of the angle between the robtos heading and the observed center line can be used as the derivative term.
-            adding the curvature K, 
-        \subsection{Vision System}
-            \subsection{Pipeline}
-            \subsection{Camera Calibration}
-            \subsection{IMU Based Software Stabilization}
-            \subsection{Adaptive Filters}
-            \subsection{Perspective Transformation}
-            \subsection{Polynomial Fitting}
-        \subsection{Trajectory Generation}
-        \subsection{Control System}
-            \subsection{Cascade PID}
-            \subsection{LQR}
-            \subsection{Trajectory Tracking}
+        \subsubsection{Sensors Overview}
+        \subsubsection{Kalman Filter}
+        \subsubsection{Extended Kalman Filter}
+    \subsection{Vision System}
+        \subsubsection{Curvilinear Transformation}
+        The planar two wheel self balancing robot, now modeled as a point P, subject to the differential drive constraints, 
+        can be instantaneously described as following some segment or radius r. This arc seggment forms part of a coninuous spline. 
+        The curvature of the spline is given by the inverse of the radius of the circle that best fits the arc segment.
+        Where a positive curvature indicates a right turn and a negative curvature indicates a left turn.
+        The forward direction is x, and left if y. using the side of the angle between the robtos heading and the observed center line can be used as the derivative term.
+        adding the curvature K, 
+            \subsubsection{Pipeline}
+            \subsubsection{Camera Calibration}
+            \subsubsection{IMU Based Software Stabilization}
+            \subsubsection{Adaptive Filters}
+            \subsubsection{Perspective Transformation}
+            \subsubsection{Polynomial Fitting}
+            \subsubsection{Trajectory Generation}
+    \subsection{Control System}
+        \subsubsection{Cascade PID}
+        \subsubsection{LQR}
+        \subsubsection{Trajectory Tracking}
 
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
   \section{Results and discussion} % edit section heading as appropriate
     \subsection{Introduction}
-      \subsection{Detail}
-      \subsection{More detail}
-      \subsection{Summary}
+    \subsection{Balance Performance}
+    \includegraphics[width=\textwidth]{V1Colated.png}
+    \subsection{Operational Robustness}
+    \subsection{Line Trajectory Tracking}
+    \subsection{More detail}
+    \subsection{Summary}
   %%%%%%%%%%%%%%%%%% SECTION 5 %%%%%%%%%%%%%%%%%%
   \section{Conclusions and future work} % edit section heading as appropriate
     \subsection{Conclusions}

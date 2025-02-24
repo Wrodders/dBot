@@ -23,7 +23,7 @@
 #define UDP_PORT 5557      
 #define BUFFER_SIZE 512  
   
-#define DEBUG_MODE true
+
 
 #define NODE_NAME "RCTRL"
 
@@ -44,20 +44,20 @@ int main() {
     zmq::context_t zmq_context(1);
     zmq::socket_t zmq_sock(zmq_context, zmq::socket_type::pub);
     zmq_sock.set(zmq::sockopt::linger, 0);
-    zmq_sock.connect(CMD_SOCKET_ADDRESS);
+    zmq_sock.connect(CMD_SRC_SOCKET);
 
     char buffer[BUFFER_SIZE];
     while(true) {
         sockaddr_in client_addr{};
         socklen_t addr_len = sizeof(client_addr);
-        ssize_t msg_len = recvfrom(udp_sock_, buffer, BUFFER_SIZE, 0, (sockaddr*)&client_addr, &addr_len);
+        ssize_t msg_len = recvfrom(udp_sock_, buffer, BUFFER_SIZE, 0, (sockaddr*)&client_addr, &addr_len);//blocking
 
         if(msg_len == -1) { 
             std::cerr << "Error receiving UDP message: " << strerror(errno) << std::endl;
             continue;
         }
 
-        zmq::message_t address_msg("TWSB");
+        zmq::message_t address_msg("TWSB", 4);
         zmq::message_t cmd_msg(buffer, msg_len);
         try {
             zmq_sock.send(address_msg, zmq::send_flags::sndmore);

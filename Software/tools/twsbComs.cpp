@@ -22,7 +22,7 @@
 
 //*** TWSB Coms Console */
 #define NODE_NAME "TWSB"
-#define DEBUG_MODE true
+
 
 #define DEFAULT_PORT "/dev/ttyAMA0"
 #define DEFAULT_BAUD 115200
@@ -32,6 +32,7 @@ void cli_display_help(const std::string& program_name) {
     fmt::print("Usage: {} <serial_port> <baud_rate> \n", program_name);
     fmt::print("Example: {} /dev/ttyUSB0 115200\n", program_name);
 }
+
 
 //@Brief: Configure the serial port non-canonical mode
 int config_serial_port(const std::string& port, int baud) {
@@ -90,8 +91,8 @@ inline int get_bytes_available(int fd) {
 enum SERCOMS_DECODE_TELEM { COMS_TELEM_IDLE = 0, COMS_TELEM_ID, COMS_TELEM_DATA, COMS_TELEM_ERROR};
 
 struct SerComs {
-    TelemetryMsg _telem_msg_rx;
-    std::queue<TelemetryMsg> telemMsgQ;
+    Message _telem_msg_rx;
+    std::queue<Message> telemMsgQ;
     SERCOMS_DECODE_TELEM telemDecodeState;
     std::vector<uint8_t> rxBuffer; // Now owned by SerComs
 
@@ -106,7 +107,7 @@ struct SerComs {
 //@Note: Multiple messages are pared and pushed to the message queue
 //@Note: Partial Messages are completed and verified in the next read
 void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol& proto, 
-                            NodeConfigManager& config) {
+                            PubMap& pub_map) {
     // read line from serial port until new line 
     int bytesAvailable = get_bytes_available(serialFd);
     bytesAvailable = std::min(bytesAvailable, static_cast<int>(coms.rxBuffer.size())); 
@@ -123,14 +124,16 @@ void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol&
                 break;
             case COMS_TELEM_ID:
                 byte = proto_decode_id(proto, byte);
-                coms._telem_msg_rx.topic = config.get_pub_name(byte); 
-                coms.telemDecodeState = COMS_TELEM_DATA;
+                coms._telem_msg_rx.topic = pub_map.get_topic_name(byte);
+                if(coms._telem_msg_rx.topic.empty()) {
+                    coms.telemDecodeState = COMS_TELEM_ERROR;
+                } else {
+                    coms.telemDecodeState = COMS_TELEM_DATA;
+                }
                 break;
             case COMS_TELEM_DATA:
-                if (byte == proto.sof_byte) {
-                    coms.telemDecodeState = COMS_TELEM_ERROR;
-                } else if (byte == proto.eof_byte) {
-                    coms._telem_msg_rx.timestamp = std::chrono::system_clock::now();
+               if (byte == proto.eof_byte) { // End of Message
+                    coms._telem_msg_rx.time_str = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
                     coms.telemMsgQ.push(coms._telem_msg_rx);
                     coms.telemDecodeState = COMS_TELEM_IDLE;
                 } else {
@@ -148,27 +151,32 @@ void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol&
     }
 }
 
+
 // ********* MAIN ************************************************************************* //
 int main(int argc, char* argv[]) {
     // --------------- CLI Parsing ----------------- //
-    if (argc < 4) {
+    if (argc < 3) {
         cli_display_help(argv[0]);
         return 1;
     }
 
     std::string port = argv[1];
     int baud_rate = std::stoi(argv[2]);
-
-    // Store console topics in a set
-    std::unordered_set<std::string> console_topics; // group of topics to display on the console
-    for (int i = 3; i < argc; i++) {
-        console_topics.insert(argv[i]);
+    if (port.empty() || baud_rate == 0) {
+        cli_display_help(argv[0]);
+        return 1;
     }
 
     // ---------- Communication Setup -------------- //
     Protocol proto = {.sof_byte = '<', .eof_byte = '\n', .delim_byte = ':', .offset = 'A'};
     CommandMsg cmd; // Working command variable
-    NodeConfigManager config("configs/robotConfig.json", NODE_NAME); // Load the robots general configuration file
+
+
+
+    PubMap pub_map("configs/robotConfig.json", NODE_NAME); 
+   
+    
+
     struct SerComs coms;
     /* Note this Node is a transparent bridge between the ZMQ and the TWSB
     // All Parameters and Publishers are of the TWSB MCU as implemented in the Firmware
@@ -186,10 +194,10 @@ int main(int argc, char* argv[]) {
     zmq::socket_t cmd_subsock(context, zmq::socket_type::sub);
     cmd_subsock.set(zmq::sockopt::linger, 0);
     cmd_subsock.set(zmq::sockopt::subscribe, NODE_NAME);
-    cmd_subsock.connect(CMD_SOCKET_ADDRESS); // Connect to the command socket proxy
+    cmd_subsock.bind("tcp://*:5556");
     zmq::socket_t msg_pubsock(context, zmq::socket_type::pub);
     msg_pubsock.set(zmq::sockopt::linger, 0);
-    msg_pubsock.bind(MSG_PUB_ADDRESS); 
+    msg_pubsock.bind("tcp://*:5555"); 
     // --------------- Console Setup ----------------- //
     fmt::print("[TWSB Coms][INFO] Begin TWSB Console\n");
     zmq::pollitem_t poll_items[] = {
@@ -204,16 +212,21 @@ int main(int argc, char* argv[]) {
             break;
         } 
         if (poll_items[0].revents & ZMQ_POLLIN) { // SerialPort Data Available
-            sercoms_grab_telemetry(serial_fd, coms, proto, config);  // read and half parse messages from the serial port
+            sercoms_grab_telemetry(serial_fd, coms, proto, pub_map);  // read and half parse messages from the serial port
             while (!coms.telemMsgQ.empty()) { // Publish all messages in the 
-                struct TelemetryMsg telem_msg = coms.telemMsgQ.front(); // grab the message from the queue
+                struct Message telem_msg = coms.telemMsgQ.front(); // grab the mcu's message from the queue
                 coms.telemMsgQ.pop(); 
-                zmqcoms_publish_tsmp_msg(msg_pubsock,telem_msg, NODE_NAME );// bridge the message to the ZMQ
+                telem_msg.topic.append("/");
+                telem_msg.topic.append(NODE_NAME); // Append the node name to the topic
+                // Send Message Under each Publisher ID over zmq
+                coms_publish_tsmp_msg(msg_pubsock,telem_msg);// bridge the message to the ZMQ
+                
+               
             }
         }
         if (poll_items[1].revents & ZMQ_POLLIN) { // ZMQ Command Message Available 
-            zmqcoms_receive_asciicmd(cmd_subsock, cmd); // Receive the command message
-            if(DEBUG_MODE) {fmt::print("[{}][INFO] Received Command: {}\n",NODE_NAME,cmd.data);}
+            coms_receive_asciicmd(cmd_subsock, cmd); // Receive the command message
+            if(DEBUG_MODE) {fmt::print("[{}][INFO] Received Command: {}{}\n",NODE_NAME,cmd.topic,cmd.data);}
             // Send the command msg to the TWSB MCU transparently
             write(serial_fd, cmd.data.c_str(), cmd.data.size());
         }

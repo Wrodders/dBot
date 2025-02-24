@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     zmq::socket_t subscriber(context, zmq::socket_type::sub);
     subscriber.set(zmq::sockopt::linger, 0);
     subscriber.set(zmq::sockopt::subscribe, "");
-    subscriber.set(zmq::sockopt::ipv6, 1);
+    subscriber.set(zmq::sockopt::ipv6, 1); // Enable IPv6 
 
     for (const auto& sckAddr : input_sckAddrs) {
         try {

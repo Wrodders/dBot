@@ -4,22 +4,8 @@
 #include "motor.h"
 
 // 
-/*  // ******* Differential Drive Mobile Robot ********* // 
+  // ******* Differential Drive Mobile Robot ********* // 
 
-Robot Frame:
-
-x_dot = (v/2) * (w1 + w2) * cos(theta) 
-y_dot = (v/2) * (w1 + w2) * sin(theta)
-theta_dot = (v/L) * (w1 - w2)
-
-where:
-    v = linear velocity
-    w1 = angular velocity of left wheel
-    w2 = angular velocity of right wheel
-    L = wheel base
-
-
-*/ // ************************************************* //
 struct DiffDriveModel{
     const float wheelR;     // R [m]
     const float wheelBase;  // L [m]

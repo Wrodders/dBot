@@ -25,7 +25,7 @@
 #define IMU_PERIOD             1
 #define WSPEED_CNTRL_PERIOD    2 
 #define BAL_CNTRL_PERIOD       5  
-#define VEL_CNTRL_PERIOD       10 
+#define VEL_CNTRL_PERIOD       50 
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f    // Counts per Revolution
@@ -35,9 +35,9 @@
 #define WHEEL_RADIUS        0.04f     // m
 
 #define VSYS                10.00f    // Nominal System Voltage [3s Li ion 10.2-12.6V]
-#define VMOTOR_MAX          7.00      // Scale duty to nominal motor voltage
+#define VMOTOR_MAX          9.00      // Scale duty to nominal motor voltage
 #define BAT_CAPACITY        2300      // mAh
-#define MOTOR_DEADBAND      0.5f      // Volts
+#define MOTOR_DEADBAND      0.0f      // Volts
 // *********** UNIT CONVERSIONS *************************** //
 const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 const float MS_TO_S         = 0.001f; // s
@@ -66,13 +66,13 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 #define SPEED_KD    0.00f
 #define SPEED_ALPHA 0.95f
 // Balance Control 
-#define BAL_OFFSET  -7.50f  // deg
+#define IMU_MOUNT_OFFSET  -0.10f  // deg
 #define BAL_CUTOFF  35       
-#define BAL_KP      0.16
+#define BAL_KP      0.3
 #define BAL_KI      3
 #define BAL_KD      0.003f
 // Linear Velocity Control
-#define VEL_P       0  
+#define VEL_P       8  
 #define VEL_I       0
 #define VEL_D       0
 #define VEL_ALPHA   1.0

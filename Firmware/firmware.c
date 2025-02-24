@@ -28,7 +28,7 @@ static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, 
                     struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
     ddmrEstimateOdom(ddmr, motorL, motorR);
     // error = (Reference - Calibrated Offset) - Estimated Pitch
-    balanceAngleCtrl->out = pidRun(balanceAngleCtrl, imu->kal.pitch); // Unicycle Wheel Speed output
+    balanceAngleCtrl->out = pidRun(balanceAngleCtrl, imu->kal.pitch+IMU_MOUNT_OFFSET); // Unicycle Wheel Speed output
     motorSetTrgtSpeed(motorL, (balanceAngleCtrl->out + steerCtrl->out)); // Apply Steering Correction
     motorSetTrgtSpeed(motorR, (balanceAngleCtrl->out - steerCtrl->out)); // Apply Steering Correction
 }
@@ -39,7 +39,7 @@ static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PI
     ddmrEstimateOdom(ddmr, motorL, motorR);
     velCtrl->out = pidRun(velCtrl, ddmr->linearVel); // Reference - odometry velocity 
     steerCtrl->out = pidRun(steerCtrl,ddmr->angularVel); // Reference - odometry angular velocity
-    pidSetRef(balanceAngleCtrl, BAL_OFFSET+velCtrl->out); // Sets Balance Reference point to reach desired velocity
+    pidSetRef(balanceAngleCtrl, -velCtrl->out); // Sets Balance Reference point to reach desired velocity
 }
 // ********** LQR FUNCTIONS ***************************************//
 
@@ -141,7 +141,7 @@ int main(void){
 
     // ****** Loop Parameters **************************************************************************** // 
     enum MODE {FW_UPDATE=0, INIT,PARK, CASCADE, LQR, TUNE_MOTOR, COMMISSION} mode;
-    nextMode = COMMISSION;
+    nextMode = INIT;
     motorEnable(&motorL);
     motorEnable(&motorR);
 

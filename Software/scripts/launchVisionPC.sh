@@ -39,4 +39,3 @@ gst-launch-1.0 filesrc location=$VIDEO_OUT ! videoparse format=i420 width=640 he
 
 # Run vision program in the foreground
 ./build/vision 
-

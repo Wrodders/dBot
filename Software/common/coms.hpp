@@ -3,38 +3,240 @@
 /* PUB_RPC COMS PROTOCOL PC Application Definitions ***************
 
 Pub-RPC Specification Protocol Frame Structure
-          |-----------Packet------------|
-          ********|---------Frame-------|
-********* |-------+---+----+- - - - - - |
- Command  | TOPIC |CMD| ID | DATA       |
-          | str   | 1 | 1  | str        | 
-********* |-------+---+----+- - - - - - |
- Telemetry| Topic |  DATA  | TIMESTAMP  | 
-        | | str   | str    | int64      |     
-********* |-------+--------+------+-----|
+          |-----------Packet---------------------|
+          | Routing Header |---------Frame-------|
+********* |----------------+---+----+- - - - - - |
+ Command  | NodeName       |CMD| ID | DATA       |
+          | str            | 1 | 1  | str        | 
+********* |----------------+---+----+- - - - - - |
+ Message  | Topic/Nodename |  DATA  | TIMESTAMP  | 
+        | | str            | str    | int64      |     
+********* |----------------+--------+------------|
 
 Note that Command and Telemetry messages are framed differently
 */
 
 #include "common.hpp"
-#include <shared_mutex>
-#include <mutex>
 #include <atomic>  // Add this line to include the atomic operations header
+ 
+struct TopicInfo{
+    uint8_t ID;
+    std::string name;
+    std::vector<std::string> args_names;
+    std::string format;
+    std::string description;
+    int nArgs; // utility
+}; // Topic Info
+
+//@Brief: Utility class to manage the topics of a particular node
+//@Note: The topics are loaded from a JSON file
+class PubMap {
+    private:
+        std::vector<TopicInfo> topics_by_id;
+        std::unordered_map<std::string, uint8_t> name_to_id;
+
+        void print_topics() {
+            for (const auto& topic : topics_by_id) {
+                fmt::print("ID: {} Name: {} Format: {} Description: {}\n", topic.ID, topic.name, topic.format, topic.description);
+                for (const auto& arg : topic.args_names) {
+                    fmt::print("Arg: {}\n", arg);
+                }
+            }
+        }
+    
+        bool load_topics(const std::string& filename, const std::string& node_name) {
+            try {
+                std::ifstream file(filename);
+                if (!file.is_open()) {
+                    throw std::runtime_error("Failed to open config file");
+                }
+                json config;
+                file >> config; // Load the JSON file
+                if (config.contains(node_name)) {
+                    auto& publishers = config[node_name]["publishers"];
+                    topics_by_id.resize(publishers.size());
+    
+                    for (const auto& topic : publishers) {
+                        TopicInfo t;
+                        t.ID = topic["id"];
+                        t.name = topic["name"];
+                        t.format = topic["format"];
+                        t.description = topic["description"];
+                    
+                        for (const auto& arg : topic["args"]) {
+                            t.args_names.push_back(arg);
+                        }
+                    
+                        t.nArgs = t.args_names.size();
+                    
+                        if (t.ID >= topics_by_id.size())
+                            topics_by_id.resize(t.ID + 1);
+                    
+                        topics_by_id[t.ID] = t;
+                        name_to_id[t.name] = t.ID;
+                    }
+                }
+                return true;
+            } catch (const json::exception& e) {
+                std::cerr << "JSON error: " << e.what() << std::endl;
+                return false;
+            }
+        }
+    
+    public:
+        PubMap(const std::string& filename, const std::string& node_name) {
+            if (!load_topics(filename, node_name))
+                throw std::runtime_error("Failed to load topics");
+
+            if(DEBUG_MODE) {print_topics();}
+        }
+    
+        const TopicInfo* get_topic(uint8_t id) const {
+            return (id < topics_by_id.size()) ? &topics_by_id[id] : nullptr;
+        }
+    
+        const TopicInfo* get_topic(const std::string& name) const {
+            auto it = name_to_id.find(name);
+            return (it != name_to_id.end()) ? get_topic(it->second) : nullptr;
+        }
+
+        const std::string get_topic_name(uint8_t id) const {
+            return (id < topics_by_id.size()) ? topics_by_id[id].name : "";
+        }   
 
 
+    };
+    
+
+struct ParameterInfo{
+    uint8_t ID;     // Allows for 256 parameters
+    std::string name; 
+    std::string format;
+    std::string access; // Read or Write
+    std::string description; // tooltip
+   // function pointer to validator function 
+    bool (*validator)(float);
+};
+
+//@Brief: Utility class to manage the parameters of a node
+//@Note: The parameters info are loaded from a JSON file
+class ParameterMap {
+    private:
+        std::vector<ParameterInfo> parameters_by_id;
+        std::vector<std::atomic<float>*> param_registers;
+        std::unordered_map<std::string, uint8_t> name_to_id;
+
+        void print_parameters() {
+            for (const auto& param : parameters_by_id) {
+                fmt::print("ID: {} Name: {} Format: {} Access: {} Description: {}\n", param.ID, param.name, param.format, param.access, param.description);
+            }
+        }
+    
+        bool load_parameters(const std::string& filename, const std::string& node_name) {
+            try {
+                std::ifstream file(filename);
+                if (!file.is_open()) {
+                    throw std::runtime_error("Failed to open config file");
+                }
+                json config;
+                file >> config; // Load the JSON file
+                if (config.contains(node_name)) {
+                    auto& parameters = config[node_name]["parameters"];
+                    parameters_by_id.resize(parameters.size());
+    
+                    for (const auto& topic : parameters) {
+                        ParameterInfo p;
+                        p.ID = topic["id"];
+                        p.name = topic["name"];
+                        p.format = topic["format"];
+                        p.access = topic["access"];
+                        p.description = topic["description"];
+
+                        if (p.ID >= parameters_by_id.size())
+                            parameters_by_id.resize(p.ID + 1);
+
+                        parameters_by_id[p.ID] = p;
+                        name_to_id[p.name] = p.ID;
+                    }            
+                }
+                return true;
+            } catch (const json::exception& e) {
+                std::cerr << "JSON error: " << e.what() << std::endl;
+                return false;
+            }
+        }
+    
+    public:
+        ParameterMap(const std::string& filename, const std::string& node_name) {
+            if (!load_parameters(filename, node_name)) {
+                throw std::runtime_error("Failed to load parameters");
+            }
+            if(DEBUG_MODE) {print_parameters();}
+        }
+
+        bool register_parameter(uint8_t id, std::atomic<float>& value, bool (*validator)(float)) {
+            if (id >= parameters_by_id.size()) return false;
+            param_registers.resize(parameters_by_id.size());
+            param_registers[id] = &value;
+            parameters_by_id[id].validator = validator;
+            return true;
+        }
+    
+        const ParameterInfo* get_parameter(uint8_t id) const {
+            return (id < parameters_by_id.size()) ? &parameters_by_id[id] : nullptr;
+        }
+    
+        const ParameterInfo* get_parameter(const std::string& name) const {
+            auto it = name_to_id.find(name);
+            return (it != name_to_id.end()) ? get_parameter(it->second) : nullptr;
+        }
+    
+        bool set_value(uint8_t id, float value) {
+            if (id >= param_registers.size()) {return false;}
+            if(!param_registers[id]) {return false;}
+            if(!parameters_by_id[id].validator(value)) {return false;}
+            param_registers[id]->store(value, std::memory_order_relaxed);
+            return true;
+        }
+    
+        bool get_value(uint8_t id, float& value) const {
+            if (id >= param_registers.size()) return false;
+            if(!param_registers[id]) {return false;}
+            value = param_registers[id]->load(std::memory_order_relaxed);
+            return true;
+        }
+    
+        bool set_value(const std::string& name, float value) {
+            auto it = name_to_id.find(name);
+            if(it == name_to_id.end()) {return false;}
+            if(!param_registers[it->second]) {return false;}
+            if(!parameters_by_id[it->second].validator(value)) {return false;}
+            param_registers[it->second]->store(value, std::memory_order_relaxed);
+            return true;
+        }
+    
+        bool get_value(const std::string& name, float& value) const {
+            auto it = name_to_id.find(name);
+            if(it == name_to_id.end()) {return false;}
+            if(!param_registers[it->second]) {return false;}
+            value = param_registers[it->second]->load(std::memory_order_relaxed);
+            return true;
+        }
+    };
+
+// ---------- PUB_RPC Utilties ----------------- //
 enum RPC {GET = 0, SET, NUM_RPC}; // Command IDs
-
 struct Protocol{ 
     char sof_byte;
     char eof_byte;
-    char delim_byte;
+    char delim_byte; 
     char offset;
 }; // Ascii protocol for encoding data
 
-struct TelemetryMsg {
+struct Message {
     std::string topic;
     std::string data; // ASCII serialized data
-    std::chrono::time_point<std::chrono::system_clock> timestamp;
+    std::string time_str;
 };
 struct CommandMsg {
     std::string topic;
@@ -42,14 +244,6 @@ struct CommandMsg {
     uint8_t cmdID;
     uint8_t paramID;
 };
-
-struct Parameter{
-    std::string name; // utility name 
-    std::string format; 
-    std::atomic<float> *reg; // register to store the value
-};
-
-
 struct ZmqCmdServer{
     zmq::context_t context;
     zmq::socket_t cmd_subsock;
@@ -63,122 +257,20 @@ struct ZmqCmdServer{
         cmd_subsock.set(zmq::sockopt::linger, 0);
         cmd_subsock.set(zmq::sockopt::subscribe, cmd_substr);
         cmd_subsock.connect(cmd_socket_address); 
+       
         msg_pubsock.set(zmq::sockopt::linger, 0);
         msg_pubsock.connect(msg_pub_address);
+       
         cmd_pubsock.set(zmq::sockopt::linger, 0);
         cmd_pubsock.connect(cmd_socket_address);
     }
 };
 
 
-
-// ********* Node Config Manager ********* //
-class NodeConfigManager {
-    private:
-        mutable std::shared_mutex param_mutex;                  // Protects param_map
-        std::unordered_map<int, std::string> address_to_name;   // Read-only after init
-        std::unordered_map<int, json> parameter_configs;        // Read-only after init
-        std::unordered_map<int, Parameter> param_map;
-    
-    public:
-        const std::string NODE_NAME;
-
-        //@Brief: Load the node configuration from a JSON file
-        NodeConfigManager(const std::string& filename, const std::string& node_name) 
-            : NODE_NAME(node_name) {
-            std::ifstream file(filename);
-            if (!file.is_open()) {
-                throw std::runtime_error("Failed to open config file");
-            }
-            json config;
-            file >> config; // Load the JSON file
-            if (config.contains(NODE_NAME)) {
-                if (config[NODE_NAME].contains("publishers")) { // Load publisher information into map
-                    for (const auto& publisher : config[NODE_NAME]["publishers"]) {
-                        int address = publisher["address"];    
-                        std::string name = publisher["name"];
-                        address_to_name[address] = name;
-                    }
-                }
-                if (config[NODE_NAME].contains("parameters")) { // Load parameter configurations into map
-                    for (const auto& param : config[NODE_NAME]["parameters"]) {
-                        int address = param["address"]; 
-                        parameter_configs[address] = param; 
-                    }
-                }
-            } else {
-                throw std::runtime_error("Section '" + NODE_NAME + "' not found in config file");
-            }
-        }
-        //@Brief: Register the parameter with the config manager
-        //@Note: The parameter must be present in the config file
-        void register_parameter(int address, std::atomic<float>* reg) {
-            std::unique_lock<std::shared_mutex> lock(param_mutex); // Exclusive access to param_map
-            
-            if (parameter_configs.find(address) == parameter_configs.end()) {
-                throw std::runtime_error("Parameter at address " +  std::to_string(address) + " not found in config");
-            }
-    
-            Parameter param;
-            param.name = parameter_configs[address]["name"];
-            param.format = parameter_configs[address]["format"];
-            param.reg = reg;
-            
-            param_map[address] = param;  // Actually store the parameter
-        }
-    
-       //@Brief: Get the name of the parameter at the given address
-       //@Returns: The name of the parameter or "Unknown Address" if not found
-       //@Note: This function is thread-safe
-        std::string get_param_name(int address) const {
-            auto it = parameter_configs.find(address);
-            return (it != parameter_configs.end()) ? it->second["name"] : "Unknown Address";
-        }
-        //@Brief: Get the name of the publisher at the given address
-        //@Returns: The name of the publisher or "Unknown Address" if not found
-        //@Note: This function is thread-safe
-        std::string get_pub_name(int address) const {
-            auto it = address_to_name.find(address);
-            return (it != address_to_name.end()) ? it->second : "Unknown Address";
-        }
-        //@Brief: Set the parameter at the given address
-        //@Note: This function is thread-safe
-        void set_param(int address, float value) {
-            std::shared_lock<std::shared_mutex> lock(param_mutex);
-            if (auto it = param_map.find(address); it != param_map.end()) {
-                it->second.reg->store(value, std::memory_order_release);
-                fmt::print("[{}] Set {} to {}\n", NODE_NAME, it->second.name, value);
-            } else {
-                std::cerr << "Parameter at address " << address 
-                         << " not registered.\n";
-            }
-        }
-        //@Brief: Get the parameter at the given address
-        //@Returns: The value of the parameter or 0.0f if not found
-        //@Note: This function is thread-safe
-        float get_param(int address) const {
-            std::shared_lock<std::shared_mutex> lock(param_mutex);
-            if (auto it = param_map.find(address); 
-                it != param_map.end() && it->second.reg != nullptr) 
-            {
-                return it->second.reg->load(std::memory_order_acquire);
-            }
-            std::cerr << "Parameter at address " << address << " not registered.\n";
-            return 0.0f;
-        }
-    };
-// *********  Utils ********* //
-void display_console( const std::string& topic, const std::string& msg, const std::string& timestring) {
-    std::cout << "\033[2J\033[1;1H"; // Clear the screen
-    fmt::print("[{}] {}: {}\n", timestring, topic, msg);
-    std::cout << std::flush; // Keep Latests message at top of screen for UX 
-}
 inline char proto_encode_id(struct Protocol& proto, uint8_t id) {return id + proto.offset;}
 inline uint8_t proto_decode_id(struct Protocol& proto, char id) {return id - proto.offset;}
 
 //@Brief: Packs the cmd string to a cmd frame as per the pub-rpc protocol
-
-
 void proto_pack_asciicmd(std::string& cmd, const struct Protocol& proto) {
     // SOF | DATA | EOF
     cmd.insert(0, 1, proto.sof_byte);
@@ -210,21 +302,17 @@ bool proto_deserialize_cmd(const std::string& cmd_msg, Protocol &proto, CommandM
     }
     return true; // Command message parsed successfully
 }
-//@Brief: Forward the telemetry message to the ZMQ publisher socket
+
+//@Brief: Forwards the telemetry message to the ZMQ publisher socket
 //@Note: It is a multipart zmq message <topic><data><timestamp> serialized to ASCII
-void zmqcoms_publish_tsmp_msg(zmq::socket_t& pubSocket, const TelemetryMsg& telem, std::string nodeName) {
-    auto duration = telem.timestamp.time_since_epoch();
-    // Prepend node name 
-    std::string topicstr = nodeName + "/" + telem.topic;
-    zmq::message_t topic(topicstr.size());
-    memcpy(topic.data(), topicstr.data(), topicstr.size());
-    zmq::message_t data(telem.data.size());
-    memcpy(data.data(), telem.data.data(), telem.data.size());
-    // format timestamp as ascii string
-    auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-    std::string timestamp = std::to_string(timestamp_ms);
-    zmq::message_t timestamp_msg(timestamp.size());
-    memcpy(timestamp_msg.data(), timestamp.data(), timestamp.size());
+//@Note: 
+void coms_publish_tsmp_msg(zmq::socket_t& pubSocket,const Message& msg) {
+    zmq::message_t topic(msg.topic.size());
+    memcpy(topic.data(), msg.topic.data(), msg.topic.size());
+    zmq::message_t data(msg.data.size());
+    memcpy(data.data(), msg.data.data(), msg.data.size());
+    zmq::message_t timestamp_msg(msg.time_str.size());
+    memcpy(timestamp_msg.data(), msg.time_str.data(), msg.time_str.size());
     // Send the multipart message (topic, data, timestamp)
     pubSocket.send(topic, zmq::send_flags::sndmore);
     pubSocket.send(data, zmq::send_flags::sndmore);
@@ -236,18 +324,20 @@ void zmqcoms_publish_tsmp_msg(zmq::socket_t& pubSocket, const TelemetryMsg& tele
 //        and publishes the command return message to the ZMQ socket if needed
 //@Note: The command is parsed and executed in place
 //@Note: The cmd return message is published to the ZMQ socket in its subtopic  CMD_RET/<node name>
-void coms_exec_rpc(const CommandMsg& cmd, NodeConfigManager& config, zmq::socket_t& msg_pubsock) {
+void coms_exec_rpc(const CommandMsg& cmd, ParameterMap& param_map, zmq::socket_t& msg_pubsock, const std::string& node_name) {
     float value = 0.0f; // working variable
-    
-    struct TelemetryMsg cmdret_msg;
+    struct Message cmdret_msg;
     switch(cmd.cmdID) {
         case GET:
-            value = config.get_param(cmd.paramID);
+            if(!param_map.get_value(cmd.paramID, value)){
+                std::cerr << " >> Invalid parameter ID: " << cmd.paramID << std::endl;
+                return;
+            }
             // build the cmd return message
-            cmdret_msg.topic = "CMD_RET" + cmd.topic; // Append CMD_RET to the topic
+            cmdret_msg.topic = "CMD_RET/" + node_name;
             cmdret_msg.data = std::to_string(value);
-            cmdret_msg.timestamp = std::chrono::system_clock::now();
-            zmqcoms_publish_tsmp_msg(msg_pubsock, cmdret_msg, config.NODE_NAME);
+            cmdret_msg.time_str = timestamp();
+            coms_publish_tsmp_msg(msg_pubsock, cmdret_msg);
             break;
         case SET:
             try{
@@ -256,9 +346,10 @@ void coms_exec_rpc(const CommandMsg& cmd, NodeConfigManager& config, zmq::socket
                 std::cerr << " >> Invalid data format: " << cmd.data << std::endl;
                 return;
             }
-            config.set_param(cmd.paramID, value);
-            
-  
+            if(!param_map.set_value(cmd.paramID, value)){
+                std::cerr << " >> Invalid parameter ID: " << cmd.paramID << std::endl;
+                return;
+            }
             break;
         default:
             std::cerr << " >> Invalid command ID: " << cmd.cmdID << std::endl;
@@ -268,7 +359,7 @@ void coms_exec_rpc(const CommandMsg& cmd, NodeConfigManager& config, zmq::socket
 
 //@Brief: Receives the Command String
 //@Note: Command Strings are formatted and encoded as per the pub-rpc protocol
-void zmqcoms_receive_asciicmd(zmq::socket_t& cmdSubSocket, struct CommandMsg& cmdFrame) {
+void coms_receive_asciicmd(zmq::socket_t& cmdSubSocket, struct CommandMsg& cmdFrame) {
     zmq::message_t topic_msg;
     zmq::message_t cmd_ret_data;
     (void) cmdSubSocket.recv(topic_msg, zmq::recv_flags::none);
@@ -278,52 +369,17 @@ void zmqcoms_receive_asciicmd(zmq::socket_t& cmdSubSocket, struct CommandMsg& cm
     cmdFrame.data = std::string(static_cast<char*>(cmd_ret_data.data()), cmd_ret_data.size());
 }
 
-//@Brief: Receives the Telemetry Message from the ZMQ socket
-//@Note: Telemetry Messages data are formatted and encoded as per the pub-rpc protocol
-//@Note: The message is parsed in place as TOPIC DATA TIMESTAMP as a multipart message
-bool zmqcoms_receive_telem(zmq::socket_t& telemSumSocket, TelemetryMsg& telem) {
-    zmq::message_t topic_msg;
-    zmq::message_t data_msg;
-    zmq::message_t timestamp_msg;
-    if (!telemSumSocket.recv(topic_msg, zmq::recv_flags::none)) {return false;}
-    if (!telemSumSocket.recv(data_msg, zmq::recv_flags::none)) {return false;}
-    if (!telemSumSocket.recv(timestamp_msg, zmq::recv_flags::none)) {return false;}
-
-    telem.topic = std::string(static_cast<char*>(topic_msg.data()), topic_msg.size());
-    telem.data = std::string(static_cast<char*>(data_msg.data()), data_msg.size());
-    // timestamp is sent as a ascii string int value need to convert to int64
-    int64_t timestamp_ms = atoi(static_cast<char*>(timestamp_msg.data()));
-    try {
-        telem.timestamp = std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(timestamp_ms));
-    } catch (const std::exception&) {
-        return false;
-    }
-    telem.timestamp = std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(timestamp_ms));
-    return true;
-}
 
 //@Brief:Parse and Execute RPC commands from the ZMQ socket
 //@Returns: -1 if exit command is received
-int handle_zmqcmd(struct CommandMsg& cmdmsg, zmq::socket_t& cmd_subsock, zmq::socket_t& msg_pubsock,  zmq::socket_t& cmd_pubsock,
-                 NodeConfigManager& config, struct Protocol& proto) {
-    zmqcoms_receive_asciicmd(cmd_subsock, cmdmsg);
-    if (cmdmsg.data == "exit") {
-        fmt::print("[ZMQ CMD] Exiting\n");
-        return -1;
+void coms_handle_cmd(struct CommandMsg& cmdmsg, zmq::socket_t& msg_pubsock,
+                 ParameterMap& param_map, struct Protocol& proto, const std::string& node_name) {
+
+    if (!proto_deserialize_cmd(cmdmsg.data, proto, cmdmsg)) { 
+        fmt::print("[{}][ERROR] Invalid Command Message: {}\n", node_name, cmdmsg.data);
+        return;
     }
-    if (!proto_deserialize_cmd(cmdmsg.data, proto, cmdmsg)) { return -1;}
-    coms_exec_rpc(cmdmsg, config, msg_pubsock);
-    return 0;
+    coms_exec_rpc(cmdmsg, param_map, msg_pubsock, node_name);
+    
 }
-
-//@Brief: Parse the console input and pack it into a command frame
-//@Returns: -1 if exit command is received
-int preprocess_console_input(std::string& cmd_input, struct Protocol& proto) {
-    if (cmd_input.empty()) { return 0; }
-    if (cmd_input == "exit") {return -1;}
-    proto_pack_asciicmd(cmd_input, proto);
-    return 0;
-}
-
-
 #endif // COMS_H

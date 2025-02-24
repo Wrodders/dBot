@@ -27,9 +27,10 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
+#define DEBUG_MODE true
 
-#define CMD_SOCKET_ADDRESS "ipc:///tmp/botcmds"
-#define MSG_PUB_ADDRESS "ipc:///tmp/botmsgs"
+#define CMD_SRC_SOCKET "tcp://Rodrigos-MacBook-Air.local:5556"
+#define MSG_PUB_ADDRESS "tcp://localhost:5555"
 
 #define PC_VIDEO_ADDRESS "192.168.0.32"
 #define SERCOMS_RX_BUFFER_SIZE 1024
@@ -43,6 +44,10 @@ std::string formatTimestamp(std::chrono::time_point<std::chrono::system_clock> t
     auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timestamp.time_since_epoch()).count() % 1000000000;
     oss << "." << std::setw(9) << std::setfill('0') << ns;
     return oss.str();
+}
+
+std::string timestamp() {
+    return std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
 }
 
 
