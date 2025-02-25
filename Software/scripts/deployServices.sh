@@ -1,7 +1,8 @@
 #!/bin/bash
 
 echo "[DEPLOY_SERVICES] Available:"
-ls ~/prog/software/services/*.service
+
+sudo ls ~/prog/software/services/*.service
 
 # Figure out hostname
 hostname=$(hostname)
@@ -10,10 +11,9 @@ echo "Hostname: $hostname"
 # Stop only the services we actually have
 sudo systemctl stop twsb.service joystick.service vision.service 
 #copy the services to /etc/systemd/system
-sudo cp ~/prog/software/services/twsb.service /etc/systemd/system/
-sudo cp ~/prog/software/services/joystick.service /etc/systemd/system/
-sudo cp ~/prog/software/services/vision.service /etc/systemd/system/
-
+sudo cp /home/pi/prog/software/services/twsb.service /etc/systemd/system/
+sudo cp /home/pi/prog/software/services/joystick.service /etc/systemd/system/
+sudo cp /home/pi/prog/software/services/vision.service /etc/systemd/system/
 
 
 # Reload systemd to pick up new/updated units

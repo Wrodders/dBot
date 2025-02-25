@@ -9,15 +9,6 @@ VIDEO_IN="/tmp/video_in"
 VIDEO_OUT="/tmp/video_out"
 
 
-# Function to clean up on exit
-cleanup() {
-    echo "Stopping all processes..."
-    pkill -P $$  # Kill all child processes of this script
-    rm -f $VIDEO_IN $VIDEO_OUT  # Remove named pipes
-    exit 0
-}
-
-trap cleanup SIGINT SIGTERM EXIT
 
 # Determine the port based on the hostname
 HOSTNAME=$(hostname)
@@ -26,10 +17,10 @@ case $HOSTNAME in
     "dbot")
         PORT=5001 #sdasdasd
         ROT=2 # Rotate 180 degrees
-        sudo gst-launch-1.0  libcamerasrc ! \
+        sudo gst-launch-1.0 -vv libcamerasrc ! \
             videoconvert  ! \
             video/x-raw,format=I420,width=640,height=480,framerate=15/1 ! \
-            v4l2h264enc ! 'video/x-h264,level=(string)4' !\
+            v4l2h264enc ! 'video/x-h264,level=(string)3' !\
             h264parse ! queue! rtph264pay config-interval=1 pt=96 !\
             udpsink host=192.168.0.32 port=$PORT 
         ;;

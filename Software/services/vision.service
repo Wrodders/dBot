@@ -6,13 +6,11 @@ Description=Vision Processing
 After=network.target
 
 [Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/prog/software
-Environment="GST_PLUGIN_PATH=/usr/lib/gstreamer-1.0"
-Environment="GST_DEBUG=4"  
+Type=exec
+User=root
 ExecStart=/bin/bash /home/pi/prog/software/scripts/launchVizPipeRobot.sh
-KillMode=process
+KillMode=mixed
+TimeoutStopSec=10
 
 # Resource Limits
 CPUQuota=60%
@@ -20,11 +18,6 @@ MemoryMax=256M
 MemorySwapMax=64M
 IOWeight=150 
 Nice=-20 
-
-# OpenCV Requirements
-DeviceAllow=/dev/vchiq rw
-DeviceAllow=/dev/vcsm rw
-SupplementaryGroups=video
 
 [Install]
 WantedBy=multi-user.target
