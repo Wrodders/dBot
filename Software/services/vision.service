@@ -1,0 +1,29 @@
+#-----------------------------------------------------------------
+# Vision Processing Service
+#-----------------------------------------------------------------
+[Unit]
+Description=Vision Processing
+After=twsb.service
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/home/pi/prog/software/build/vision
+Restart=on-failure
+RestartSec=20s
+
+# Resource Limits
+CPUQuota=60%
+MemoryMax=256M
+MemorySwapMax=64M
+IOWeight=150 
+Nice=-20 
+Processors=0-1  # Bind to first 2 cores
+
+# OpenCV Requirements
+DeviceAllow=/dev/vchiq rw
+DeviceAllow=/dev/vcsm rw
+SupplementaryGroups=video
+
+[Install]
+WantedBy=multi-user.target

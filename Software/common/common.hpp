@@ -1,31 +1,24 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 
-#include <iostream>
-#include <fstream>
-#include <iomanip>
+#include <vector>
+#include <string.h>
 #include <stdexcept>
-#include <sstream>
+#include <syslog.h>
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <syslog.h>
+#include <sys/ioctl.h>
 
 #include <chrono>
-#include <ctime>
-
-#include <string.h>
-#include <unordered_map>
-#include <unordered_set>
-#include <queue>
-#include <vector>
-
 #include <zmq.hpp>
-#include <fmt/format.h>
-#include <nlohmann/json.hpp>
-using json = nlohmann::json;
+
+
+
 
 #define DEBUG_MODE true
 

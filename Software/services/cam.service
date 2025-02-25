@@ -1,0 +1,28 @@
+[Unit]
+Description=Camera Pipeline
+After=twsb.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/bin/bash -c  'sudo libcamera-vid -t 0 --rotation 180 --width 640 --height 480  --nopreview --autofocus-mode manual --inline -o udp://Rodrigos-MacBook-Air.local:5554'
+RestartSec=5s
+
+# Aggressive Limits
+CPUQuota=20%
+
+MemoryMax=128M
+MemorySwapMax=128M
+IOWeight=300
+Nice=-20 
+Processors=2-3  
+
+# Hardware Access
+DeviceAllow=/dev/video0 rw
+DeviceAllow=/dev/vchiq rw
+SupplementaryGroups=video
+
+
+
+[Install]
+WantedBy=multi-user.target

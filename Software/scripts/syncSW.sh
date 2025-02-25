@@ -1,7 +1,7 @@
 #!/bin/bash
 # -------------------------------------------------- 
-#  @file     syncSW.cpp
-#  @brief   Synchronizes software files to the robot remotely.
+#  @file    syncSW.cpp
+#  @brief   Synchronizes software files to the robot remotely. 
 #  @details Used as part of the build and deploy process.
 
 set -e

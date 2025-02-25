@@ -8,10 +8,7 @@
  */
 
 
-#include <iostream>
-#include <cstring>
-#include <stdexcept>
-#include <zmq.hpp>
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -23,8 +20,6 @@
 #define UDP_PORT 5557      
 #define BUFFER_SIZE 512  
   
-
-
 #define NODE_NAME "RCTRL"
 
 int main() {
@@ -37,14 +32,17 @@ int main() {
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(UDP_PORT);
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    if(bind(udp_sock_, (sockaddr*)&server_addr, sizeof(server_addr)) ){
+    if(bind(udp_sock_, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
         close(udp_sock_);
-        throw std::runtime_error("UDP bind failed: " +  std::string(strerror(errno)));
+        syslog(LOG_ERR, "Error binding UDP socket: %s", strerror(errno));
+        return 1;
+        
     }
     zmq::context_t zmq_context(1);
-    zmq::socket_t zmq_sock(zmq_context, zmq::socket_type::pub);
-    zmq_sock.set(zmq::sockopt::linger, 0);
-    zmq_sock.connect(CMD_SRC_SOCKET);
+
+    zmq::socket_t cmd_pubsock(zmq_context, zmq::socket_type::pub);
+    cmd_pubsock.set(zmq::sockopt::linger, 0);
+    cmd_pubsock.connect("ipc:///tmp/botcmds"); 
 
     char buffer[BUFFER_SIZE];
     while(true) {
@@ -56,12 +54,12 @@ int main() {
             std::cerr << "Error receiving UDP message: " << strerror(errno) << std::endl;
             continue;
         }
-
+        // Forward the message to the TWSB over ZMQ ipc
         zmq::message_t address_msg("TWSB", 4);
         zmq::message_t cmd_msg(buffer, msg_len);
         try {
-            zmq_sock.send(address_msg, zmq::send_flags::sndmore);
-            zmq_sock.send(cmd_msg, zmq::send_flags::none);
+            cmd_pubsock.send(address_msg, zmq::send_flags::sndmore);
+            cmd_pubsock.send(cmd_msg, zmq::send_flags::none);
         } catch(const zmq::error_t& e) {
             std::cerr << "ZMQ send error: " << e.what() << std::endl;
         }

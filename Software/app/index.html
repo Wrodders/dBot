@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Joystick Controller</title>
+  <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0"></script>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f4f4f4;
+      margin: 0;
+    }
+    #joystick-container {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background: #d3d3d3; /* Light grey background for the base container */
+      border-radius: 50%;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    /* Customize nipple.js styling */
+    .nipple {
+      background: grey !important; /* Joystick button color */
+      border: 2px solid #555;
+    }
+    .nipple-base {
+      background: transparent !important; /* Remove default base color */
+    }
+  </style>
+</head>
+<body>
+  <div id="joystick-container"></div>
+  <script>
+    // Create a static joystick so it is always visible at the center
+    const joystick = nipplejs.create({
+      zone: document.getElementById('joystick-container'),
+      mode: 'static',
+      position: { left: '50%', top: '50%' },
+      color: 'grey',
+      size: 150,  // Adjust size as needed
+      restOpacity: 0.8
+    });
+
+    function sendJoystickData(x, y) {
+      fetch('/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x, y })
+      });
+    }
+
+    joystick.on('move', (evt, data) => {
+      // Use the normalized vector values rounded to two decimals
+      const x = (data.vector.x || 0).toFixed(2);
+      const y = (data.vector.y || 0).toFixed(2);
+      sendJoystickData(x, y);
+    });
+
+    joystick.on('end', () => {
+      sendJoystickData(0, 0);
+    });
+  </script>
+</body>
+</html>

@@ -1,8 +1,7 @@
 #!/bin/bash
 # -------------------------------------------------- 
 #  @file    twsbConsole.cpp
-#  @brief   A simple console for debugging TWSB messages.
-
+#  @brief   A simple console for debugging raw TWSB messages.
 
 # Ensure correct usage
 if [[ $# -lt 3 ]]; then
@@ -39,9 +38,6 @@ echo "-------------------------"
 echo "[DEBUG_CONSOLE][INFO] Listening on $PORT at $BAUD baud. Filtering messages with '<$FILTER'."
 echo "[DEBUG_CONSOLE][INFO] Type 'exit' to quit."
 echo "-------------------------"
-echo "[DEBUG_CONSOLE][INFO] Listening on $PORT at $BAUD baud. Filtering messages with '$@'."
-echo "[DEBUG_CONSOLE][INFO] Type 'exit' to quit."
-
 # Background listener process to filter incoming messages
 ( cat "$PORT" | grep -E --line-buffered "$FILTER_PATTERN" ) &  
 LISTENER_PID=$!

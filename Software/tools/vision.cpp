@@ -29,31 +29,30 @@
 
 
 #include "../inc/vision.hpp"
-#include <deque>
+
+
+
+
 
 #define NODE_NAME "VISION"
-
-
-
-
 
 int main(int argc, char* argv[]) {
     (void) argc;
     (void) argv;
-    std::cout << "[VISION] Starting Vision Pipeline" << std::endl;
+    
     //  -------------- Video IO Setup  ----------------- //
     mkfifo(viz::INPUT_PIPE, 0666); 
     mkfifo(viz::OUTPUT_PIPE, 0666); 
     // Command to capture video using rpicam-vid with YUV420p output
     FILE* in_pipe = fopen(viz::INPUT_PIPE, "r");
     if (!in_pipe) {
-        std::cerr << "Failed to open pipe to video input!" << std::endl;
+        syslog(LOG_CRIT, "Unable to open pipe to video input!");
         return -1;
     }
    
     FILE* out_pipe = fopen(viz::OUTPUT_PIPE, "w");
     if (!out_pipe) {
-        std::cerr << "Failed to open pipe to video output!" << std::endl;
+        syslog(LOG_CRIT, "Unable to open pipe to video output!");
         return -1;
     }
     // -------------- Runtime Parameters ----------------- //
@@ -63,27 +62,22 @@ int main(int argc, char* argv[]) {
     param_map.register_parameter(viz::P_TRFM_PAD, params[viz::P_TRFM_PAD], viz::val_trfm_pad);
     param_map.register_parameter(viz::P_EDGE, params[viz::P_EDGE], viz::val_edge);
     param_map.register_parameter(viz::P_PROG_MODE, params[viz::P_PROG_MODE], viz::val_prog_mode);
-
     // initialize the parameters
     params[viz::P_HRZ_HEIGHT].store(viz::HEIGHT / 2);
     params[viz::P_TRFM_PAD].store(viz::WIDTH / 2);
     params[viz::P_EDGE].store(viz::P_CANNY);
     params[viz::P_PROG_MODE].store(viz::M_RUN);
-    
-
-    
-
-
     // ------------- Command Server Coms Thread ----------------- //
     std::thread cmd_thread(viz::command_server, std::ref(param_map));
     // -------------- Vision Pipeline Allocations ----------------- //
     std::array<uint8_t, viz::FRAME_SIZE> yuv_buffer; // serialized frame buffer
     cv::Mat homography_matrix = cv::Mat::eye(3, 3, CV_64F); // identity matrix
 
+    // -------------- Vision Pipeline Loop ----------------- //
     while(viz::_exit_trig == false) {
         size_t bytes_read = fread(yuv_buffer.data(), 1, yuv_buffer.size(), in_pipe);
         if (bytes_read != viz::FRAME_SIZE) {
-            std::cerr << "[VISION] Error: Unable to read a complete frame." << std::endl;
+            syslog(LOG_ERR, "Unable to read frame from input pipe!");
             continue; // skip frame if not complete
         }
         cv::Mat y_plane(viz::HEIGHT, viz::WIDTH, CV_8UC1, yuv_buffer.data()); // zero-copy
@@ -120,13 +114,17 @@ int main(int argc, char* argv[]) {
         try {
             viz::write_frame(out_pipe, yuv_buffer);
         } catch (const std::exception& e) {
-            fmt::print("[{}] Error: {}\n", "VISION", e.what());
+            syslog(LOG_ERR,"Exception in write_frame %s", e.what());
+            viz::_exit_trig.store(true); // force exit
         }
     }
+
+    // -------------- Cleanup ----------------- //
     viz::_exit_trig.store(true); // force exit
     cmd_thread.join(); 
     fclose(in_pipe);
     fclose(out_pipe);
-    fmt::print("[{}] Exiting\n", NODE_NAME);
+    remove(viz::INPUT_PIPE);
+    remove(viz::OUTPUT_PIPE);
     return 0;
 }

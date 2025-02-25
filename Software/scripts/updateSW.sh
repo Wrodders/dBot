@@ -37,7 +37,9 @@ bash scripts/syncSW.sh -u $USER -i $HOSTNAME
 echo "[UPDATE_SW][INFO] Running remote build script..."
 ssh "$USER@$HOSTNAME" << EOF
     cd prog/software
-    bash scripts/buildSW.sh
+    bash scripts/buildSW.sh || exit 1
+    bash scripts/deployServices.sh || exit 1
 EOF
 
 echo "[UPDATE_SW][SUCCESS] Software build completed successfully on $HOSTNAME!"
+ 

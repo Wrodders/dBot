@@ -17,8 +17,19 @@ Note that Command and Telemetry messages are framed differently
 */
 
 #include "common.hpp"
-#include <atomic>  // Add this line to include the atomic operations header
- 
+
+#include <unordered_map>
+#include <unordered_set>
+#include <queue>
+#include <fstream>
+#include <atomic> 
+#include <exception>
+#include <nlohmann/json.hpp>
+
+
+
+using json = nlohmann::json;
+
 struct TopicInfo{
     uint8_t ID;
     std::string name;
@@ -33,17 +44,7 @@ struct TopicInfo{
 class PubMap {
     private:
         std::vector<TopicInfo> topics_by_id;
-        std::unordered_map<std::string, uint8_t> name_to_id;
-
-        void print_topics() {
-            for (const auto& topic : topics_by_id) {
-                fmt::print("ID: {} Name: {} Format: {} Description: {}\n", topic.ID, topic.name, topic.format, topic.description);
-                for (const auto& arg : topic.args_names) {
-                    fmt::print("Arg: {}\n", arg);
-                }
-            }
-        }
-    
+        std::unordered_map<std::string, uint8_t> name_to_id;    
         bool load_topics(const std::string& filename, const std::string& node_name) {
             try {
                 std::ifstream file(filename);
@@ -77,7 +78,7 @@ class PubMap {
                     }
                 }
                 return true;
-            } catch (const json::exception& e) {
+            } catch (const nlohmann::json::exception& e) {
                 std::cerr << "JSON error: " << e.what() << std::endl;
                 return false;
             }
@@ -85,10 +86,10 @@ class PubMap {
     
     public:
         PubMap(const std::string& filename, const std::string& node_name) {
-            if (!load_topics(filename, node_name))
+            if (!load_topics(filename, node_name)){
                 throw std::runtime_error("Failed to load topics");
+            }
 
-            if(DEBUG_MODE) {print_topics();}
         }
     
         const TopicInfo* get_topic(uint8_t id) const {
@@ -126,12 +127,6 @@ class ParameterMap {
         std::vector<std::atomic<float>*> param_registers;
         std::unordered_map<std::string, uint8_t> name_to_id;
 
-        void print_parameters() {
-            for (const auto& param : parameters_by_id) {
-                fmt::print("ID: {} Name: {} Format: {} Access: {} Description: {}\n", param.ID, param.name, param.format, param.access, param.description);
-            }
-        }
-    
         bool load_parameters(const std::string& filename, const std::string& node_name) {
             try {
                 std::ifstream file(filename);
@@ -160,18 +155,18 @@ class ParameterMap {
                     }            
                 }
                 return true;
-            } catch (const json::exception& e) {
+            } catch (const nlohmann::json::exception& e) {
                 std::cerr << "JSON error: " << e.what() << std::endl;
                 return false;
             }
         }
+
     
     public:
         ParameterMap(const std::string& filename, const std::string& node_name) {
             if (!load_parameters(filename, node_name)) {
                 throw std::runtime_error("Failed to load parameters");
             }
-            if(DEBUG_MODE) {print_parameters();}
         }
 
         bool register_parameter(uint8_t id, std::atomic<float>& value, bool (*validator)(float)) {
@@ -330,7 +325,7 @@ void coms_exec_rpc(const CommandMsg& cmd, ParameterMap& param_map, zmq::socket_t
     switch(cmd.cmdID) {
         case GET:
             if(!param_map.get_value(cmd.paramID, value)){
-                std::cerr << " >> Invalid parameter ID: " << cmd.paramID << std::endl;
+                syslog(LOG_WARNING, "Invalid parameter ID: %d", cmd.paramID);
                 return;
             }
             // build the cmd return message
@@ -343,16 +338,16 @@ void coms_exec_rpc(const CommandMsg& cmd, ParameterMap& param_map, zmq::socket_t
             try{
                 value = std::stof(cmd.data);
             } catch (const std::exception& e) {
-                std::cerr << " >> Invalid data format: " << cmd.data << std::endl;
+               syslog(LOG_WARNING, "Invalid data value: %s", cmd.data.c_str());
                 return;
             }
             if(!param_map.set_value(cmd.paramID, value)){
-                std::cerr << " >> Invalid parameter ID: " << cmd.paramID << std::endl;
+                syslog(LOG_WARNING, "Invalid parameter ID: %d", cmd.paramID);
                 return;
             }
             break;
         default:
-            std::cerr << " >> Invalid command ID: " << cmd.cmdID << std::endl;
+            syslog(LOG_WARNING, "Invalid Command ID: %d", cmd.cmdID);
             return;
     }
 }
@@ -376,7 +371,7 @@ void coms_handle_cmd(struct CommandMsg& cmdmsg, zmq::socket_t& msg_pubsock,
                  ParameterMap& param_map, struct Protocol& proto, const std::string& node_name) {
 
     if (!proto_deserialize_cmd(cmdmsg.data, proto, cmdmsg)) { 
-        fmt::print("[{}][ERROR] Invalid Command Message: {}\n", node_name, cmdmsg.data);
+        syslog(LOG_WARNING, "Invalid Command Message: %s", cmdmsg.data.c_str());
         return;
     }
     coms_exec_rpc(cmdmsg, param_map, msg_pubsock, node_name);

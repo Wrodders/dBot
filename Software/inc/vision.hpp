@@ -1,27 +1,18 @@
 #ifndef VISION_HPP
 #define VISION_HPP
-#include "../common/coms.hpp"
-#include "../common/common.hpp"
+
+#include <opencv2/opencv.hpp>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
-#include <istream>
-#include <atomic>
 #include <thread>
-#include <mutex>
-#include <deque>
-#include <opencv2/opencv.hpp>
 
 
+#include "../common/coms.hpp"
 
 namespace nav{
     //@brief: Generates trajectory based on snr of Histogram
     //@param hist: The histogram of the bottom half of the frame
     void algo1(cv::Mat& hist){
-
-
-
-        
     }
 
 }
@@ -174,7 +165,7 @@ bool calibrate(cv::Mat& y_plane, cv::Mat& homography_matrix){
 //@brief: Command Server for Vision
 //@description: Listens for commands on the VISION topic over IPC;
 void command_server(ParameterMap& param_map) {
-    fmt::print("[VISION] Starting Command Server\n");
+    syslog(LOG_INFO, "Starting Command Server");
     // --------- Communication Setup --------------------- //
     Protocol _proto = {'<', '\n', ':', 'A'};
     CommandMsg recv_cmd_msg; // Working command variable
@@ -188,15 +179,10 @@ void command_server(ParameterMap& param_map) {
     msg_pubsock.set(zmq::sockopt::linger, 0);
     msg_pubsock.connect("tcp://localhost:5555"); 
     
-    fmt::print("[VISION] Command Server Started\n");
+   syslog(LOG_INFO, "Command Server Started");
     while(_exit_trig == false){
         coms_receive_asciicmd(cmd_subsock, recv_cmd_msg);
-        if (recv_cmd_msg.data == "EXIT") {
-            fmt::print("[VISION] Received Exit Command\n");
-            break;
-        }
         coms_handle_cmd(recv_cmd_msg, msg_pubsock, param_map, _proto, "VISION");
-        if(DEBUG_MODE){fmt::print("[VISION] Received Command: {} {} {}\n", recv_cmd_msg.topic, recv_cmd_msg.cmdID, recv_cmd_msg.data);}
     }
     // Cleanup
     _exit_trig.store(true);
