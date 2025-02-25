@@ -178,6 +178,7 @@ void command_server(ParameterMap& param_map) {
     zmq::socket_t msg_pubsock(context, zmq::socket_type::pub);
     msg_pubsock.set(zmq::sockopt::linger, 0);
     msg_pubsock.connect("tcp://localhost:5555"); 
+    msg_pubsock.connect("ipc:///tmp/botmsgs");
     
    syslog(LOG_INFO, "Command Server Started");
     while(_exit_trig == false){

@@ -10,6 +10,8 @@ User=pi
 ExecStart=/home/pi/prog/software/build/twsbComs /dev/ttyAMA0 115200
 Restart=on-failure
 RestartSec=5s
+KillMode=process
+
 
 # Resource Limits
 CPUQuota=10%
@@ -26,7 +28,6 @@ DeviceAllow=char-serial rw
 ReadOnlyPaths=/home/pi/prog/software/
 
 # Security
-PrivateTmp=yes
 
 [Install]
 WantedBy=multi-user.target

@@ -698,5 +698,5 @@ pathDefaults:
 
 paths:
   cam1:
-     runOnDemand: bash -c 'ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x360 -r 30 -i ///tmp/video_out -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+     runOnDemand: bash -c 'ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x360 -r 15 -i ///tmp/video_out -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
      runOnDemandRestart: yes

@@ -13,56 +13,80 @@
       height: 100vh;
       background-color: #f4f4f4;
       margin: 0;
+      font-family: Arial, sans-serif;
     }
+
     #joystick-container {
       position: relative;
-      width: 200px;
-      height: 200px;
-      background: #d3d3d3; /* Light grey background for the base container */
+      width: min(40vw, 250px);
+      height: min(40vw, 250px);
+      background: #ddd;
       border-radius: 50%;
-      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background 0.2s ease-in-out;
     }
-    /* Customize nipple.js styling */
-    .nipple {
-      background: grey !important; /* Joystick button color */
-      border: 2px solid #555;
-    }
-    .nipple-base {
-      background: transparent !important; /* Remove default base color */
+
+    .active {
+      background: #bbb !important;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.3);
     }
   </style>
 </head>
 <body>
   <div id="joystick-container"></div>
+
   <script>
-    // Create a static joystick so it is always visible at the center
+    const joystickContainer = document.getElementById('joystick-container');
+
+    // WebSocket Setup
+    let socket = null;
+
+    function connectWebSocket() {
+      socket = new WebSocket("ws://localhost:5001"); // Adjust URL if needed
+
+      socket.onopen = () => console.log("WebSocket connected.");
+      socket.onclose = () => {
+        console.log("WebSocket disconnected. Reconnecting...");
+        setTimeout(connectWebSocket, 1000); // Reconnect after 1 sec
+      };
+      socket.onerror = (error) => console.error("WebSocket Error:", error);
+    }
+    
+    connectWebSocket(); // Initial connection
+
+    // Create the joystick
     const joystick = nipplejs.create({
-      zone: document.getElementById('joystick-container'),
+      zone: joystickContainer,
       mode: 'static',
       position: { left: '50%', top: '50%' },
       color: 'grey',
-      size: 150,  // Adjust size as needed
+      size: Math.min(window.innerWidth * 0.4, 200),
       restOpacity: 0.8
     });
 
+    let lastSent = 0;
+
     function sendJoystickData(x, y) {
-      fetch('/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x, y })
-      });
+      const now = Date.now();
+      if (now - lastSent > 50 && socket.readyState === WebSocket.OPEN) { // Limit to 20 updates/sec
+        socket.send(JSON.stringify({ x, y }));
+        lastSent = now;
+      }
     }
 
     joystick.on('move', (evt, data) => {
-      // Use the normalized vector values rounded to two decimals
-      const x = (data.vector.x || 0).toFixed(2);
-      const y = (data.vector.y || 0).toFixed(2);
+      const x = parseFloat((data.vector.x || 0).toFixed(2));
+      const y = parseFloat((data.vector.y || 0).toFixed(2));
       sendJoystickData(x, y);
+      joystickContainer.classList.add('active');
     });
 
     joystick.on('end', () => {
       sendJoystickData(0, 0);
+      joystickContainer.classList.remove('active');
     });
   </script>
 </body>

@@ -3,14 +3,16 @@
 #-----------------------------------------------------------------
 [Unit]
 Description=Vision Processing
-After=twsb.service
+After=network.target
 
 [Service]
 Type=simple
 User=pi
-ExecStart=/home/pi/prog/software/build/vision
-Restart=on-failure
-RestartSec=20s
+WorkingDirectory=/home/pi/prog/software
+Environment="GST_PLUGIN_PATH=/usr/lib/gstreamer-1.0"
+Environment="GST_DEBUG=4"  
+ExecStart=/bin/bash /home/pi/prog/software/scripts/launchVizPipeRobot.sh
+KillMode=process
 
 # Resource Limits
 CPUQuota=60%
@@ -18,7 +20,6 @@ MemoryMax=256M
 MemorySwapMax=64M
 IOWeight=150 
 Nice=-20 
-Processors=0-1  # Bind to first 2 cores
 
 # OpenCV Requirements
 DeviceAllow=/dev/vchiq rw

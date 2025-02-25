@@ -1,28 +1,29 @@
 #!/bin/bash
-#--------------------------------------------------
-#
 
+echo "[DEPLOY_SERVICES] Available:"
+ls ~/prog/software/services/*.service
 
-
-
-# Copy service files
-sudo cp ~/prog/software/services/*.service /etc/systemd/system/
-# Reload systemd
-sudo systemctl daemon-reload
-#stop all services
-sudo systemctl stop twsb.service joystick.service cam.service vision.service
-
-# Enable services (start at boot)
-sudo systemctl enable --now twsb.service joystick.service
-
+# Figure out hostname
 hostname=$(hostname)
-#if hostnam is dbot th euse cam serves else use vision service
-if [ $hostname == "dbot" ]; then
-    sudo cp ~/prog/software/services/cam.service /etc/systemd/system/
-    sudo systemctl enable --now cam.service
+echo "Hostname: $hostname"
 
-else
-    sudo cp ~/prog/software/services/vision.service /etc/systemd/system/
-    sudo systemctl enable --now vision.service
-fi
+# Stop only the services we actually have
+sudo systemctl stop twsb.service joystick.service vision.service 
+#copy the services to /etc/systemd/system
+sudo cp ~/prog/software/services/twsb.service /etc/systemd/system/
+sudo cp ~/prog/software/services/joystick.service /etc/systemd/system/
+sudo cp ~/prog/software/services/vision.service /etc/systemd/system/
 
+
+
+# Reload systemd to pick up new/updated units
+sudo systemctl daemon-reload
+
+# Enable & start twsb.service and joystick.service
+sudo systemctl enable --now twsb.service
+sudo systemctl enable --now joystick.service
+sudo systemctl enable --now vision.service
+
+# Conditionally enable/start cam or vision
+
+echo "[DEPLOY_SERVICE] complete."

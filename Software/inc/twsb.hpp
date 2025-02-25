@@ -19,7 +19,6 @@
 
 //@Brief: Configure the serial port non-canonical mode
 int config_serial_port(const std::string& port, int baud) {
-    syslog(LOG_INFO, "Configuring Serial Port %s at %d baud", port.c_str(), baud);
     int serial_port_fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK); 
     if (serial_port_fd == -1) {
         std::cerr << "Error: Unable to open serial port " << port << std::endl;

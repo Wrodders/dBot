@@ -1,7 +1,7 @@
 # Software
 
 - [Software](#software)
-  - [twsbComs:](#twsbcoms)
+  - [twsbComs](#twsbcoms)
     - [twsbComs](#twsbcoms-1)
     - [twsbComs Console](#twsbcoms-console)
     - [zmqComs](#zmqcoms)
@@ -9,13 +9,12 @@
     - [Vision Based Trajectory Planning](#vision-based-trajectory-planning)
 - [Vision Perforamnce Testing](#vision-perforamnce-testing)
 
-
-## twsbComs: 
+## twsbComs
 
 * Publishes Messages to botmsgs under TWSB/
+* 
 * Processes Commands from botcmds under TWSB/
 * Processes Raw Comands from the TWSB Console 
-
 
 ```mermaid
 graph TD
@@ -30,10 +29,12 @@ graph TD
 Single Threaded, Event Driven IO Server loop. 
 
 ### twsbComs
+
 TWSB Coms, listens for **raw commands** from the TWSB Console, and **command packets** from the ZMQ Subscriber to the TWSB Topic on the ***ipc:///tmp/botcmds*** socket.
 It also listens for telemetry messages from the serial port these are used to map the received messages to the appropriate botmsgs topic. ( As the MCU is memory constrained, it sends ascii encoded single byte headers, which are mapped to strings using xMacros in the Firmware/pubrpc/ module.) 
 
 ### twsbComs Console
+
 The TWSB Coms Console is a simple command line interface that allows the user to send raw commands to the TWSB Coms module. The raw commands are sent accoding to the protocol. e.g of the form ***'<BC6.8\n'***. The TWSB console is a direct interface to the serial port. The TWSB console also can listen and "subscribe" to the messages as they are parsed by the TWSB Coms module. e.g it can listen to the ***'CMD_RET'*** and ***'IMU'*** messages.
 It is primarily used for debugging and testing.
 
