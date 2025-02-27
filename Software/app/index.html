@@ -41,23 +41,22 @@
   <script>
     const joystickContainer = document.getElementById('joystick-container');
 
-    // WebSocket Setup
+    // WebSocket Setup with auto-reconnect
     let socket = null;
 
     function connectWebSocket() {
-      socket = new WebSocket("ws://localhost:5001"); // Adjust URL if needed
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      socket = new WebSocket(wsUrl);
 
       socket.onopen = () => console.log("WebSocket connected.");
-      socket.onclose = () => {
-        console.log("WebSocket disconnected. Reconnecting...");
-        setTimeout(connectWebSocket, 1000); // Reconnect after 1 sec
-      };
+      socket.onclose = () => setTimeout(connectWebSocket, 1000);
       socket.onerror = (error) => console.error("WebSocket Error:", error);
     }
     
-    connectWebSocket(); // Initial connection
+    connectWebSocket();
 
-    // Create the joystick
+    // Joystick initialization
     const joystick = nipplejs.create({
       zone: joystickContainer,
       mode: 'static',
@@ -68,25 +67,26 @@
     });
 
     let lastSent = 0;
+    const sendInterval = 10; // 20Hz
 
     function sendJoystickData(x, y) {
       const now = Date.now();
-      if (now - lastSent > 50 && socket.readyState === WebSocket.OPEN) { // Limit to 20 updates/sec
+      if (now - lastSent >= sendInterval && socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ x, y }));
         lastSent = now;
       }
     }
 
     joystick.on('move', (evt, data) => {
-      const x = parseFloat((data.vector.x || 0).toFixed(2));
-      const y = parseFloat((data.vector.y || 0).toFixed(2));
+      const x = parseFloat((data.vector.x || 0).toFixed(4));
+      const y = parseFloat((data.vector.y || 0).toFixed(4));
       sendJoystickData(x, y);
       joystickContainer.classList.add('active');
     });
 
     joystick.on('end', () => {
       sendJoystickData(0, 0);
-      joystickContainer.classList.remove('active');
+     
     });
   </script>
 </body>

@@ -91,7 +91,8 @@ User defines the Application Specific Topics and Parameters
     X(27, P_IMU_A_XOFFSET, "P_IMU_A_XOFFSET")         \
     X(28, P_IMU_A_YOFFSET, "P_IMU_A_YOFFSET")         \
     X(29, P_IMU_A_ZOFFSET, "P_IMU_A_ZOFFSET")         \
-    X(30, NUM_PARAMS,   "NUM_PARAMS")                 \
+    X(30, P_IMU_MOUNT_OFFSET, "P_IMU_MOUNT_OFFSET")   \
+    X(31, NUM_PARAMS,   "NUM_PARAMS")                 \
   
 #define PARAM_ENUM(ID, NAME, MSG) NAME = ID,
 #define PARAM_STRING(ID, NAME, MSG) case NAME: return MSG;

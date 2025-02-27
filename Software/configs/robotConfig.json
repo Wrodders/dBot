@@ -48,7 +48,9 @@
             {"name": "P_IMU_KAL_QB",    "id": 26,  "access": "W",   "format":"%f",     "description":  "IMU Kalman Q Bias"},
             {"name": "P_IMU_A_XOFFSET", "id": 27,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer X Offset"},
             {"name": "P_IMU_A_YOFFSET", "id": 28,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer Y Offset"},
-            {"name": "P_IMU_A_ZOFFSET", "id": 29,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer Z Offset"}
+            {"name": "P_IMU_A_ZOFFSET", "id": 29,  "access": "W",   "format":"%f",     "description":  "IMU Accelerometer Z Offset"},
+            {"name": "P_IMU_MOUNT_OFFSET", "address":30, "access":"W",    "format":"%f",    "description":   "IMU pitch mounting offset"}
+
         ],
         "publishers": [
             {"name": "CMD_RET",         "id":0,  "description": "Return Cmd Value",                "format": "%s:%d", "args": "retval, timestamp"},

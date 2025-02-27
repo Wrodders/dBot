@@ -21,6 +21,7 @@ make clean || error_exit "Clean failed."
 if [ "$HOSTNAME" == "dbot" ]; then
     make all_no_vision -j4 || error_exit "Build failed."
 else
+
 make all -j4 || error_exit "Build failed." 
 fi
 

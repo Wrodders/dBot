@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
         subSocket.connect(socket_address);
     }
 
-    fmt::print("[ZMQ Subscriber] {} to {}\n", socket_address, mode);
+    fmt::print("[ZMQ Subscriber] {} to {}\n",mode, socket_address);
     fmt::print("[ZMQ Subscriber] Subscribed to {}\n", topic_string);
 
     while (true) {

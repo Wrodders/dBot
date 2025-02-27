@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     }else{
         pubSocket.connect(socket_address);
     }
-    fmt::print("[{}] Bound to {}\n",NODE_NAME, socket_address);
+    fmt::print("[{}] {} to {}\n",NODE_NAME, socket_address, mode);
     fmt::print("[{}] Publishing under topic: {}\n",NODE_NAME, topic_string);
     fmt::print("[{}] Enter messages to publish under topic: {}\n",NODE_NAME, topic_string);
     while (true) {

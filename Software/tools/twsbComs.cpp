@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
     cmd_subsock.bind("ipc:///tmp/botcmds"); // local command server
     zmq::socket_t msg_pubsock(context, zmq::socket_type::pub);
     msg_pubsock.set(zmq::sockopt::linger, 0);
-    msg_pubsock.bind("tcp://*:5555");  // message server
+    msg_pubsock.bind("tcp://*:5555");  // message server    
     // --------------- Console Setup ----------------- //
    
     zmq::pollitem_t poll_items[] = {
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
             syslog(LOG_INFO, "Resetting TWSB MCU Attempt: %d", rst_attempts);
             system("bash -c gpioset gpiochip0 2=0");
             usleep(100000);
-            system("bash -c gpioset gpiochip0 2");
+            system("bash -c gpioget gpiochip0 2");
             if (rst_attempts >= 3) {
                 syslog(LOG_CRIT, "Error: Reset Attempts Exceeded\n");
                 return 1;

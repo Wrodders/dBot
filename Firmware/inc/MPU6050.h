@@ -36,6 +36,7 @@ struct MPU6050{
     struct IMUCalib offset; // Calibration offset
     struct vector_t accel; //xyz
     struct vector_t gyro; // xyz
+    float mount_offset;
 }MPU6050;
 
 
@@ -171,6 +172,7 @@ static struct MPU6050 mpu6050Init(uint32_t perif){
     sensor.offset.accel.x = IMU_A_XOFFSET;      // Pre Computed Calibration Offset
     sensor.offset.accel.y = IMU_A_YOFFSET;        
     sensor.offset.accel.z = IMU_A_ZOFFSET;
+    sensor.mount_offset = IMU_MOUNT_OFFSET;
 
     sensor.initalized = true;
 

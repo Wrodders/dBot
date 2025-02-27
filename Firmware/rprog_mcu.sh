@@ -39,6 +39,7 @@ flash_stm32flash() {
     echo "Entering FW update mode on the target..."
     ssh "$PI_USER@$PI_IP" << EOF
         echo "Entering FW update mode..."
+        sudo systemctl stop twsb.service
         stty -F "$SERIAL_PORT" 115200
         echo '<BB0\n' > $SERIAL_PORT 
         sleep 1
@@ -49,6 +50,7 @@ flash_stm32flash() {
         else
             echo "RPROG_MCU: Flashing successful."
         fi
+        sudo systemctl restart twsb.service
 EOF
 }
 

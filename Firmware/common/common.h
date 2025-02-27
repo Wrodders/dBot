@@ -25,7 +25,7 @@
 #define IMU_PERIOD             1
 #define WSPEED_CNTRL_PERIOD    2 
 #define BAL_CNTRL_PERIOD       5  
-#define VEL_CNTRL_PERIOD       50 
+#define VEL_CNTRL_PERIOD       15 
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f    // Counts per Revolution
@@ -66,18 +66,18 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 #define SPEED_KD    0.00f
 #define SPEED_ALPHA 0.95f
 // Balance Control 
-#define IMU_MOUNT_OFFSET  -0.10f  // deg
-#define BAL_CUTOFF  35       
-#define BAL_KP      0.3
-#define BAL_KI      3
-#define BAL_KD      0.003f
+#define IMU_MOUNT_OFFSET  0.5f  // deg
+#define BAL_CUTOFF  35  
+#define BAL_KP      0.28
+#define BAL_KI      7
+#define BAL_KD      0.0035f
 // Linear Velocity Control
 #define VEL_P       8  
 #define VEL_I       0
 #define VEL_D       0
 #define VEL_ALPHA   1.0
 // Angular Velocity Control
-#define STEER_KP    0
+#define STEER_KP    0.7
 #define STEER_KI    0
 #define STEER_KD    0
 #define STEER_ALPHA 1.0

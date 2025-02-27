@@ -35,4 +35,6 @@ echo "Using port: $PORT for device: $DEVICE_HOSTNAME"
 # Start the video visualization process
 sudo gst-launch-1.0 udpsrc port=$PORT ! \
     application/x-rtp, payload=96 ! \
-    rtph264depay ! avdec_h264 ! videoconvert ! osxvideosink sync=false
+    rtpjitterbuffer! rtph264depay ! avdec_h264 ! videoconvert ! osxvideosink sync=false
+
+

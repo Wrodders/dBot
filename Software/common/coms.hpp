@@ -321,6 +321,7 @@ void coms_publish_tsmp_msg(zmq::socket_t& pubSocket,const Message& msg) {
 //@Note: The cmd return message is published to the ZMQ socket in its subtopic  CMD_RET/<node name>
 void coms_exec_rpc(const CommandMsg& cmd, ParameterMap& param_map, zmq::socket_t& msg_pubsock, const std::string& node_name) {
     float value = 0.0f; // working variable
+    
     struct Message cmdret_msg;
     switch(cmd.cmdID) {
         case GET:

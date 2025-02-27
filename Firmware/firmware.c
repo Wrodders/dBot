@@ -13,7 +13,7 @@
 #include "pubrpc/serComs.h" // Serial Communications to PC
 
 // ********** GLOBAL STATIC BUFFERS ***************************************// ACCESS THROUGH RING BUFFER 
-uint8_t rx1_buf_[128] = {0};
+uint8_t rx1_buf_[512] = {0};
 uint8_t tx1_buf_[256] = {0};
 float uuid = 3.14159;
 // ********** CASCADED PID FUNCTIONS ***************************************//
@@ -28,7 +28,7 @@ static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, 
                     struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
     ddmrEstimateOdom(ddmr, motorL, motorR);
     // error = (Reference - Calibrated Offset) - Estimated Pitch
-    balanceAngleCtrl->out = pidRun(balanceAngleCtrl, imu->kal.pitch+IMU_MOUNT_OFFSET); // Unicycle Wheel Speed output
+    balanceAngleCtrl->out = pidRun(balanceAngleCtrl, imu->kal.pitch); // Unicycle Wheel Speed output
     motorSetTrgtSpeed(motorL, (balanceAngleCtrl->out + steerCtrl->out)); // Apply Steering Correction
     motorSetTrgtSpeed(motorR, (balanceAngleCtrl->out - steerCtrl->out)); // Apply Steering Correction
 }
@@ -129,6 +129,7 @@ int main(void){
     comsRegisterParam(&coms, P_IMU_A_XOFFSET,  "%0.3f", &imu.sensor->offset.accel.x);
     comsRegisterParam(&coms, P_IMU_A_YOFFSET, "%0.3f", &imu.sensor->offset.accel.y);
     comsRegisterParam(&coms, P_IMU_A_ZOFFSET, "%0.3f", &imu.sensor->offset.accel.z);
+    comsRegisterParam(&coms, P_IMU_MOUNT_OFFSET, "%0.3f", &imu.sensor->mount_offset);
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
     // ***** Application Tasks **************************************************************************** // 
@@ -233,6 +234,7 @@ int main(void){
             mpu6050Read(&mpu6050);
             imuLPF(&imu, &mpu6050.accel, &mpu6050.gyro);
             imuKalUpdate(&imu);
+            imu.kal.pitch += imu.sensor->mount_offset;
             imuTask.lastTick = loopTick;
         }
         // ********** Communications ********************************************************************** //
@@ -248,8 +250,10 @@ int main(void){
             
             
             // Handle RX Messages 
-            if(comsGrabCmdMsg(&coms, &ser1)){
-               comsExecuteRPC(&coms, &ser1);
+            while(rbEmpty(&ser1.rxRB)==false){
+                if(comsGrabCmdMsg(&coms, &ser1)){
+                    comsExecuteRPC(&coms, &ser1);
+                }
             }
             comsTask.lastTick = loopTick;
         }
