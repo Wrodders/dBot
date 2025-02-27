@@ -1,0 +1,113 @@
+%% Creator: Inkscape 1.4 (e7c3feb1, 2024-10-09), www.inkscape.org
+%% PDF/EPS/PS + LaTeX output extension by Johan Engelen, 2010
+%% Accompanies image file 'SystemModel.pdf' (pdf, eps, ps)
+%%
+%% To include the image in your LaTeX document, write
+%%   \input{<filename>.pdf_tex}
+%%  instead of
+%%   \includegraphics{<filename>.pdf}
+%% To scale the image, write
+%%   \def\svgwidth{<desired width>}
+%%   \input{<filename>.pdf_tex}
+%%  instead of
+%%   \includegraphics[width=<desired width>]{<filename>.pdf}
+%%
+%% Images with a different path to the parent latex file can
+%% be accessed with the `import' package (which may need to be
+%% installed) using
+%%   \usepackage{import}
+%% in the preamble, and then including the image with
+%%   \import{<path to file>}{<filename>.pdf_tex}
+%% Alternatively, one can specify
+%%   \graphicspath{{<path to file>/}}
+%% 
+%% For more information, please see info/svg-inkscape on CTAN:
+%%   http://tug.ctan.org/tex-archive/info/svg-inkscape
+%%
+\begingroup%
+  \makeatletter%
+  \providecommand\color[2][]{%
+    \errmessage{(Inkscape) Color is used for the text in Inkscape, but the package 'color.sty' is not loaded}%
+    \renewcommand\color[2][]{}%
+  }%
+  \providecommand\transparent[1]{%
+    \errmessage{(Inkscape) Transparency is used (non-zero) for the text in Inkscape, but the package 'transparent.sty' is not loaded}%
+    \renewcommand\transparent[1]{}%
+  }%
+  \providecommand\rotatebox[2]{#2}%
+  \newcommand*\fsize{\dimexpr\f@size pt\relax}%
+  \newcommand*\lineheight[1]{\fontsize{\fsize}{#1\fsize}\selectfont}%
+  \ifx\svgwidth\undefined%
+    \setlength{\unitlength}{1217.25bp}%
+    \ifx\svgscale\undefined%
+      \relax%
+    \else%
+      \setlength{\unitlength}{\unitlength * \real{\svgscale}}%
+    \fi%
+  \else%
+    \setlength{\unitlength}{\svgwidth}%
+  \fi%
+  \global\let\svgwidth\undefined%
+  \global\let\svgscale\undefined%
+  \makeatother%
+  \begin{picture}(1,0.42020949)%
+    \lineheight{1}%
+    \setlength\tabcolsep{0pt}%
+    \put(0,0){\includegraphics[width=\unitlength,page=1]{SystemModel.pdf}}%
+    \put(0.8012939,0.20671596){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}in\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=2]{SystemModel.pdf}}%
+    \put(0.02495379,0.38909427){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Z\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=3]{SystemModel.pdf}}%
+    \put(0.37861984,0.03173136){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}X\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=4]{SystemModel.pdf}}%
+    \put(0.33302526,0.39155884){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Z'\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=5]{SystemModel.pdf}}%
+    \put(0.63000616,0.39155884){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Y\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=6]{SystemModel.pdf}}%
+    \put(0.8887862,0.2905114){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}X'\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=7]{SystemModel.pdf}}%
+    \put(0.69038817,0.3163894){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Y'\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=8]{SystemModel.pdf}}%
+    \put(0.83949476,0.32255083){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$v_L$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=9]{SystemModel.pdf}}%
+    \put(0.9319162,0.21780653){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$v_R$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=10]{SystemModel.pdf}}%
+    \put(0.82224276,0.24738139){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$v_b$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=11]{SystemModel.pdf}}%
+    \put(0.72119532,0.26833025){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$\omega_L$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=12]{SystemModel.pdf}}%
+    \put(0.85181762,0.20548367){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$\omega_b$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=13]{SystemModel.pdf}}%
+    \put(0.74953789,0.13401109){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}D\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=14]{SystemModel.pdf}}%
+    \put(0.09272951,0.17960567){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}L\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=15]{SystemModel.pdf}}%
+    \put(0.07794208,0.06130622){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}R\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=16]{SystemModel.pdf}}%
+    \put(0.18515096,0.06253851){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$M_w$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=17]{SystemModel.pdf}}%
+    \put(0.6176833,0.20548367){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$y_g$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=18]{SystemModel.pdf}}%
+    \put(0.24060382,0.33487369){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$\theta$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=19]{SystemModel.pdf}}%
+    \put(0.2159581,0.06253851){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$J_w$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=20]{SystemModel.pdf}}%
+    \put(0.32686383,0.24861368){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$J_b$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=21]{SystemModel.pdf}}%
+    \put(0.2689464,0.25354282){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$M_b$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=22]{SystemModel.pdf}}%
+    \put(0.90850277,0.16112138){\makebox(0,0)[lt]{\lineheight{1.25}\smash{\begin{tabular}[t]{l}$$\...\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=23]{SystemModel.pdf}}%
+    \put(0.79513247,0.19192853){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}G\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=24]{SystemModel.pdf}}%
+    \put(0.31454097,0.21657425){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}B\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=25]{SystemModel.pdf}}%
+    \put(0.04343808,0.27572397){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$z_b$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=26]{SystemModel.pdf}}%
+    \put(0.2689464,0.02556993){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$x_b$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=27]{SystemModel.pdf}}%
+    \put(0.8271719,0.02556993){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}$$x_g$$\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=28]{SystemModel.pdf}}%
+    \put(0.98613678,0.03419593){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}X\end{tabular}}}}%
+  \end{picture}%
+\endgroup%

@@ -1,0 +1,81 @@
+%% Creator: Inkscape 1.4 (e7c3feb1, 2024-10-09), www.inkscape.org
+%% PDF/EPS/PS + LaTeX output extension by Johan Engelen, 2010
+%% Accompanies image file 'VisionPipeline.pdf' (pdf, eps, ps)
+%%
+%% To include the image in your LaTeX document, write
+%%   \input{<filename>.pdf_tex}
+%%  instead of
+%%   \includegraphics{<filename>.pdf}
+%% To scale the image, write
+%%   \def\svgwidth{<desired width>}
+%%   \input{<filename>.pdf_tex}
+%%  instead of
+%%   \includegraphics[width=<desired width>]{<filename>.pdf}
+%%
+%% Images with a different path to the parent latex file can
+%% be accessed with the `import' package (which may need to be
+%% installed) using
+%%   \usepackage{import}
+%% in the preamble, and then including the image with
+%%   \import{<path to file>}{<filename>.pdf_tex}
+%% Alternatively, one can specify
+%%   \graphicspath{{<path to file>/}}
+%% 
+%% For more information, please see info/svg-inkscape on CTAN:
+%%   http://tug.ctan.org/tex-archive/info/svg-inkscape
+%%
+\begingroup%
+  \makeatletter%
+  \providecommand\color[2][]{%
+    \errmessage{(Inkscape) Color is used for the text in Inkscape, but the package 'color.sty' is not loaded}%
+    \renewcommand\color[2][]{}%
+  }%
+  \providecommand\transparent[1]{%
+    \errmessage{(Inkscape) Transparency is used (non-zero) for the text in Inkscape, but the package 'transparent.sty' is not loaded}%
+    \renewcommand\transparent[1]{}%
+  }%
+  \providecommand\rotatebox[2]{#2}%
+  \newcommand*\fsize{\dimexpr\f@size pt\relax}%
+  \newcommand*\lineheight[1]{\fontsize{\fsize}{#1\fsize}\selectfont}%
+  \ifx\svgwidth\undefined%
+    \setlength{\unitlength}{355.72499084bp}%
+    \ifx\svgscale\undefined%
+      \relax%
+    \else%
+      \setlength{\unitlength}{\unitlength * \real{\svgscale}}%
+    \fi%
+  \else%
+    \setlength{\unitlength}{\svgwidth}%
+  \fi%
+  \global\let\svgwidth\undefined%
+  \global\let\svgscale\undefined%
+  \makeatother%
+  \begin{picture}(1,0.76323004)%
+    \lineheight{1}%
+    \setlength\tabcolsep{0pt}%
+    \put(0,0){\includegraphics[width=\unitlength,page=1]{VisionPipeline.pdf}}%
+    \put(0.84861904,0.55133883){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Pure...\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=2]{VisionPipeline.pdf}}%
+    \put(0.84861904,0.38266921){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Predictive C...\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=3]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.70735823){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Read Frame\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=4]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.62302342){\color[rgb]{0.2,0.2,0.2}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}ROI\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=5]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.53868861){\color[rgb]{0.2,0.2,0.2}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Segment Floor\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=6]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.4543538){\color[rgb]{0.2,0.2,0.2}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Warp Perspective\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=7]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.37001898){\color[rgb]{0.2,0.2,0.2}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Edge Detect\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=8]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.28568417){\color[rgb]{0.2,0.2,0.2}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Histogram\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=9]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.20134936){\color[rgb]{0.2,0.2,0.2}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Sliding Window\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=10]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.11701455){\color[rgb]{0.2,0.2,0.2}\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Leas Squares Fit\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=11]{VisionPipeline.pdf}}%
+    \put(0.84861904,0.20134936){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Intensity Fo...\end{tabular}}}}%
+    \put(0,0){\includegraphics[width=\unitlength,page=12]{VisionPipeline.pdf}}%
+    \put(0.20767447,0.03267974){\makebox(0,0)[t]{\lineheight{1.25}\smash{\begin{tabular}[t]{c}Write Frame\end{tabular}}}}%
+  \end{picture}%
+\endgroup%

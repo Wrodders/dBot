@@ -38,8 +38,6 @@
   \usepackage[base]{babel}           % for proper hypthenation in lipsum sections
   \usepackage{subcaption}            % for multiple sub-figures in a single float
   % Add your packages here
-  
-  % Optional: for adding alt-text to images:
   %\usepackage{pdfcomment}            % for alt text for accessibility
   % Then to add images use:
   % \pdftooltip{\includegraphics[width=0.5\textwidth]{image.pdf}}{Alt-text here}
@@ -94,27 +92,78 @@
     \subsection{Aims and objectives}
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
   \section{Literature review} % edit section heading as appropriate
+
     \subsection{Introduction}
+
+    This is now a MIMO control problem. numerous control strategies have been used to solve this problem, 
+    with different goals in mind. [dadsasd] presents a lqr controller which tracks 
+    the desiered velocity, leanding itself to telleorative usecases, [sadasda] 
+    shows how a casscasded PID controlleri is used to perform postion control, 
+    and [aasdasd] explores how a nerual net can be used for swing up and balance control.
     \subsection{Summary}
   %%%%%%%%%%%%%%%%%% SECTION 3 %%%%%%%%%%%%%%%%%%
   \pagebreak{}
   \section{Methodology } % edit section heading as appropriate
-    \subsection{System Design and Modeling}
-        \includegraphics[width=\textwidth]{bBotV2TechDraw.jpg}
-        \subsection{Key Design Decisions}
-        \subsection{{BOM and Cost Analysis}}
-    \subsection{State Space Model}
-        \subsubsection{2D Kinematics}
-        \subsubsection{3D Dynamics}
-        \subsubsection{DC Motor Model}
-        \subsubsection{Parameter Estimation}
-    \subsection{Software Architecture}
+  \subsection{Dynamic Model}
+    \includegraphics[width=\textwidth]{ModelingDiags.pdf}
+
+    \subsection{System Design}
+        \includegraphics[width=\textwidth]{bBotV2TechDraw.pdf}
+        The TWSB is printed out of PLA plastic in 3 parts for minimal assembly.
+        The battery pack is quickly swappable and both it and the electronics section 
+        are soft-mounted in a roll cage like for protection against impacts. 
+        \includegraphics[width=\textwidth]{SystemOverview.pdf}
+        
+        \subsubsection{Parameters}
+
+        \subsection{Software Architecture}
         \subsubsection{Compute Systems Overview }
-        \subsubsection{Test Bench Programs}
+        \includegraphics[width=\textwidth]{CommunicationDataPath.pdf}  
+            The software system is managed as systemd services.
+            Programs implement a runtime GET/SET/RUN rpc interface,
+            this significantly reduces iteration time and separates 
+            complex and fallible processes like the Gstreamer pipeline 
+            from the main control loop. 
+            A Gstreamer pipeline setup a RSTP server which can be accessed on the network.
+
+        \includegraphics[width=\textwidth]{FirmwareArch.pdf}
+            The Firmware is implemented in c99 using the libopencm3 project[].
+            The MCU also presents the same rpc ascii interface over serial. 
+            The super-loop executes commands at 10Hz, 
+            and publishes its state at 100Hz.
+
+
+        
+
     \subsection{State Estimation}
+        \subsubsection{Parameter Estimation}
         \subsubsection{Sensors Overview}
         \subsubsection{Kalman Filter}
         \subsubsection{Extended Kalman Filter}
+    \subsection{Control System}
+       
+        A simple PD controller is often enough to stabilize one of the systems dynamic variables c[].
+        However as shown by fig3, x position drifts. Since the linear velocity is coupled to the
+        pitch angle by eq(1), the pitch angle must be controlled to maintain a constant x velocity. 
+       
+        The navigation algorithms discussed in section 3.7 require the 
+        TWSB to present a layer of abstraction enabling the platform to be modeled as a point G in 2D plane 
+        as shown in fig. 3. 
+
+        \subsubsection{Cascade PID}
+        A cascaded pid controller is used to control the pitch angle and the linear velocity.
+        A P controller is used to regulate the steering control signal, which modded
+        as a disturbance from the 2D dynamics model. 
+        \subsubsection{LQR}
+        The TWSB robot is a MIMO system, using the state space representation of the system in eq[1]
+        
+
+
+
+        \subsubsection{Reference Tracking}
+
+ 
+
     \subsection{Vision System}
         \subsubsection{Curvilinear Transformation}
         The planar two wheel self balancing robot, now modeled as a point P, subject to the differential drive constraints, 
@@ -125,15 +174,11 @@
         adding the curvature K, 
             \subsubsection{Pipeline}
             \subsubsection{Camera Calibration}
-            \subsubsection{IMU Based Software Stabilization}
-            \subsubsection{Adaptive Filters}
+            \subsubsection{IMU Based Software Stabilization Methods}
             \subsubsection{Perspective Transformation}
             \subsubsection{Polynomial Fitting}
             \subsubsection{Trajectory Generation}
-    \subsection{Control System}
-        \subsubsection{Cascade PID}
-        \subsubsection{LQR}
-        \subsubsection{Trajectory Tracking}
+
 
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
   \section{Results and discussion} % edit section heading as appropriate
