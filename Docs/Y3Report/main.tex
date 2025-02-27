@@ -60,7 +60,7 @@
   \DefineBibliographyStrings{english}{backrefpage = {cited on p\adddot},  backrefpages = {cited on pp\adddot}}
   %  \renewcommand*{\bibfont}{\large}
   % Add more .bib files here if wanted
-  \addbibresource{references.bib}
+  \addbibresource{References.bib}
   
   %%%%%%%%%%%%%%%%%% START DOCUMENT %%%%%%%%%%%%%%%%%%
   % Don't edit these lines, title and author are automatically taken from the document meta-data defined above
@@ -83,13 +83,58 @@
 
   %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
   \begin{abstract} % put abstract here. Limit is 1 page.
-    Abstract goes here.
+    The highly dynamic Two Wheel Self Balancing Robot (TWSB)
+    has a large exploration space for high level control strategies. 
+    This reports presents an autonomous line racing TWSB utilizing 
+    a monocular vision system on low cost hardware. 
+    Cascaded PID and LQR controllers 
+    are explored as a SISO and MIMO control strategies. 
+    Discussion on software architecure 
+    for rapid develoepemtn on  emmbeded platoforms is also presented. 
+    An efficient line tracking algorithm is developed based 
+    on the SNR of a curvilinear transformation of the image, 
+    and is compared with common classical computer vision approaches.
+    The system is tested in a variety of conditions 
+    and demonstrates robustness to disturbances 
+    and can suitably track a line at high speeds.
+   
   \end{abstract}%
   \clearpage
   %%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
   \section{Introduction}
-    \subsection{Background and motivation}
-    \subsection{Aims and objectives}
+    The TWSB system is an example of a non-linear, under-actuated system which is inherently unstable[1].
+    Compared to a differential drive platform, the TWSB's dynamics are more complex, enabling a 
+    wider range of high level robotic behaviors to be explored. \cite{RoboLimbo} []. The extra degree of freedom 
+    presents some challenges when vision based control strategies are used. 
+    Techniques from [] and [] from the field of quad-rotor attitude control are explored to minimize the effect 
+    of the fundamental instability of the system.
+
+    This paper presents the design developemtn and validionof a TWSB robotic platform for automonus line racing. 
+    The system is designed to be low cost and easily aseembeld whilst providing suitabel protection, as testing 
+    of racing lines may lead to large forces on the system, fig(1)
+
+    
+    As such many control strategies have been proposed to stabilize the system.[] 
+    Of these the most common are the LQR and Cascaded PID controllers. 
+    
+
+
+    Amongst the early works on the TWSB system,[1] achieved telle-operation on flat ground. 
+    This was implemented using a FPGA base DSP system. Advances in price to performance of emmbeded systems and MEMS sensors have allowed 
+    [][][] to similarly obtain remote control of the TWSB system using a low powered microcontroller.
+    Having a stable platform and available computational resources, higher levels of autonomy can be developed. 
+    []Utilizes a camera as a matrix of binary intensity sensors and a rule based algorithm to successful track 
+    a line whilst balancing. [] Developed an end to end neural network to perform the same task and [] proposes 
+    a ConvNet based approach which utilizes all of the cameras RDB-D data to be able to 
+    autonomously navigate with human-centric social behavior. 
+    To the same end, [][][] develop wheeled robot navigation and realtime lane segmentation geometric computer vision techniques. 
+    [][] build a online data driven model of the mobile system and embed it in a ModelPredictive controller. This adaptive control strategy 
+    is shown to be robust to un-modeled environment and plant dynamics, allowing for autonomous aggressive maneuvers. 
+    This is implemented on a commercial GPU which allows for realtime operation of the optimization algorithm.
+
+
+
+
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
   \section{Literature review} % edit section heading as appropriate
 
@@ -97,46 +142,91 @@
 
     This is now a MIMO control problem. numerous control strategies have been used to solve this problem, 
     with different goals in mind. [dadsasd] presents a lqr controller which tracks 
-    the desiered velocity, leanding itself to telleorative usecases, [sadasda] 
-    shows how a casscasded PID controlleri is used to perform postion control, 
-    and [aasdasd] explores how a nerual net can be used for swing up and balance control.
+    the desired velocity, lending itself to tele-operative use cases, [sadasda] 
+    shows how a cascaded PID controller is used to perform position control, 
+    and [aasdasd] explores how a neural net can be used for swing up and balance control.
     \subsection{Summary}
   %%%%%%%%%%%%%%%%%% SECTION 3 %%%%%%%%%%%%%%%%%%
   \pagebreak{}
-  \section{Methodology } % edit section heading as appropriate
-  \subsection{Dynamic Model}
+  \section{Mathematical Modeling} % edit section heading as appropriate
+    Significant research, both in simulation[][] and 
+    application[][][] has been done on the 1DOF inverted pendulum
+    on a cart as a bench mark for control techniques[]. This is often used as a baseline model for the TWSB problem
+    however higher order models are required to capture the dynamics of the TWSB system. [] Explores models of different fidelity 
+    and [] expands on this and developed a 3DOF model by decoupling the system based into 2 controllers which 
+    operate on the yaw and pitch rate independently. [trajectory tracking control for navigation of the inverse pendulum type] 
+    It is possible to separate the steering control from the balance control without linear velocity and direction angular velocity being constrained too much.
+    Following this the system is decoupled into the 1DOF wheeled inverted pendulum in fig.3 and a differential drive robot shown in fig4.
+    From eq 1()
+
     \includegraphics[width=\textwidth]{ModelingDiags.pdf}
+    
+    \subsection{Dynamics Model}
+    The equations of motion are developed through the Lagrangian Method as per [][][]. 
+    Where total kinetic and potential engery of the system is given by eq(1) and the potential energy by eq(2).
+    The system is driven by two independently controlled DC motors, modeled in fig(5). The transfer function 
+    is obtained as eq(4). An alternative formulation of the transfer function is given by eq(5) which is used in section(3.8) 
+    to obtain the motors parameters through offline system identification techniques discussed in section 3.7.
+
+    \includegraphics[width=\textwidth]{DCMotor.pdf}
+
+    The system of equations (1)(2)(3) are linearized around the operating point given as eq(5) and after standard algebraic manipulation the 
+    2DOF state space representation of the system is given by eq(6).
+   
+    \pagebreak{}
 
     \subsection{System Design}
         \includegraphics[width=\textwidth]{bBotV2TechDraw.pdf}
-        The TWSB is printed out of PLA plastic in 3 parts for minimal assembly.
-        The battery pack is quickly swappable and both it and the electronics section 
-        are soft-mounted in a roll cage like for protection against impacts. 
-        
+
+        The TWSB body is 3D printed out of PLA plastic in 3 parts for minimal assembly.
+        The battery pack is quickly swappable and both it and the electronics sub assembly 
+        are soft-mounted in a roll cage like housing for protection against impacts. 
+
         \includegraphics[width=\textwidth]{SystemOverview.pdf}
 
-        \subsubsection{Parameters}
+        2x DC motors are powered by an H bridge with 
+        integrated per-phase current sensing.
+        The STM32F411RE Microcontroller Unit (MCU) is used to control the 
+        motors and the 6 Axis IMU over I2C. It communicates with the 
+        Raspberry Pi 5 over UART. The system is powered by a a nominal 
+        12V Li ion Battery pack. A USB-C CC-CV charger is used for quick 
+        and accessible recharging,critical for mobile robotics applications.
+        Under normal operation the system is observed to have a 3 hour battery life.
 
+        \pagebreak{}
+        \subsubsection{Parameters}
+        The system parameters are given in table(1). The center of mass of the body is obtained from the CAD model,
+        as is the moment of inertia. The motor parameters are obtained through offline system identification techniques
+        discussed in section(3.7). 
+        \pagebreak{}
         \subsection{Software Architecture}
-        \subsubsection{Compute Systems Overview }
+        The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. Whilst this is a powerful tool,
+        it is deemed too complex for the requirements of this project. Nevertheless some core concepts are used such as its 
+        decentralized message pattern shown in fig(7). where ZeroMQ[] is used for 
+        anonymous pub sub style communication between computational nodes.
+
         \includegraphics[width=\textwidth]{CommunicationDataPath.pdf}  
-            The software system is managed as systemd services.
-            Programs implement a runtime GET/SET/RUN rpc interface,
-            this significantly reduces iteration time and separates 
-            complex and fallible processes like the Gstreamer pipeline 
-            from the main control loop. 
-            A Gstreamer pipeline setup a RSTP server which can be accessed on the network.
+
+        The software system is managed as systemd services. 
+        Several self-diagnosis tools are used for resource monitoring and auto recovery. 
+        For example both the MCU and the CPU monitor each other using watchdog timers.
+        Programs implement a runtime Remote Procedure Call (RCP) ASCII interface using 
+        a GET/SET/RUN pattern. This significantly reduces iteration time and separates 
+        heavy computations or fallible processes like the Gstreamer pipeline 
+        from the main control loop. 
+        A Gstreamer pipeline setup a RSTP server
+        which can be accessed on the network.
+        Core functionality is implemented in C++17. 
 
         \includegraphics[width=\textwidth]{FirmwareArch.pdf}
-            The Firmware is implemented in c99 using the libopencm3 project[].
-            The MCU also presents the same rpc ascii interface over serial. 
-            The super-loop executes commands at 10Hz, 
-            and publishes its state at 100Hz.
-
-
-        
-
+        Key components of the firmware are shown in fig(8).
+        It is implemented in c99 using the libopencm3 project[]. 
+        The MCU also presents the same RPC ascii interface over serial. 
+        The super-loop executes commands at 10Hz, 
+        and publishes its state at 100Hz.
+        \pagebreak{}
     \subsection{State Estimation}
+
         \subsubsection{Parameter Estimation}
         \subsubsection{Sensors Overview}
         \subsubsection{Kalman Filter}
@@ -146,10 +236,7 @@
         A simple PD controller is often enough to stabilize one of the systems dynamic variables c[].
         However as shown by fig3, x position drifts. Since the linear velocity is coupled to the
         pitch angle by eq(1), the pitch angle must be controlled to maintain a constant x velocity. 
-       
-        The navigation algorithms discussed in section 3.7 require the 
-        TWSB to present a layer of abstraction enabling the platform to be modeled as a point G in 2D plane 
-        as shown in fig. 3. 
+
 
         \subsubsection{Cascade PID}
         A cascaded pid controller is used to control the pitch angle and the linear velocity.
@@ -195,7 +282,7 @@
     \subsection{Conclusions}
       \subsection{Future work}
   %%%%%%%%%%%%%%%%%% REFERENCES %%%%%%%%%%%%%%%%%%
-  %\clearpage % uncomment to start on a new page if wanted
+  clearpage % uncomment to start on a new page if wanted
   \printbibliography[title={References},heading=bibintoc] % a single list of references for the whole thesis
   %%%%%%%%%%%%%%%%%% APPENDICES %%%%%%%%%%%%%%%%%%
   \begin{uomappendix} 
