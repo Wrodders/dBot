@@ -382,7 +382,7 @@ static void _comsExecGetCmd(struct Serial *ser, struct CmdFrame *rxFrame, struct
     uint8_t paramIdx = rxFrame->id;
     const char *argFmt = param->format; // get format string
     // Serialize Parameter Value to buffer using its format string
-    snprintf(retBuf, sizeof(retBuf), argFmt, *param->reg);
+    snprintf(retBuf, MAX_SERIALIZED_FLOAT_SIZE, argFmt, *param->reg);
 }
 
 //@Brief: Sets a Parameter Value in the Parameter Map

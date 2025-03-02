@@ -72,14 +72,14 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 #define BAL_KI      7
 #define BAL_KD      0.0035f
 // Linear Velocity Control
-#define VEL_P       8  
-#define VEL_I       0
-#define VEL_D       0
+#define VEL_P       3  
+#define VEL_I       0.4
+#define VEL_D       0.0
 #define VEL_ALPHA   1.0
 // Angular Velocity Control
 #define STEER_KP    0.7
-#define STEER_KI    0
-#define STEER_KD    0
+#define STEER_KI    0.01
+#define STEER_KD    0.0
 #define STEER_ALPHA 1.0
 // *********** GLOBAL VARIABLES ******************************************** //
 static float vbat_val_ = VSYS;     

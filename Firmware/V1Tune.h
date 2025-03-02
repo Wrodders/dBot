@@ -31,3 +31,29 @@
 #define STEER_KD    0.000
 #define STEER_ALPHA 1.0
 // *********** GLOBAL VARIABLES ******************************************** //
+
+
+// V2 TUNE Safrcice linvel for stability 
+// Motor Speed Control
+#define SPEED_KP    2.0f
+#define SPEED_KI    8.0f
+#define SPEED_KD    0.00f
+#define SPEED_ALPHA 0.95f
+// Balance Control 
+#define IMU_MOUNT_OFFSET  1.5f  // deg
+#define BAL_CUTOFF  45  
+#define BAL_KP      0.28
+#define BAL_KI      8
+#define BAL_KD      0.004f
+// Linear Velocity Control
+#define VEL_P       4  
+#define VEL_I       0.6
+#define VEL_D       0
+#define VEL_ALPHA   1.0
+// Angular Velocity Control
+#define STEER_KP    0.7
+#define STEER_KI    0
+#define STEER_KD    0
+#define STEER_ALPHA 1.0
+// *********** GLOBAL VARIABLES ******************************************** //
+static float vbat_val_ = VSYS;     

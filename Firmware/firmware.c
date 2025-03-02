@@ -26,7 +26,6 @@ static void runMotorSpeedLoop(struct Motor *m){
 //@Brief: Balance Angle Control Loop
 static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, struct IMU *imu, 
                     struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
-    ddmrEstimateOdom(ddmr, motorL, motorR);
     // error = (Reference - Calibrated Offset) - Estimated Pitch
     balanceAngleCtrl->out = pidRun(balanceAngleCtrl, imu->kal.pitch); // Unicycle Wheel Speed output
     motorSetTrgtSpeed(motorL, (balanceAngleCtrl->out + steerCtrl->out)); // Apply Steering Correction
@@ -93,43 +92,43 @@ int main(void){
     comsRegisterPub(&coms, PUB_DEBUG,   SERIALIZED_DEBUG_FMT);
     comsRegisterPub(&coms, PUB_TELEM,   SERIALIZED_TELEM_FMT);
     // --------------------PARAMETER REGISTERS ---------------------- //
-    comsRegisterParam(&coms, P_ID,      "%0.3f", &uuid);
-    comsRegisterParam(&coms, P_MODE,    "%0.3f", &nextMode);
+    comsRegisterParam(&coms, P_ID,      "%f", &uuid);
+    comsRegisterParam(&coms, P_MODE,    "%f", &nextMode);
     // - LEFT MOTOR
-    comsRegisterParam(&coms, P_LTRGT,   "%0.3f", &motorL.speedCtrl.ref);
-    comsRegisterParam(&coms, P_LKP,     "%0.3f", &motorL.speedCtrl.kp);
-    comsRegisterParam(&coms, P_LKI,     "%0.3f", &motorL.speedCtrl.ki);
+    comsRegisterParam(&coms, P_LTRGT,   "%f", &motorL.speedCtrl.ref);
+    comsRegisterParam(&coms, P_LKP,     "%f", &motorL.speedCtrl.kp);
+    comsRegisterParam(&coms, P_LKI,     "%f", &motorL.speedCtrl.ki);
     // - RIGHT MOTOR
-    comsRegisterParam(&coms, P_RTRGT,   "%0.3f", &motorR.speedCtrl.ref);
-    comsRegisterParam(&coms, P_RKP,     "%0.3f", &motorR.speedCtrl.kp);
-    comsRegisterParam(&coms, P_RKI,     "%0.3f", &motorR.speedCtrl.ki);
+    comsRegisterParam(&coms, P_RTRGT,   "%f", &motorR.speedCtrl.ref);
+    comsRegisterParam(&coms, P_RKP,     "%f", &motorR.speedCtrl.kp);
+    comsRegisterParam(&coms, P_RKI,     "%f", &motorR.speedCtrl.ki);
     // - BALANCE CONTROLLER
-    comsRegisterParam(&coms, P_BTRGT,   "%0.3f", &balanceAngleCtrl.ref);
-    comsRegisterParam(&coms, P_BKP,     "%0.3f", &balanceAngleCtrl.kp);
-    comsRegisterParam(&coms, P_BKI,     "%0.3f", &balanceAngleCtrl.ki);
-    comsRegisterParam(&coms, P_BKD,     "%0.3f", &balanceAngleCtrl.kd);
+    comsRegisterParam(&coms, P_BTRGT,   "%f", &balanceAngleCtrl.ref);
+    comsRegisterParam(&coms, P_BKP,     "%f", &balanceAngleCtrl.kp);
+    comsRegisterParam(&coms, P_BKI,     "%f", &balanceAngleCtrl.ki);
+    comsRegisterParam(&coms, P_BKD,     "%f", &balanceAngleCtrl.kd);
     // - Linear Velocity Controller
-    comsRegisterParam(&coms, P_VTRGT,   "%0.3f", &velCtrl.ref);
-    comsRegisterParam(&coms, P_VKP,     "%0.3f", &velCtrl.kp);
-    comsRegisterParam(&coms, P_VKI,     "%0.3f", &velCtrl.ki);
-    comsRegisterParam(&coms, P_VKD,     "%0.3f", &velCtrl.kd);
-    comsRegisterParam(&coms, P_VAPLHA,  "%0.3f", &ddmr.linearVelAlpha);
+    comsRegisterParam(&coms, P_VTRGT,   "%f", &velCtrl.ref);
+    comsRegisterParam(&coms, P_VKP,     "%f", &velCtrl.kp);
+    comsRegisterParam(&coms, P_VKI,     "%f", &velCtrl.ki);
+    comsRegisterParam(&coms, P_VKD,     "%f", &velCtrl.kd);
+    comsRegisterParam(&coms, P_VAPLHA,  "%f", &ddmr.linearVelAlpha);
     // - Angular Velocity Controller
-    comsRegisterParam(&coms, P_ATRGT,   "%0.3f", &steerCtrl.ref);
-    comsRegisterParam(&coms, P_AKP,     "%0.3f", &steerCtrl.kp);
-    comsRegisterParam(&coms, P_AKI,     "%0.3f", &steerCtrl.ki);
-    comsRegisterParam(&coms, P_AKD,     "%0.3f", &steerCtrl.kd);
-    comsRegisterParam(&coms, P_AALPHA,  "%0.3f", &ddmr.angularVelAlpha);
+    comsRegisterParam(&coms, P_ATRGT,   "%f", &steerCtrl.ref);
+    comsRegisterParam(&coms, P_AKP,     "%f", &steerCtrl.kp);
+    comsRegisterParam(&coms, P_AKI,     "%f", &steerCtrl.ki);
+    comsRegisterParam(&coms, P_AKD,     "%f", &steerCtrl.kd);
+    comsRegisterParam(&coms, P_AALPHA,  "%f", &ddmr.angularVelAlpha);
     // - IMU Parameters
-    comsRegisterParam(&coms, P_IMU_AA,  "%0.3f", &imu.lpf.alpha_accel);
-    comsRegisterParam(&coms, P_IMU_GA,  "%0.3f", &imu.lpf.alpha_gyro);
-    comsRegisterParam(&coms, P_IMU_KQ,  "%0.3f", &imu.kal.pitchK.Q_angle);
-    comsRegisterParam(&coms, P_IMU_KQB, "%0.3f", &imu.kal.pitchK.Q_bias);
-    comsRegisterParam(&coms, P_IMU_KR,  "%0.3f", &imu.kal.pitchK.R_measure);
-    comsRegisterParam(&coms, P_IMU_A_XOFFSET,  "%0.3f", &imu.sensor->offset.accel.x);
-    comsRegisterParam(&coms, P_IMU_A_YOFFSET, "%0.3f", &imu.sensor->offset.accel.y);
-    comsRegisterParam(&coms, P_IMU_A_ZOFFSET, "%0.3f", &imu.sensor->offset.accel.z);
-    comsRegisterParam(&coms, P_IMU_MOUNT_OFFSET, "%0.3f", &imu.sensor->mount_offset);
+    comsRegisterParam(&coms, P_IMU_AA,  "%f", &imu.lpf.alpha_accel);
+    comsRegisterParam(&coms, P_IMU_GA,  "%f", &imu.lpf.alpha_gyro);
+    comsRegisterParam(&coms, P_IMU_KQ,  "%f", &imu.kal.pitchK.Q_angle);
+    comsRegisterParam(&coms, P_IMU_KQB, "%f", &imu.kal.pitchK.Q_bias);
+    comsRegisterParam(&coms, P_IMU_KR,  "%f", &imu.kal.pitchK.R_measure);
+    comsRegisterParam(&coms, P_IMU_A_XOFFSET,  "%f", &imu.sensor->offset.accel.x);
+    comsRegisterParam(&coms, P_IMU_A_YOFFSET, "%f", &imu.sensor->offset.accel.y);
+    comsRegisterParam(&coms, P_IMU_A_ZOFFSET, "%f", &imu.sensor->offset.accel.z);
+    comsRegisterParam(&coms, P_IMU_MOUNT_OFFSET, "%f", &imu.sensor->mount_offset);
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
     // ***** Application Tasks **************************************************************************** // 
@@ -141,7 +140,7 @@ int main(void){
     struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);            // Velocity Control Loop
 
     // ****** Loop Parameters **************************************************************************** // 
-    enum MODE {FW_UPDATE=0, INIT,PARK, CASCADE, LQR, TUNE_MOTOR, COMMISSION} mode;
+    enum MODE {FW_UPDATE=0,INIT,PARK, CASCADE, LQR,  TUNE_MOTOR, COMMISSION} mode;
     nextMode = INIT;
     motorEnable(&motorL);
     motorEnable(&motorR);
@@ -188,7 +187,6 @@ int main(void){
                 }
                 break;
             case CASCADE:
-                // State Transition 
                 if(_fabs(imu.kal.pitch) >= BAL_CUTOFF){  // Safety Cut Off
                     motorDisable(&motorL);
                     motorDisable(&motorR);
@@ -199,6 +197,7 @@ int main(void){
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
+                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 if(CHECK_PERIOD(balanceCntrlTask, loopTick)){  
@@ -214,18 +213,19 @@ int main(void){
                 break;
 
             case TUNE_MOTOR:
+                motorEnable(&motorL);
+                motorEnable(&motorR);
+                nextMode = COMMISSION;
+                break;
+            case COMMISSION:
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 break;
-            case COMMISSION:
-                motorSetVoltage(&motorL,motorL.speedCtrl.ref);
-                motorSetVoltage(&motorR,motorR.speedCtrl.ref);
-                break;
-               
             default:
+                nextMode = PARK;
                 break;  
         };
 

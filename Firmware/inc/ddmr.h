@@ -14,7 +14,6 @@ struct DiffDriveModel{
     // kinematic state
     float linearVel;    // m/s    
     float angularVel;   // angular vel [rad/s]
-    float dt;           // sample period [s]
 }DiffDriveModel; // Deferential Drive Mobile Robot
 
 
@@ -27,8 +26,7 @@ static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheel
         .linearVelAlpha = linearVel_alpha,
         .angularVelAlpha = angularVel_alpha,
         .linearVel = 0.0f,
-        .angularVel = 0.0f,
-        .dt = VEL_CNTRL_PERIOD*MS_TO_S,
+        .angularVel = 0.0f
     };
     return ddmr;
 } 
