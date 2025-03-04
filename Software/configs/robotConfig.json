@@ -14,7 +14,8 @@
             {"name": "CMD_RET",         "id": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
             {"name": "ERROR",           "id": 1, "description": "Error Message", "format": "%s:%d", "args": "msg, timestamp"},
             {"name": "INFO",            "id": 2, "description": "Info Log", "format": "%s:%d", "args": "msg, timestamp"},
-            {"name": "DEBUG",           "id": 3, "description": "Debug Log", "format": "%s:%d", "args": "msg, timestamp"}
+            {"name": "DEBUG",           "id": 3, "description": "Debug Log", "format": "%s:%d", "args": "msg, timestamp"},
+            {"name": "LANE",            "id": 4, "description": "Lane Data", "format": "%f:%f:d", "args": "SNR, xtrack error, timestamp"}
         ]
     },
     "TWSB": {
@@ -59,7 +60,7 @@
             {"name": "DEBUG",           "id":3,  "description": "Debug Log",                       "format": "%s:%d", "args": "msg, timestamp"},
             {"name": "TELEM",            "id":4,  "description": "Telemetry Data",                  
             "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%d", 
-            "args":  ["ROLL",    "PITCH",
+            "args":  ["PITCH",    "ROLL",
                      "ACCEL_X", "ACCEL_Y",  "ACCEL_Z",
                      "GYRO_X",  "GYRO_Y",   "GYRO_Z", 
                      "LEFT_SHAFT_RPS",  "LEFT_WHEEL_TRGT",  "LEFT_VOLTAGE", 

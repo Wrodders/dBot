@@ -6,41 +6,52 @@ from tornado import web, websocket, ioloop
 import sys
 import os
 
-# WebSocket handler: receives joystick data and publishes it via ZMQ.
 class WSHandler(websocket.WebSocketHandler):
     def check_origin(self, origin):
-        # Allow all origins (adjust if needed for security)
         return True
 
     def open(self):
-        logging.info("WebSocket connection opened.")
-        self.last_x = None
-        self.last_y = None
+        logging.info("WebSocket connection opened")
+        self.last_values = {'x': 0.0, 'y': 0.0}
 
     def on_message(self, message):
         try:
-            # Parse incoming JSON with joystick coordinates.
             data = json.loads(message)
-            # Multiply by -2 as required.
-            x = float(data.get("x", 0)) * 2
-            y = float(data.get("y", 0)) * 2
+            throttle = data.get("y", 0.0)
+            steering = data.get("x", 0.0)
 
-            self.last_x = x
-            self.last_y = y
+            # Clamp values to [-1, 1] range
+            logging.info(f"Throttle: {throttle:.3f}, Steering: {steering:.3f}")
 
-            # Combine commands into one message to reduce overhead.
-            # Use .3f formatting to capture 0.001 changes.
-            payload = f"<BR{x:.3f}\n".encode()
-            self.application.zmq_socket.send_multipart([b"TWSB", payload])
-            payload2 = f"<BM{y:.3f}\n".encode()
-            self.application.zmq_socket.send_multipart([b"TWSB", payload2])
+            # Send steering (X axis)
+            if abs(steering - self.last_values['x']) >= 0.001:
+                payload = f"<BR{steering:.3f}\n".encode()
+                self.application.zmq_socket.send_multipart([b"TWSB", payload])
+                self.last_values['x'] = steering
+
+            # Send throttle (Y axis)
+            if abs(throttle - self.last_values['y']) >= 0.001:
+                payload = f"<BM{throttle:.3f}\n".encode()
+                self.application.zmq_socket.send_multipart([b"TWSB", payload])
+                self.last_values['y'] = throttle
+
+        except (TypeError, ValueError) as e:
+            logging.error(f"Invalid data: {message}", exc_info=True)
         except Exception as e:
-            logging.error("Error processing message: %s", e)
+            logging.error(f"Error: {str(e)}", exc_info=True)
 
     def on_close(self):
-        logging.info("WebSocket connection closed.")
+        logging.info("WebSocket connection closed")
+        self.send_command(0.0, 0.0)
+        
+    def send_command(self, steering, throttle):
+        try:
+            self.application.zmq_socket.send_multipart([b"TWSB", f"<BR{steering:.3f}\n".encode()])
+            self.application.zmq_socket.send_multipart([b"TWSB", f"<BM{throttle:.3f}\n".encode()])
+            logging.info(f"Sent reset commands: Steering={steering}, Throttle={throttle}")
+        except zmq.ZMQError as e:
+            logging.error(f"ZMQ error: {str(e)}")
 
-# HTTP handler for serving the UI.
 class MainHandler(web.RequestHandler):
     def get(self):
         self.set_header("Content-Type", "text/html")
@@ -50,36 +61,38 @@ def make_app(index_html):
     return web.Application([
         (r"/", MainHandler),
         (r"/ws", WSHandler),
-    ], debug=False)
+    ], compress_response=True, autoreload=False)
 
 def load_index_html():
-    if os.path.exists("index.html"):
+    try:
         with open("index.html", "r") as f:
             return f.read()
+    except Exception as e:
+        return f"<h1>Controller Error</h1><p>{str(e)}</p>"
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
-    index_html = load_index_html()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)]
+    )
 
-    # Set up the ZMQ publisher.
-    context = zmq.Context()
+    context = zmq.Context.instance()
     zmq_socket = context.socket(zmq.PUB)
-    # Set linger to 0 to avoid delays on socket close.
-    zmq_socket.setsockopt(zmq.LINGER, 0)
-    # Connect to the local IPC endpoint where TWSB is listening.
+    zmq_socket.setsockopt(zmq.LINGER, 100)
     zmq_socket.connect("ipc:///tmp/botcmds")
-    logging.info("ZMQ PUB socket connected to ipc:///tmp/botcmds")
+    logging.info("ZMQ PUB connected to ipc:///tmp/botcmds")
 
-    app = make_app(index_html)
+    app = make_app(load_index_html())
     app.zmq_socket = zmq_socket
-    app.index_html = index_html
-    app.listen(8080, address="0.0.0.0")
-    logging.info("HTTP/WebSocket server started on port 8080")
-
+    app.index_html = load_index_html()
+    
     try:
+        app.listen(8080, address="0.0.0.0")
+        logging.info("Server listening on :8080")
         ioloop.IOLoop.current().start()
     except KeyboardInterrupt:
-        logging.info("Shutting down server...")
+        logging.info("Shutting down")
     finally:
         zmq_socket.close()
         context.term()

@@ -9,8 +9,11 @@
 struct DiffDriveModel{
     const float wheelR;     // R [m]
     const float wheelBase;  // L [m]
-    float linearVelAlpha;   // LPF coeff
-    float angularVelAlpha;  // LPF coeff 
+    float linearVelAlpha;   // LPF coeff estimate
+    float angularVelAlpha;  // LPF coeff estimate
+
+    float linVelFiltAlpha;  // LPF coeff reference
+    float angVelFiltAlpha;  // LPF coeff reference
     // kinematic state
     float linearVel;    // m/s    
     float angularVel;   // angular vel [rad/s]
@@ -19,12 +22,16 @@ struct DiffDriveModel{
 
 
 
-static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheelBase, const float linearVel_alpha, const float angularVel_alpha){
+static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheelBase, 
+                                      const float linearVel_alpha, const float angularVel_alpha, 
+                                      const float linVelFiltAlpha, const float angVelFiltAlpha){
     struct DiffDriveModel ddmr =  {
         .wheelR = wheelRadius,
         .wheelBase = wheelBase,
         .linearVelAlpha = linearVel_alpha,
         .angularVelAlpha = angularVel_alpha,
+        .linVelFiltAlpha = linVelFiltAlpha,
+        .angVelFiltAlpha = angVelFiltAlpha,
         .linearVel = 0.0f,
         .angularVel = 0.0f
     };

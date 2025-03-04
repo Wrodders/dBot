@@ -39,6 +39,7 @@
   \usepackage{subcaption}            % for multiple sub-figures in a single float
   % Add your packages here
   %\usepackage{pdfcomment}            % for alt text for accessibility
+  \usepackage{booktabs}              % for better looking tables
   % Then to add images use:
   % \pdftooltip{\includegraphics[width=0.5\textwidth]{image.pdf}}{Alt-text here}
   % This makes the text in the image non-select-able though (assuming it's a vector file)
@@ -97,7 +98,11 @@
     The system is tested in a variety of conditions 
     and demonstrates robustness to disturbances 
     and can suitably track a line at high speeds.
-   
+    \begin{figure}[H]
+    \includegraphics[height=\textwidth]{bBot ISO Drawing v3.pdf}
+    \caption{3D CAD Render of the TWSB system}
+    \end{figure}
+
   \end{abstract}%
   \clearpage
   %%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
@@ -131,6 +136,7 @@
     [][] build a online data driven model of the mobile system and embed it in a ModelPredictive controller. This adaptive control strategy 
     is shown to be robust to un-modeled environment and plant dynamics, allowing for autonomous aggressive maneuvers. 
     This is implemented on a commercial GPU which allows for realtime operation of the optimization algorithm.
+    \pagebreak{}
 
 
 
@@ -168,7 +174,9 @@
     is obtained as eq(4). An alternative formulation of the transfer function is given by eq(5) which is used in section(3.8) 
     to obtain the motors parameters through offline system identification techniques discussed in section 3.7.
 
-    \includegraphics[width=\textwidth]{DCMotor.pdf}
+
+
+    \includegraphics[width=\textwidth]{DCMotorModel.png}
 
     The system of equations (1)(2)(3) are linearized around the operating point given as eq(5) and after standard algebraic manipulation the 
     2DOF state space representation of the system is given by eq(6).
@@ -176,7 +184,7 @@
     \pagebreak{}
 
     \subsection{System Design}
-        \includegraphics[width=\textwidth]{bBotV2TechDraw.pdf}
+        \includegraphics[width=\textwidth]{bBot Drawing v3.pdf}
 
         The TWSB body is 3D printed out of PLA plastic in 3 parts for minimal assembly.
         The battery pack is quickly swappable and both it and the electronics sub assembly 
@@ -184,73 +192,182 @@
 
         \includegraphics[width=\textwidth]{SystemOverview.pdf}
 
-        2x DC motors are powered by an H bridge with 
-        integrated per-phase current sensing.
+        Two brushed DC motors are powered by an H bridge IC 
         The STM32F411RE Microcontroller Unit (MCU) is used to control the 
-        motors and the 6 Axis IMU over I2C. It communicates with the 
-        Raspberry Pi 5 over UART. The system is powered by a a nominal 
-        12V Li ion Battery pack. A USB-C CC-CV charger is used for quick 
-        and accessible recharging,critical for mobile robotics applications.
-        Under normal operation the system is observed to have a 3 hour battery life.
+        motors and monitor the 6 Axis IMU over I2C. It communicates with the 
+        Raspberry Pi 5 over UART via a custom ASCII protocol discussed in section 3.3. 
+        The system is powered by a a nominal 12V Li ion Battery pack. A USB-C CC-CV charger is used for quick 
+        and accessible recharging,critical for mobile robotics applications. Battery Voltage is monitors by the MCU
+        and the pack is protected by a BMS and a 3A poly-fuse.
+        A simple circuit adapted from[] is used to safely load share between the battery pack and the charger.
+
 
         \pagebreak{}
         \subsubsection{Parameters}
         The system parameters are given in table(1). The center of mass of the body is obtained from the CAD model,
         as is the moment of inertia. The motor parameters are obtained through offline system identification techniques
         discussed in section(3.7). 
+        \begin{table} [H]
+            \centering
+            \begin{tabular}{|c|c|c|c|}
+                \hline
+                Parameter & Value & Units & Description \\
+                \hline
+                $m$ & 1.5 & kg & Mass of the body \\
+                $l$ & 0.1 & m & Length of the body \\
+                $I$ & 0.01 & $kgm^2$ & Moment of inertia of the body \\
+                $r$ & 0.03 & m & Radius of the wheel \\
+                $R$ & 1.5 & $\Omega$ & Resistance of the motor \\
+                $L$ & 0.1 & H & Inductance of the motor \\
+                $K_t$ & 0.01 & Nm/A & Torque constant of the motor \\
+                $K_v$ & 0.01 & V/rad/s & Back EMF constant of the motor \\
+                $J$ & 0.01 & $kgm^2$ & Moment of inertia of the motor \\
+                $B$ & 0.01 & Nms/rad & Viscous damping of the motor \\
+                \hline
+            \end{tabular}
+            \caption{System Parameters}
+        \end{table}
+      
         \pagebreak{}
         \subsection{Software Architecture}
-        The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. Whilst this is a powerful tool,
-        it is deemed too complex for the requirements of this project. Nevertheless some core concepts are used such as its 
-        decentralized message pattern shown in fig(7). where ZeroMQ[] is used for 
+        The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. 
+        Whilst this is a powerful tool, it is deemed too complex for the requirements of this project.
+        Nevertheless some core concepts are used such as its 
+        decentralized message pattern shown in fig(7). ZeroMQ[] is used for 
         anonymous pub sub style communication between computational nodes.
 
         \includegraphics[width=\textwidth]{CommunicationDataPath.pdf}  
 
-        The software system is managed as systemd services. 
+        The software is managed by systemd through services. 
         Several self-diagnosis tools are used for resource monitoring and auto recovery. 
         For example both the MCU and the CPU monitor each other using watchdog timers.
-        Programs implement a runtime Remote Procedure Call (RCP) ASCII interface using 
-        a GET/SET/RUN pattern. This significantly reduces iteration time and separates 
-        heavy computations or fallible processes like the Gstreamer pipeline 
-        from the main control loop. 
-        A Gstreamer pipeline setup a RSTP server
-        which can be accessed on the network.
+        Programs implement a runtime Remote Procedure Call (RPC) ASCII interface using 
+        a GET/SET/RUN pattern operating on runtime parameters. This significantly reduces the compile/flash/debug 
+        iteration time. A Gstreamer pipeline is setup a RSTP server which can be accessed on the network.
         Core functionality is implemented in C++17. 
 
         \includegraphics[width=\textwidth]{FirmwareArch.pdf}
         Key components of the firmware are shown in fig(8).
         It is implemented in c99 using the libopencm3 project[]. 
-        The MCU also presents the same RPC ascii interface over serial. 
-        The super-loop executes commands at 10Hz, 
+        The MCU also presents the same RPC ASCII interface over serial.
+        The super-loop executes commands at 20Hz, 
         and publishes its state at 100Hz.
         \pagebreak{}
     \subsection{State Estimation}
-
-        \subsubsection{Parameter Estimation}
+        Given the model in eq(6) and the system parameters in table(1) the 2DOF state space representation of the system is given by eq(7).
         \subsubsection{Sensors Overview}
+        The TWSB system uses an Kalman Filter to obtain an estimate of theta, from the accelerometer and gyroscope readings of the IMU. 
+        This is polled at the maximum 1kHz using an interrupt according to the IMU datasheet[]. 
+        The kalman estimate is obtanined by eq(8)  after initilay observingin a prediction and then an inovation step.
+        The state ransiion model is givenby [] as eq(9).  The system is initialized with a priori estimates of the state and covariance matrix. in eq(10-11). 
+
+        Fig(9) shows that the ertiamte stabalizses after 1 second, and is robust to noise from the acceleroemter. 
         \subsubsection{Kalman Filter}
         \subsubsection{Extended Kalman Filter}
+        \pagebreak{}
     \subsection{Control System}
        
-        A simple PD controller is often enough to stabilize one of the systems dynamic variables c[].
+        A simple PID controller opperatign on the pitch error is often enough to stabilize one of the systems dynamic variables[].
         However as shown by fig3, x position drifts. Since the linear velocity is coupled to the
         pitch angle by eq(1), the pitch angle must be controlled to maintain a constant x velocity. 
 
-
         \subsubsection{Cascade PID}
-        A cascaded pid controller is used to control the pitch angle and the linear velocity.
-        A P controller is used to regulate the steering control signal, which modded
-        as a disturbance from the 2D dynamics model. 
-        \subsubsection{LQR}
-        The TWSB robot is a MIMO system, using the state space representation of the system in eq[1]
+
+        The TWSB achieves balance by osculating the pitch angle about the vertical axis. 
+        The lineariezed system of equatiosn in eq(4) is applicable 
+        only when the pitch angle is small, this is taken to be 10 degrees. 
+        A target maximum pitch oscitation is set to +-1 degree. 
+        The TWSB also needs to be able to move in its inertial $$X'$$ frame.
+        This is achieved by regulating the equilibrium pitch angle to about 0 degrees.
+
+        A cascaded pid controller is used to control the pitch angle and the linear velocity. 
+        If the inner loop dynamics are much faster than the outer loop, 
+        then the inner loop can be approximated as a disturbance[].
+
+        In order to determine the maximum operating frequency of the outer loop, 
+        the inner motor speed loop is closed at 200Hz and the system is observed.
         
+        Through the Ziegler-Nichols method[], the PID gains for each DC Motors speed control loop 
+        are obtained as shown in table(2). This process however may cause damage to the motors 
+        during the sustained oscillations at the critical gain. 
+       
+        \begin{figure}[H]
+            \includegraphics[width=\textwidth]{SysIDMotorSetUp.png}
+            \caption{System Identification Setup}
+        \end{figure}
+        
+        Using the test bench setup shown in fig2, a series of reference ramp, step, 
+        sine and chirp inputs are applied to each of the DC motors. 
+        The resulting data is then used by the linear system identification toolbox in MATLAB 
+        to obtain the transfer function of the DC motors, given in eq(4).
 
+        Similarly fig(3) shows the speed-current plot of each of the DC motors.
 
+        From these plots and empirical measurements the motor parameters are fitted to equation(4) and are obtained as shown in table(3).
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|c|c|c|c|}
+                \hline
+                Parameter & Value & Units & Description \\
+                \hline
+                $R$ & 1.5 & $\Omega$ & Resistance of the motor \\
+                $L$ & 0.1 & H & Inductance of the motor \\
+                $K_t$ & 0.01 & Nm/A & Torque constant of the motor \\
+                $K_v$ & 0.01 & V/rad/s & Back EMF constant of the motor \\
+                $J$ & 0.01 & $kgm^2$ & Moment of inertia of the motor \\
+                $B$ & 0.01 & Nms/rad & Viscous damping of the motor \\
+                \hline
+            \end{tabular}
+            \caption{Estimated Motor Parameters}
+        \end{table}
 
-        \subsubsection{Reference Tracking}
+        The frequency response of the transfer function is shown in fig(4) and its closed loop bandwidth is determined to be rads
 
- 
+        This is then used to obtain the PID gains in table(4) in MATLAB using pole-placement techniques
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|c|c|c|}
+                \hline
+                Parameter & Zeigler-Nichols & SysId \\
+                \hline 
+                $K_p$ & 0.1 & 0.1 \\
+                $K_i$ & 0.01 & 0.01 \\
+                $K_d$ & 0.01 & 0.01 \\
+                \hline
+            \end{tabular}
+            \caption{PID Gains}
+        \end{table}
+
+        A P controller is used to regulate the steering control signal, which modeled
+        as a disturbance from the 2D dynamics model.
+
+        The error of the pitch angle is regulated by a PID controller operating at 100Hz. 
+        
+        This results in a stable system in 1DOF space, controlling the body velocity requires the outermost loop to be closed at 20Hz.
+        The final cascaded closed loop pid controller is shown in fig(5) with the gains in table(5)
+
+        \begin{figure}[H]
+            \includegraphics[width=\textwidth]{CascadedPID.pdf}
+            \caption{Cascaded PID Controller}
+        \end{figure}
+
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|r|r|r|r|c|c|c}
+                \hline
+                & \multicolumn{4}{c|}{Process Variable}  \\
+                \hline
+                Parameter & $v_b$ & $\theta$  & $\omega_L$ & $\omega_R$ \\
+                \hline      
+                $K_p$ & 0.1 & 0.1 & 0.1 & Nm \\
+                $K_i$ & 0.01 & 0.01 & 0.01 & Nms \\
+                $K_d$ & 0.01 & 0.01 & 0.01 & Nm/s \\
+                \hline
+            \end{tabular}
+            \caption{PID Gains}
+        \end{table}
+        \subsubsection{LQR}
+         
 
     \subsection{Vision System}
         \subsubsection{Curvilinear Transformation}
@@ -260,12 +377,27 @@
         Where a positive curvature indicates a right turn and a negative curvature indicates a left turn.
         The forward direction is x, and left if y. using the side of the angle between the robtos heading and the observed center line can be used as the derivative term.
         adding the curvature K, 
-            \subsubsection{Pipeline}
             \subsubsection{Camera Calibration}
+            \begin{figure}
+            \includegraphics[width=\textwidth]{PinHoleModel.pdf}
+            \caption{Pin Hole Camera Model}
+            \end{figure}
+
             \subsubsection{IMU Based Software Stabilization Methods}
             \subsubsection{Perspective Transformation}
+            \begin{figure}
+            \includegraphics[width=\textwidth]{VisionPipelineRes.png}
+            \end{figure}
             \subsubsection{Polynomial Fitting}
             \subsubsection{Trajectory Generation}
+
+    \subsection{Trajectory Tracking}
+        \subsubsection{Pure Persuit}
+        \begin{figure}
+            \includegraphics[width=\textwidth]{PurePersuit.pdf}
+            \caption{Pure Pursuit Algorithm}
+        \end{figure}
+        \subsubsection{Model Predictive Control}
 
 
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%

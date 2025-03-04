@@ -2,91 +2,222 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Joystick Controller</title>
+  <!-- Disable zooming and force proper scaling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Mobile Controller</title>
   <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0"></script>
   <style>
+    /* Global styling */
     body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background-color: #f4f4f4;
       margin: 0;
+      padding: 15px;
       font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      touch-action: none; 
+      overflow: hidden; 
     }
-
-    #joystick-container {
-      position: relative;
-      width: min(40vw, 250px);
-      height: min(40vw, 250px);
-      background: #ddd;
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+    /* Orientation warning overlay */
+    #orientation-warning {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #1a1a1a;
+      color: #fff;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      text-align: center;
+      padding: 20px;
+      font-size: 1.5rem;
+    }
+    /* Main container layout with three columns; now shifted upward */
+    .main-container {
       display: flex;
       justify-content: center;
-      align-items: center;
-      transition: background 0.2s ease-in-out;
+      align-items: flex-start; /* align at top */
+      height: 100vh;
+      padding-top: 15vh; /* increased top padding so items are higher */
+      box-sizing: border-box;
+      gap: 30px;
     }
-
-    .active {
-      background: #bbb !important;
-      box-shadow: 0 0 25px rgba(0, 0, 0, 0.3);
+    /* Column styling for joysticks and buttons */
+    .joystick-column, .buttons-column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    /* Joystick styling */
+    .joystick-wrapper {
+      position: relative;
+      width: 150px;
+      height: 150px;
+    }
+    .joystick-container {
+      width: 100%;
+      height: 100%;
+      background: #333;
+      border-radius: 50%;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+    }
+    .label {
+      position: absolute;
+      bottom: -30px;
+      width: 100%;
+      text-align: center;
+      color: #fff;
+      font-size: 1.1rem;
+      pointer-events: none;
+    }
+    /* Dummy buttons styling */
+    .dummy-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dummy-button {
+      width: 100px;
+      padding: 5px;
+      background: #4CAF50;
+      border: none;
+      color: #fff;
+      font-size: 0.9rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .dummy-button:active {
+      background: #388E3C;
     }
   </style>
 </head>
 <body>
-  <div id="joystick-container"></div>
+  <!-- Orientation Warning (shown in portrait mode) -->
+  <div id="orientation-warning">Please rotate your device to landscape mode.</div>
+  <!-- Main container with three columns -->
+  <div class="main-container">
+    <!-- Left Column: Throttle Joystick -->
+    <div class="joystick-column">
+      <div class="label">THROTTLE</div>
+      <div class="joystick-wrapper">
+        <div class="joystick-container" id="joystick-throttle"></div>
+        
+      </div>
+    </div>
+    <!-- Middle Column: Dummy Buttons -->
+    <div class="buttons-column">
+      <div class="dummy-buttons">
+        <button id="dummy1" class="dummy-button">Dummy 1</button>
+        <button id="dummy2" class="dummy-button">Dummy 2</button>
+        <button id="dummy3" class="dummy-button">Dummy 3</button>
+      </div>
+    </div>
+    <!-- Right Column: Steering Joystick -->
+    <div class="joystick-column">
+      <div class="label">STEERING</div>
+      <div class="joystick-wrapper">
+        <div class="joystick-container" id="joystick-steering"></div>
+        
+      </div>
+    </div>
+  </div>
 
   <script>
-    const joystickContainer = document.getElementById('joystick-container');
-
-    // WebSocket Setup with auto-reconnect
-    let socket = null;
-
-    function connectWebSocket() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      socket = new WebSocket(wsUrl);
-
-      socket.onopen = () => console.log("WebSocket connected.");
-      socket.onclose = () => setTimeout(connectWebSocket, 1000);
-      socket.onerror = (error) => console.error("WebSocket Error:", error);
+    // Orientation check: show overlay if in portrait mode
+    function checkOrientation() {
+      if (window.innerWidth < window.innerHeight) {
+        document.getElementById("orientation-warning").style.display = "flex";
+      } else {
+        document.getElementById("orientation-warning").style.display = "none";
+      }
     }
-    
-    connectWebSocket();
+    window.addEventListener("resize", checkOrientation);
+    window.addEventListener("orientationchange", checkOrientation);
+    checkOrientation();
 
-    // Joystick initialization
-    const joystick = nipplejs.create({
-      zone: joystickContainer,
-      mode: 'static',
-      position: { left: '50%', top: '50%' },
-      color: 'grey',
-      size: Math.min(window.innerWidth * 0.4, 200),
-      restOpacity: 0.8
+    // Setup WebSocket and update the connection status bar
+    let socket = new WebSocket(`ws://${window.location.host}/ws`);
+
+    // Joystick value variables
+    let throttleValue = 0, steeringValue = 0;
+    let lastSend = 0; // Last time data was sent
+
+    // Function to reset both joystick values and send data
+    function resetJoysticks() {
+      throttleValue = 0;
+      steeringValue = 0;
+      sendData();
+    }
+
+    // Generic joystick creator that calls a callback with (x, y) values
+    function createJoystick(element, callback) {
+      return nipplejs.create({
+        zone: element,
+        mode: 'static',
+        position: { left: '50%', top: '50%' },
+        color: '#4CAF50',
+        size: 120,
+        threshold: 0.05
+      })
+      .on('move', (evt, data) => {
+        if (data.vector && data.force) {
+          callback(
+            parseFloat((data.vector.x * data.force).toFixed(3)), 
+            parseFloat((data.vector.y * data.force).toFixed(3))
+          );
+        }
+        sendData();
+      })
+      .on('end', () => {
+        // Reset both values when touch ends
+        resetJoysticks();
+      });
+    }
+
+    // Create Throttle Joystick (vertical axis only; ignore horizontal value)
+    createJoystick(document.getElementById('joystick-throttle'), (x, y) => {
+      throttleValue = y;
     });
 
-    let lastSent = 0;
-    const sendInterval = 10; // 20Hz
+    // Create Steering Joystick (horizontal axis only; ignore vertical value)
+    createJoystick(document.getElementById('joystick-steering'), (x, y) => {
+      steeringValue = x;
+    });
 
-    function sendJoystickData(x, y) {
+    // Send joystick data if the WebSocket is open
+    function sendData() {
       const now = Date.now();
-      if (now - lastSent >= sendInterval && socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ x, y }));
-        lastSent = now;
+      if (now - lastSend < 50) return;  // 20Hz limit
+      const payload = {
+        x: steeringValue,
+        y: throttleValue
+      };
+      if (socket.readyState === WebSocket.OPEN) {
+        try {
+          socket.send(JSON.stringify(payload));
+          lastSend = now;
+        } catch(e) {
+          console.error('Send error:', e);
+        }
       }
     }
 
-    joystick.on('move', (evt, data) => {
-      const x = parseFloat((data.vector.x || 0).toFixed(4));
-      const y = parseFloat((data.vector.y || 0).toFixed(4));
-      sendJoystickData(x, y);
-      joystickContainer.classList.add('active');
+    // Dummy buttons send dummy messages when clicked
+    document.getElementById("dummy1").addEventListener("click", () => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ dummy: "Dummy 1 pressed" }));
+      }
     });
-
-    joystick.on('end', () => {
-      sendJoystickData(0, 0);
-     
+    document.getElementById("dummy2").addEventListener("click", () => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ dummy: "Dummy 2 pressed" }));
+      }
+    });
+    document.getElementById("dummy3").addEventListener("click", () => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ dummy: "Dummy 3 pressed" }));
+      }
     });
   </script>
 </body>

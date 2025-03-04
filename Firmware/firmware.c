@@ -35,7 +35,8 @@ static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, 
 static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PID *balanceAngleCtrl, 
                             struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
     // Twist Velocity Control Loop
-    ddmrEstimateOdom(ddmr, motorL, motorR);
+    float linvelFilt = iirLPF(ddmr->linVelFiltAlpha, ddmr->linearVel, ddmr->linearVel); // LPF Filter
+    float angvelFilt = iirLPF(ddmr->angVelFiltAlpha, ddmr->angularVel, ddmr->angularVel); // LPF Filter
     velCtrl->out = pidRun(velCtrl, ddmr->linearVel); // Reference - odometry velocity 
     steerCtrl->out = pidRun(steerCtrl,ddmr->angularVel); // Reference - odometry angular velocity
     pidSetRef(balanceAngleCtrl, -velCtrl->out); // Sets Balance Reference point to reach desired velocity
@@ -78,7 +79,7 @@ int main(void){
     struct PID balanceAngleCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&balanceAngleCtrl, -7.5f);
     // DIFFERENTIAL DRIVE MODEL (LinVel, AngVel)
-    struct DiffDriveModel ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, STEER_ALPHA);
+    struct DiffDriveModel ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, STEER_ALPHA, LIN_VEL_FILT_ALPHA, ANG_VEL_FILT_ALPHA);
     struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
    
@@ -129,6 +130,8 @@ int main(void){
     comsRegisterParam(&coms, P_IMU_A_YOFFSET, "%f", &imu.sensor->offset.accel.y);
     comsRegisterParam(&coms, P_IMU_A_ZOFFSET, "%f", &imu.sensor->offset.accel.z);
     comsRegisterParam(&coms, P_IMU_MOUNT_OFFSET, "%f", &imu.sensor->mount_offset);
+    comsRegisterParam(&coms, P_LINVEL_FILT_A, "%f", &ddmr.linVelFiltAlpha);
+    comsRegisterParam(&coms, P_ANGVEL_FILT_A, "%f", &ddmr.angVelFiltAlpha);
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
     // ***** Application Tasks **************************************************************************** // 
@@ -140,7 +143,7 @@ int main(void){
     struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);            // Velocity Control Loop
 
     // ****** Loop Parameters **************************************************************************** // 
-    enum MODE {FW_UPDATE=0,INIT,PARK, CASCADE, LQR,  TUNE_MOTOR, COMMISSION} mode;
+    enum MODE {FW_UPDATE=0,INIT,PARK, CASCADE, LQR,  TUNE_MOTOR, COMMISSION, SYSID} mode;
     nextMode = INIT;
     motorEnable(&motorL);
     motorEnable(&motorR);
@@ -197,7 +200,6 @@ int main(void){
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
-                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 if(CHECK_PERIOD(balanceCntrlTask, loopTick)){  
@@ -205,6 +207,7 @@ int main(void){
                     balanceCntrlTask.lastTick = loopTick;
                 }
                 if(CHECK_PERIOD(velCtrlTask, loopTick)){    
+                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     runVelocityLoop(&velCtrl, &steerCtrl, &balanceAngleCtrl, &ddmr, &motorL, &motorR);
                     velCtrlTask.lastTick= loopTick;
                 }
@@ -219,8 +222,19 @@ int main(void){
                 break;
             case COMMISSION:
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
+                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
+                    wspeedCntlTask.lastTick = loopTick;
+                }
+                break;
+            case SYSID:
+                if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
+                    motorSetVoltage(&motorL, motorL.speedCtrl.ref);
+                    motorSetVoltage(&motorR, motorR.speedCtrl.ref);
+                    motorEstSpeed(&motorL);
+                    motorEstSpeed(&motorR);
+                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 break;

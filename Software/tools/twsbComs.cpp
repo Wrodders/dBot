@@ -13,16 +13,13 @@
  
 #include "../inc/twsb.hpp"
 
-
-
 // ********* MAIN ************************************************************************* //
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     // --------------- CLI Parsing ----------------- //
     if (argc < 3) {
         syslog(LOG_ERR, "Usage: %s <serial_port> <baud_rate>\n", argv[0]);
         return 1;
     }
-
     std::string port = argv[1];
     int baud_rate = std::stoi(argv[2]);
     if (port.empty() || baud_rate == 0) {
@@ -68,7 +65,6 @@ int main(int argc, char* argv[]) {
     // -------------- Event Loop ----------------- //
     syslog(LOG_INFO, "Starting Event Loop");
     int rst_attempts = 0;
-    auto start = std::chrono::high_resolution_clock::now();
     while (true) {
         int rc = zmq::poll(poll_items, 2, std::chrono::milliseconds(30000)); // 30 sec timeout
         if (rc == -1) {
