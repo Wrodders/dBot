@@ -114,7 +114,8 @@ void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol&
                 break;
             case COMS_TELEM_DATA:
                if (byte == proto.eof_byte) { // End of Message
-                    coms._telem_msg_rx.time_str = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+                    auto time = std::chrono::system_clock::now().time_since_epoch().count();
+                    coms._telem_msg_rx.time_str = std::to_string(time);
                     coms.telemMsgQ.push(coms._telem_msg_rx);
                     coms.telemDecodeState = COMS_TELEM_IDLE;
                 } else {

@@ -1,0 +1,13 @@
+stress-ng: info:  [1110] setting to a 60 second run per stressor
+stress-ng: info:  [1110] dispatching hogs: 4 cpu, 2 vm, 1 hdd, 8 fork
+stress-ng: metrc: [1110] stressor       bogo ops real time  usr time  sys time   bogo ops/s     bogo ops/s CPU used per       RSS Max
+stress-ng: metrc: [1110]                           (secs)    (secs)    (secs)   (real time) (usr+sys time) instance (%)          (KB)
+stress-ng: metrc: [1110] cpu               14736     60.06     87.98      0.45       245.35         166.64        36.81          4352
+stress-ng: metrc: [1110] vm              1159135     60.02     31.48      4.20     19311.12       32493.45        29.72        149680
+stress-ng: metrc: [1110] hdd               32768     74.06      1.36      1.44       442.43       11706.46         3.78          2304
+stress-ng: metrc: [1110] fork              93151     60.00     35.93     49.76      1552.49        1087.05        17.85          2816
+stress-ng: metrc: [1110] miscellaneous metrics:
+stress-ng: metrc: [1110] hdd                  865.80 MB/sec read rate (geometic mean of 1 instances)
+stress-ng: metrc: [1110] hdd                  353.65 MB/sec write rate (geometic mean of 1 instances)
+stress-ng: metrc: [1110] hdd                  502.18 MB/sec read/write combined rate (geometic mean of 1 instances)
+stress-ng: info:  [1110] successful run completed in 74.07s (1 min, 14.07 secs)

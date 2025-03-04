@@ -20,7 +20,8 @@
 #define NULL ((void *)0)
 #endif
 // ************* Task Execution Periods ******************** // 
-#define COMS_PERIOD            20  // ms
+#define COMSCMD_PERIOD         20  // ms
+#define COMSPUB_PERIOD         50  // ms
 #define BLINK_PERIOD           200 // ms
 #define IMU_PERIOD             1
 #define WSPEED_CNTRL_PERIOD    5

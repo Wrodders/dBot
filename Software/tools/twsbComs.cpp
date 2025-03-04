@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
         if (rc == 0) { // Polling Timeout Attempt to Reset the MCU
             syslog(LOG_ERR, "Error: Polling Timeout\n");
             rst_attempts++;
-            syslog(LOG_INFO, "Resetting TWSB MCU Attempt: %d", rst_attempts);
+            syslog(LOG_WARNING, "Resetting TWSB MCU Attempt: %d", rst_attempts);
             system("bash -c gpioset gpiochip0 2=0");
             usleep(100000);
             system("bash -c gpioget gpiochip0 2");

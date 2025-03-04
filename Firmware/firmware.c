@@ -135,12 +135,13 @@ int main(void){
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
     // ***** Application Tasks **************************************************************************** // 
-    struct FixedTimeTask blinkTask = createTask(BLINK_PERIOD);              // Watchdog led
-    struct FixedTimeTask comsTask = createTask(COMS_PERIOD);                // PUB SUB RPC 
-    struct FixedTimeTask imuTask =  createTask(IMU_PERIOD);
-    struct FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD);      // Motor Speed Control
-    struct FixedTimeTask balanceCntrlTask = createTask(BAL_CNTRL_PERIOD);       // Balance Control Loop
-    struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);            // Velocity Control Loop
+    struct FixedTimeTask blinkTask = createTask(BLINK_PERIOD);      // Watchdog led
+    struct FixedTimeTask comsCmdTask = createTask(COMSCMD_PERIOD); // SUB RPC 
+    struct FixedTimeTask comsPUBTask = createTask(COMSPUB_PERIOD); // PUB Telemetry
+    struct FixedTimeTask imuTask =  createTask(IMU_PERIOD); // IMU Read
+    struct FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD); // Motor Speed Control
+    struct FixedTimeTask balanceCntrlTask = createTask(BAL_CNTRL_PERIOD);  // Balance Control Loop
+    struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);  // Velocity Control Loop
 
     // ****** Loop Parameters **************************************************************************** // 
     enum MODE {FW_UPDATE=0,INIT,PARK, CASCADE, LQR,  TUNE_MOTOR, COMMISSION, SYSID} mode;
@@ -219,6 +220,7 @@ int main(void){
                 motorEnable(&motorL);
                 motorEnable(&motorR);
                 nextMode = COMMISSION;
+                comsSendMsg(&coms, &ser1, PUB_INFO, "TUNE_MOTOR => COMMISSION");
                 break;
             case COMMISSION:
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
@@ -252,7 +254,7 @@ int main(void){
             imuTask.lastTick = loopTick;
         }
         // ********** Communications ********************************************************************** //
-        if(CHECK_PERIOD(comsTask, loopTick)){
+        if(CHECK_PERIOD(comsCmdTask, loopTick)){
             // TX Publishing Telemetry
             comsSendMsg(&coms, &ser1, PUB_TELEM,    imu.kal.pitch,      imu.kal.roll, 
                                                     imu.lpf.accel.x,    imu.lpf.accel.y,        imu.lpf.accel.z,
@@ -269,7 +271,7 @@ int main(void){
                     comsExecuteRPC(&coms, &ser1);
                 }
             }
-            comsTask.lastTick = loopTick;
+            comsCmdTask.lastTick = loopTick;
         }
         // ********* DEBUG LED ******************************************************************* // 
         if(CHECK_PERIOD(blinkTask, loopTick)){

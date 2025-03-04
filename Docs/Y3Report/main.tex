@@ -184,13 +184,18 @@
     \pagebreak{}
 
     \subsection{System Design}
-        \includegraphics[width=\textwidth]{bBot Drawing v3.pdf}
+        \begin{figure}[H]
+            \includegraphics[width=\textwidth]{bBot Drawing v3.pdf}
+            \caption{CAD Drawing of the TWSB system}
+        \end{figure}
 
         The TWSB body is 3D printed out of PLA plastic in 3 parts for minimal assembly.
         The battery pack is quickly swappable and both it and the electronics sub assembly 
         are soft-mounted in a roll cage like housing for protection against impacts. 
-
-        \includegraphics[width=\textwidth]{SystemOverview.pdf}
+        \begin{figure}[H]
+            \includegraphics[width=\textwidth]{SystemOverview.pdf}
+            \caption{System Overview}
+        \end{figure}
 
         Two brushed DC motors are powered by an H bridge IC 
         The STM32F411RE Microcontroller Unit (MCU) is used to control the 
@@ -204,8 +209,12 @@
 
         \pagebreak{}
         \subsubsection{Parameters}
-        The system parameters are given in table(1). The center of mass of the body is obtained from the CAD model,
-        as is the moment of inertia. The motor parameters are obtained through offline system identification techniques
+        The system parameters are given in table(1). 
+        The masses of the sub-compoentes obtanined by weighing,
+        and estimates of the 3D printed parts mass are given by the slicer software. 
+        The CAD Model computes the center of mass using these values and the COM is identified in fig(6).
+        The using the approximate model as in fig(2) the moment of inertial is computed from standard formulas.
+        The motor parameters are obtained through offline system identification techniques
         discussed in section(3.7). 
         \begin{table} [H]
             \centering
@@ -227,6 +236,15 @@
             \end{tabular}
             \caption{System Parameters}
         \end{table}
+
+        \subsubsection{Open Loop Response}
+        The open loop response of the system is simulated in MATLAB to obtain fig(7).
+        This is compared to the response of a prototype system, shown in fig(8). 
+        Whose parameters are given in table(2). The same motors are used for both robots.
+        The prototype demonstrates that increasing the body mass whilst keeping the COM 
+        distance approximately the same results in a system whose poles are closer to the origin, 
+        suggesting a more stable system.
+        
       
         \pagebreak{}
         \subsection{Software Architecture}
@@ -235,8 +253,10 @@
         Nevertheless some core concepts are used such as its 
         decentralized message pattern shown in fig(7). ZeroMQ[] is used for 
         anonymous pub sub style communication between computational nodes.
-
-        \includegraphics[width=\textwidth]{CommunicationDataPath.pdf}  
+        \begin{figure} [H]
+            \includegraphics[width=\textwidth]{CommunicationDataPath.pdf}  
+            \caption{InterProcess Communications Data Path}
+        \end{figure}
 
         The software is managed by systemd through services. 
         Several self-diagnosis tools are used for resource monitoring and auto recovery. 
@@ -245,25 +265,37 @@
         a GET/SET/RUN pattern operating on runtime parameters. This significantly reduces the compile/flash/debug 
         iteration time. A Gstreamer pipeline is setup a RSTP server which can be accessed on the network.
         Core functionality is implemented in C++17. 
-
-        \includegraphics[width=\textwidth]{FirmwareArch.pdf}
+        \begin{figure} [H]
+            \includegraphics[width=\textwidth]{FirmwareArch.pdf}
+            \caption{Firmware Architecture}
+        \end{figure}
         Key components of the firmware are shown in fig(8).
         It is implemented in c99 using the libopencm3 project[]. 
         The MCU also presents the same RPC ASCII interface over serial.
         The super-loop executes commands at 20Hz, 
         and publishes its state at 100Hz.
+
+        The data-aquististion system obtains a timestamped sample of the TWSB state 
+        and telemetry values sampled by the MCU through the serial link.
+        This results in non-uniformly sampled data. Parsing the UART IO buffer on Linux 
+        and timestamp is bottlnekced by the CPU. An event driven system is used to minimize CPU overhead.   
+        Worst case jitter is observed, under CPU stress tests[] to be 1ms. This is acceptable for telemetry data, but
+        any further online or offline signal processing is resampled to a uniform rate using lagrange interpolation \cite{DataStreamProcessing.}
         \pagebreak{}
     \subsection{State Estimation}
-        Given the model in eq(6) and the system parameters in table(1) the 2DOF state space representation of the system is given by eq(7).
+        Given the model in eq(6) and the system parameters in table(1) the 2DOF 
+        state space representation of the system is given by eq(7).
         \subsubsection{Sensors Overview}
-        The TWSB system uses an Kalman Filter to obtain an estimate of theta, from the accelerometer and gyroscope readings of the IMU. 
+        The TWSB system uses an Kalman Filter to obtain an estimate of theta, 
+        from the accelerometer and gyroscope readings of the IMU. 
         This is polled at the maximum 1kHz using an interrupt according to the IMU datasheet[]. 
-        The kalman estimate is obtanined by eq(8)  after initilay observingin a prediction and then an inovation step.
-        The state ransiion model is givenby [] as eq(9).  The system is initialized with a priori estimates of the state and covariance matrix. in eq(10-11). 
+        The kalman estimate is obtanined by eq(8)  after initilay observingin
+         a prediction and then an inovation step.
+        The state ransiion model is givenby [] as eq(9).  The system is initialized with a 
+        priori estimates of the state and covariance matrix. in eq(10-11). 
 
-        Fig(9) shows that the ertiamte stabalizses after 1 second, and is robust to noise from the acceleroemter. 
-        \subsubsection{Kalman Filter}
-        \subsubsection{Extended Kalman Filter}
+        Fig(9) shows that the ertiamte stabalizses after 1 second, 
+        and is robust to noise from the acceleroemter. 
         \pagebreak{}
     \subsection{Control System}
        
@@ -277,8 +309,8 @@
         The lineariezed system of equatiosn in eq(4) is applicable 
         only when the pitch angle is small, this is taken to be 10 degrees. 
         A target maximum pitch oscitation is set to +-1 degree. 
-        The TWSB also needs to be able to move in its inertial $$X'$$ frame.
-        This is achieved by regulating the equilibrium pitch angle to about 0 degrees.
+        The TWSB also needs to be able to move along the $X'$ axis in its inertial frame.
+        This is achieved by regulating the pitch angle about equilibrium or 0 degrees.
 
         A cascaded pid controller is used to control the pitch angle and the linear velocity. 
         If the inner loop dynamics are much faster than the outer loop, 
@@ -304,6 +336,7 @@
         Similarly fig(3) shows the speed-current plot of each of the DC motors.
 
         From these plots and empirical measurements the motor parameters are fitted to equation(4) and are obtained as shown in table(3).
+
         \begin{table}[H]
             \centering
             \begin{tabular}{|c|c|c|c|}
@@ -366,16 +399,24 @@
             \end{tabular}
             \caption{PID Gains}
         \end{table}
+        \pagebreak{}
         \subsubsection{LQR}
+        A Linear Quadratic Regulator (LQR) is used to control the system in 2DOF space.
+        The system is linearized around the operating point given in eq(5) 
+        and the state space representation is given by eq(6).
+        Selecting the Q and R matrixes as eq(7) and eq(8) respectively, 
+        the K feedback matrix in eq(9) is obtained by solving the Algebraic Riccati
+        equation of the discretized system eq(10) in MATLAB.
+
          
 
     \subsection{Vision System}
         \subsubsection{Curvilinear Transformation}
         The planar two wheel self balancing robot, now modeled as a point P, subject to the differential drive constraints, 
-        can be instantaneously described as following some segment or radius r. This arc seggment forms part of a coninuous spline. 
+        can be instantaneously described as following some segment or radius r. This arc segment forms part of a continuous spline. 
         The curvature of the spline is given by the inverse of the radius of the circle that best fits the arc segment.
         Where a positive curvature indicates a right turn and a negative curvature indicates a left turn.
-        The forward direction is x, and left if y. using the side of the angle between the robtos heading and the observed center line can be used as the derivative term.
+        The forward direction is x, and left if y. using the side of the angle between the robots heading and the observed center line can be used as the derivative term.
         adding the curvature K, 
             \subsubsection{Camera Calibration}
             \begin{figure}

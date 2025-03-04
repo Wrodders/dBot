@@ -231,7 +231,8 @@ struct Protocol{
 struct Message {
     std::string topic;
     std::string data; // ASCII serialized data
-    std::string time_str;
+    std::string time_str; // ns timestamp
+    
 };
 struct CommandMsg {
     std::string topic;
