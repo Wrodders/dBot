@@ -174,20 +174,21 @@
     DC motors execute a torque $t_r$, proportional to the armature current $i_a$, when a voltage $V_a$ is applied.
     The ratio of motors inductance $L_a$ and resistance $R_a$ determine the time constant $\tau_e$ of the motor. 
     That is the time it takes for $i_a$ to reach 63.2\% of its final value. []
-    The gear box has a gear ratio $N_1/N_2$ which amplifies the viscous damping coefficient $B_G$ and the moment of inertia $J_G$  with respect to the motor.
+    The gear ratio $n=N_2/N_1$ which amplifies the viscous damping coefficient 
+    $B_G$ and the moment of inertia $J_G$ with respect to the motor as $J_{\text{eq}} = J_G + J_r \cdot n^2$ and $B_{\text{eq}} = B_G \cdot n$.
 
-    The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage by the well-known transfer function  Kt/(s*((Jm*s+Bm)*(La*s+Ra)+(Kt*Ke)))
+    The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage by the well-known transfer function
     \begin{equation}
         \begin{aligned}
             \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s^2 \cdot L_a R_a +\;s\left(R_a \cdot J_{\mathrm{eq}} +B_{\mathrm{eq}} \cdot L_a \right)+K_t {\cdot K}_e +R_a \cdot B_q }\cdot n
         \end{aligned}
     \end{equation}
-    Where $\Omega_w$ is the laplace transform of the output speed, $J_r$ is the moment of inertia of ththe rotor.
+    Where $\Omega_w$ is the laplace transform of the output speed, $J_r$ is the moment of inertia of the the rotor.
     The rotors viscous damping $B_r$ is assumed to be negligible, as is $B_G$. 
-    For small motors, $t\tau_e$ is small hence $L_a << R_a$ and the motor can be approximated as a first order system as in 
+    For small motors, $t\tau_e$ is small hence $L_a << R_a$ and the motor can be approximated as a first order system by[][]
     \begin{equation}
         \begin{aligned}
-            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot \left(N_1/N_2\right)}^2 \right)+K_t K_e }\cdot\left(N_1/N_2\right)
+            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot n}^2 \right)+K_t K_e }\cdot\left(n\right)
         \end{aligned}
     \end{equation}
 
@@ -227,7 +228,8 @@
         The battery pack is quickly swappable and both it and the electronics sub assembly 
         are soft-mounted in a roll cage like housing for protection against impacts. 
         \begin{figure}[H]
-            \includegraphics[width=\textwidth]{SystemOverview.pdf}
+            \centering
+            \includegraphics[width=0.45\textwidth]{SystemOverview.pdf}
             \caption{System Overview}
         \end{figure}
 
@@ -247,23 +249,25 @@
 
         A series of experiments are conducted in order to obtain an estimate transfer function of the motors
         
-        \begin{table}
+        \begin{table}[H]
+            \centering
                 \begin{tabular}{|r|c|c|c|c|c|c|}
-                    \vline 
+                    \hline 
                     Gear Ratio & Rated Torque & Rated Speed & Rated Current & Stall Torque & Stall Current \\
+                    \hline
                      1:20 & 0.39 & 400 & 500 & 2 & 0.15 \\
-                    \vline
+                    \hline
                 \end{tabular}
-                \caption{DC Motor Parameters}
+                \caption{Manufacturer Provided Motor Parameters}
         \end{table}
-
-
-        \begin{figure}[H]
-            \includegraphics[width=\textwidth]{SysIDMotorSetUp.png}
-            \caption{System Identification Setup}
-        \end{figure}
         Using the test bench setup shown in fig(6), a series of reference ramp, step, 
-        sine and chirp inputs are applied to each of the DC motors. 
+        sine and chirp inputs are applied to each of the DC motors.  This uses the ComsTerm software described in section 3.3.
+        \begin{figure}[H]
+            \centering
+            \includegraphics[height=0.45\textwidth]{SysIDMotorSetUp.png}
+            \caption{System Identification Testbench Setup}
+        \end{figure}
+     
 
         \begin{figure}[H]
             \centering
@@ -278,15 +282,13 @@
             }
             \caption{Open Loop Speed Voltage experiments}
         \end{figure}    
-        The resulting data, shown in fig(7) is then used by the linear system identification toolbox in MATLAB 
-        to obtain the transfer function of the DC motors as 
+        The transfer function of the motor is obtained by fitting the data to a first order system with time delay.
+        The time delay is found to be 0.1s and the transfer function is given by eq(7).
         \begin{equation}
             \begin{aligned}
-                \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot \left(N_1/N_2\right)}^2 \right)+K_t K_e }\cdot\left(N_1/N_2\right)
+                \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{0.1}{s+0.9}
             \end{aligned}
         \end{equation}
-
-
 
         \pagebreak{}
         \subsubsection{Parameters }
@@ -351,11 +353,36 @@
         This results in non-uniformly sampled data. Parsing the UART IO buffer on Linux 
         and timestamp is bottlnekced by the CPU. An event driven system is used to minimize CPU overhead.   
         Worst case jitter is observed, under CPU stress tests[] to be 1ms. This is acceptable for telemetry data, but
-        any further online or offline signal processing is resampled to a uniform rate using lagrange interpolation \cite{DataStreamProcessing.}
+        any further online or offline signal processing is resampled to a uniform rate using 
+        lagrange interpolation \cite{DataStreamProcessing}
         \pagebreak{}
     \subsection{State Estimation}
-        Given the model in eq(6) and the system parameters in table(1) the 2DOF 
-        state space representation of the system is given by eq(7).
+        For the TWSB system in eq(6) its state variables $\theta$ and $\dot x_b$ can be measured by the onboard IMU and the encoders.
+        The motors incorporate a low cost 12 pulses per revolution quadrature encoder. This is of poor resolution as compared wth the
+        the 1000 pulses per revolution encoders used in []. The Hardware Decoder on the STM32 is used to increment the pulse count 
+        and the rotational speed is updated at each step of a fixed rate loop. The quantization error from the encoder at low speeds can 
+        be reduced by using a larger sample time but this might make the system less responsive.
+
+        The IMU is a 6 axis sensor which measures the linear acceleration and angular velocity of the system in its frame. 
+        The resultant 3D acceleration vector is used to obtain an estimate of the pitch angle $\hat\theta$ of the system.
+
+        This estimate is sensitive to noise as shown in fig(), contrasinlgly an estimate as obtained by the 
+        corresponding 3D angular velocity vector is less sensitive to noise, but is subject to drift, as shown in fig().
+
+        The Kalman Filter is commonly used [ros][][] in robotics to obtain the optimal estimate from complementary sensors whose 
+        noise characteristics are gaussian. The Kalman Filter is a recursive type estimator which uses a dynamical model of the system 
+        and the sensor model to obtain an estimate of the state of the system. [] and [] rely purely on a model of the IMU 
+        to obtain an estimate of $\theta$. 
+        Whereas [] implements an LQG controller which uses a model of the form of eq(1) to obtain an estimate of the full state.
+
+        
+
+        \begin{figure}
+            \centering
+            \includegraphics[width=\textwidth]{openChirp.pdf}
+            \caption{Kalman Filter Estimation}
+        \end{figure}
+
         \subsubsection{Sensors Overview}
         The TWSB system uses an Kalman Filter to obtain an estimate of theta, 
         from the accelerometer and gyroscope readings of the IMU. 
