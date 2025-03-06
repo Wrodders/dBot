@@ -394,7 +394,7 @@ static void _comsExecGetCmd(struct Serial *ser, struct CmdFrame *rxFrame, struct
 static void _comsExecSetCmd(struct Serial *ser, struct CmdFrame *rxFrame, struct Param * const param, char* retBuf){
     float val; // working variable
     uint8_t paramIdx = rxFrame->id;
-    val = atof((char*)rxFrame->buf); // read in paramater value from start of data
+    val = uc_atof((char*)rxFrame->buf); // read in paramater value from start of data
     *param->reg = val; // lookup into param Map 
 }
 #endif // SER_COMS_H

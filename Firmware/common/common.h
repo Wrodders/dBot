@@ -33,7 +33,7 @@
 #define ENC_CPR             12.00f    // Counts per Revolution
 #define GEAR_RATIO          20.00f    // 20:1
 #define EDGE_NUM            4.00f     // Quaducore Encoder
-#define WHEEL_BASE          0.12f     // m
+#define WHEEL_BASE          0.132f    // m
 #define WHEEL_RADIUS        0.04f     // m
 
 #define VSYS                10.00f    // Nominal System Voltage [3s Li ion 10.2-12.6V]

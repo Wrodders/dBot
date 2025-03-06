@@ -34,8 +34,8 @@
             {"name": "P_IMU_MOUNT_OFFSET", "id": 30, "access": "W",   "format":"%f",     "description":  "IMU Mounting Offset"},
             {"name": "P_K1", "id": 31, "access": "W", "format":"%f", "description":"LQR K1"},
             {"name": "P_K2", "id": 32, "access": "W", "format":"%f", "description":"LQR K2"},
-            {"name": "P_K3", "id": 33, "access": "W", "format":"%f", "description":"LQR K2"},
-            {"name": "P_K4", "id": 34, "access": "W", "format":"%f", "description":"LQR K2"},
+            {"name": "P_K3", "id": 33, "access": "W", "format":"%f", "description":"LQR K3"},
+            {"name": "P_K4", "id": 34, "access": "W", "format":"%f", "description":"LQR K4"}
         ],
         "publishers": [
             {"name": "CMD_RET",     "id": 0,   "description": "Return Cmd Value",  "format": "%s", "args": "retval"},
@@ -47,7 +47,6 @@
                 "description": "Telemetry Data",   
                 "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", 
                 "args":  ["PITCH",    "ROLL",
-                          "PITCH_RATE", "ROLL_RATE",
                           "ACCEL_X", "ACCEL_Y",  "ACCEL_Z",
                           "GYRO_X",  "GYRO_Y",   "GYRO_Z",
                           "LEFT_SHAFT_RPS",  "LEFT_WHEEL_TRGT",  "LEFT_VOLTAGE", 

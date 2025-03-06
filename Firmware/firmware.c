@@ -132,9 +132,9 @@ int main(void){
     comsRegisterParam(&coms, P_IMU_A_ZOFFSET, "%f", &imu.sensor->offset.accel.z);
     comsRegisterParam(&coms, P_IMU_MOUNT_OFFSET, "%f", &imu.sensor->mount_offset);
     comsRegisterParam(&coms, P_K1, "%f", &lqr.K[0]);
-    comsRegisterParam(&coms, P_K3, "%f", &lqr.K[2]);
-    comsRegisterParam(&coms, P_K3, "%f", &lqr.K[2]);
-    comsRegisterParam(&coms, P_K4, "%f", &lqr.K[2]);
+    comsRegisterParam(&coms, P_K2, "%f", &lqr.K[1]);
+    comsRegisterParam(&coms, P_K3, "%f", &lqr.K[3]);
+    comsRegisterParam(&coms, P_K4, "%f", &lqr.K[4]);
 
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
