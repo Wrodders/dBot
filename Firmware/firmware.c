@@ -9,7 +9,7 @@
 #include "inc/pid.h"
 #include "inc/motor.h"
 #include "inc/ddmr.h"
-
+#include "inc/lqr.h"
 #include "pubrpc/serComs.h" // Serial Communications to PC
 
 // ********** GLOBAL STATIC BUFFERS ***************************************// ACCESS THROUGH RING BUFFER 
@@ -35,8 +35,8 @@ static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, 
 static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PID *balanceAngleCtrl, 
                             struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
     // Twist Velocity Control Loop
-    float linvelFilt = iirLPF(ddmr->linVelFiltAlpha, ddmr->linearVel, ddmr->linearVel); // LPF Filter
-    float angvelFilt = iirLPF(ddmr->angVelFiltAlpha, ddmr->angularVel, ddmr->angularVel); // LPF Filter
+    float linvelFilt = ddmr->linearVel; 
+    float angvelFilt = ddmr->angularVel;
     velCtrl->out = pidRun(velCtrl, ddmr->linearVel); // Reference - odometry velocity 
     steerCtrl->out = pidRun(steerCtrl,ddmr->angularVel); // Reference - odometry angular velocity
     pidSetRef(balanceAngleCtrl, -velCtrl->out); // Sets Balance Reference point to reach desired velocity
@@ -79,10 +79,11 @@ int main(void){
     struct PID balanceAngleCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&balanceAngleCtrl, -7.5f);
     // DIFFERENTIAL DRIVE MODEL (LinVel, AngVel)
-    struct DiffDriveModel ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, STEER_ALPHA, LIN_VEL_FILT_ALPHA, ANG_VEL_FILT_ALPHA);
+    struct DiffDriveModel ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, STEER_ALPHA);
     struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
-   
+    // LQR Controller
+    struct LQR lqr ={.K = {LQR_K1, LQR_K2, LQR_K3, LQR_K4}};
 
     // ***************************** COMMUNICATIONS ******************************************************** // 
     struct Coms coms = comsInit();
@@ -130,8 +131,11 @@ int main(void){
     comsRegisterParam(&coms, P_IMU_A_YOFFSET, "%f", &imu.sensor->offset.accel.y);
     comsRegisterParam(&coms, P_IMU_A_ZOFFSET, "%f", &imu.sensor->offset.accel.z);
     comsRegisterParam(&coms, P_IMU_MOUNT_OFFSET, "%f", &imu.sensor->mount_offset);
-    comsRegisterParam(&coms, P_LINVEL_FILT_A, "%f", &ddmr.linVelFiltAlpha);
-    comsRegisterParam(&coms, P_ANGVEL_FILT_A, "%f", &ddmr.angVelFiltAlpha);
+    comsRegisterParam(&coms, P_K1, "%f", &lqr.K[0]);
+    comsRegisterParam(&coms, P_K3, "%f", &lqr.K[2]);
+    comsRegisterParam(&coms, P_K3, "%f", &lqr.K[2]);
+    comsRegisterParam(&coms, P_K4, "%f", &lqr.K[2]);
+
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
     // ***** Application Tasks **************************************************************************** // 
@@ -142,6 +146,8 @@ int main(void){
     struct FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD); // Motor Speed Control
     struct FixedTimeTask balanceCntrlTask = createTask(BAL_CNTRL_PERIOD);  // Balance Control Loop
     struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);  // Velocity Control Loop
+    struct FixedTimeTask lqrTask = createTask(LQR_CNTRL_PERIOD); // LQR Controller
+
 
     // ****** Loop Parameters **************************************************************************** // 
     enum MODE {FW_UPDATE=0,INIT,PARK, CASCADE, LQR,  TUNE_MOTOR, COMMISSION, SYSID} mode;
@@ -214,6 +220,31 @@ int main(void){
                 }
                 break;
             case LQR:
+                if(_fabs(imu.kal.pitch) >= BAL_CUTOFF){  // Safety Cut Off
+                    motorDisable(&motorL);
+                    motorDisable(&motorR);
+                    nextMode = PARK;
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "RUN => PARK "); 
+                    break;
+                }
+                if(CHECK_PERIOD(lqrTask, loopTick)){
+                    // LQR Controller
+                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
+                    motorEstSpeed(&motorL);
+                    motorEstSpeed(&motorR);
+                    float x[4] = {imu.kal.pitch, imu.kal.pitchRate, ddmr.posX,ddmr.linearVel};
+                    float u[2] = {velCtrl.ref, steerCtrl.ref};
+                    for (int i = 0; i < 2; i++){
+                        u[i] = 0;
+                        for (int j = 0; j < 4; j++){
+                            u[i] += lqr.K[i*4 + j] * x[j];
+                        }
+                    }
+
+                    motorSetVoltage(&motorL, u[0]);
+                    motorSetVoltage(&motorR, u[1]);
+                    lqrTask.lastTick = loopTick;
+                }
                 break;
 
             case TUNE_MOTOR:

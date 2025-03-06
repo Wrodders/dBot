@@ -52,6 +52,7 @@ struct IMU{
         struct Kalman rollK;
         struct Kalman pitchK;
         float pitch, roll;
+        float pitchRate, rollRate;
     }kal;
 
     float pitchMountOffset; //degrees
@@ -163,6 +164,8 @@ static void imuKalUpdate(struct IMU* imu){
     else{
         imu->kal.pitch = imuKalPredict(&imu->kal.pitchK, pitch_estimate, yRate, imu->dt);
     }
+    imu->kal.rollRate = xRate - imu->kal.rollK.bias;
+    imu->kal.pitchRate = yRate - imu->kal.pitchK.bias;
 }
 
 

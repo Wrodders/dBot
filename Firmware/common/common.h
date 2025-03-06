@@ -24,9 +24,10 @@
 #define COMSPUB_PERIOD         50  // ms
 #define BLINK_PERIOD           200 // ms
 #define IMU_PERIOD             1
-#define WSPEED_CNTRL_PERIOD    5
-#define BAL_CNTRL_PERIOD       10
-#define VEL_CNTRL_PERIOD       12 
+#define WSPEED_CNTRL_PERIOD    2
+#define BAL_CNTRL_PERIOD       5
+#define VEL_CNTRL_PERIOD       10
+#define LQR_CNTRL_PERIOD       5
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f    // Counts per Revolution
@@ -66,26 +67,34 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 #define ANG_VEL_FILT_ALPHA  0.95f
 
 // Motor Speed Control
-#define SPEED_KP    5.4f
-#define SPEED_KI    28.152f
+#define SPEED_KP    2.4f
+#define SPEED_KI    5.0f
 #define SPEED_KD    0.00f
 #define SPEED_ALPHA 0.95f
 // Balance Control 
-#define IMU_MOUNT_OFFSET  0.0f  // deg
+#define IMU_MOUNT_OFFSET  1.0f  // deg
 #define BAL_CUTOFF  35  
-#define BAL_KP      0.14
-#define BAL_KI      3.2
-#define BAL_KD      0.001f
+#define BAL_KP      0.24
+#define BAL_KI      5
+#define BAL_KD      0.0035f
 // Linear Velocity Control
-#define VEL_P       0.5
-#define VEL_I       0.0
+#define VEL_P       3.5
+#define VEL_I       0.6
 #define VEL_D       0.0
 #define VEL_ALPHA   1.0
 // Angular Velocity Control
 #define STEER_KP    0.7
-#define STEER_KI    0.00
+#define STEER_KI    0.001
 #define STEER_KD    0.0
 #define STEER_ALPHA 1.0
+
+// Full State Feedback Controller
+#define LQR_K1      -0.3980
+#define LQR_K2      -2.0416
+#define LQR_K3      -62.0196
+#define LQR_K4      -2.0854
+
+
 // *********** GLOBAL VARIABLES ******************************************** //
 static float vbat_val_ = VSYS;     
 

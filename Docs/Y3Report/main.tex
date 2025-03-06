@@ -109,7 +109,8 @@
   \section{Introduction}
     The TWSB system is an example of a non-linear, under-actuated system which is inherently unstable[1].
     Compared to a differential drive platform, the TWSB's dynamics are more complex, enabling a 
-    wider range of high level robotic behaviors to be explored. \cite{RoboLimbo} []. The extra degree of freedom 
+    wider range of high level robotic behaviors to be explored. \cite{RoboLimbo} []. 
+    The extra degree of freedom 
     presents some challenges when vision based control strategies are used. 
     Techniques from [] and [] from the field of quad-rotor attitude control are explored to minimize the effect 
     of the fundamental instability of the system.
@@ -161,25 +162,58 @@
     however higher order models are required to capture the dynamics of the TWSB system. [] Explores models of different fidelity 
     and [] expands on this and developed a 3DOF model by decoupling the system based into 2 controllers which 
     operate on the yaw and pitch rate independently. [trajectory tracking control for navigation of the inverse pendulum type] 
-    It is possible to separate the steering control from the balance control without linear velocity and direction angular velocity being constrained too much.
-    Following this the system is decoupled into the 1DOF wheeled inverted pendulum in fig.3 and a differential drive robot shown in fig4.
-    From eq 1()
+    \pagebreak{}
+    \subsection{DC Motor Model}    
+    \begin{figure}[H]
+        \centering
+            \includegraphics[width=0.75\textwidth]{DCMotorModel.png}
+        \caption{Gearbox DC Motor Model Diagram}
+    \end{figure}
+    The system is driven by two independently voltage controlled DC motors through planetary gearboxes, 
+    as is shown in Fig(2). 
+    DC motors execute a torque $t_r$, proportional to the armature current $i_a$, when a voltage $V_a$ is applied.
+    The ratio of motors inductance $L_a$ and resistance $R_a$ determine the time constant $\tau_e$ of the motor. 
+    That is the time it takes for $i_a$ to reach 63.2\% of its final value. []
+    The gear box has a gear ratio $N_1/N_2$ which amplifies the viscous damping coefficient $B_G$ and the moment of inertia $J_G$  with respect to the motor.
 
-    \includegraphics[width=\textwidth]{ModelingDiags.pdf}
+    The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage by the well-known transfer function  Kt/(s*((Jm*s+Bm)*(La*s+Ra)+(Kt*Ke)))
+    \begin{equation}
+        \begin{aligned}
+            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s^2 \cdot L_a R_a +\;s\left(R_a \cdot J_{\mathrm{eq}} +B_{\mathrm{eq}} \cdot L_a \right)+K_t {\cdot K}_e +R_a \cdot B_q }\cdot n
+        \end{aligned}
+    \end{equation}
+    Where $\Omega_w$ is the laplace transform of the output speed, $J_r$ is the moment of inertia of ththe rotor.
+    The rotors viscous damping $B_r$ is assumed to be negligible, as is $B_G$. 
+    For small motors, $t\tau_e$ is small hence $L_a << R_a$ and the motor can be approximated as a first order system as in 
+    \begin{equation}
+        \begin{aligned}
+            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot \left(N_1/N_2\right)}^2 \right)+K_t K_e }\cdot\left(N_1/N_2\right)
+        \end{aligned}
+    \end{equation}
+
+    \pagebreak{}
+
+
+    \subsection{2DOF System Model}
+
+    \begin{figure}[H]
+        \includegraphics[width=\textwidth]{ModelingDiags.pdf}
+        \caption{2DOF Model}
+    \end{figure}
+
+    The TWSB robot is modeled as two separate 2DOF systems as shown in fig(4), 
+    namely a wheeled inverted pendulum (WIP) and a differential drive robot (DDMR).
+    It however exits in a 3D space, and for the purposes of this paper must be able to rotate about the inertial Z axis. 
+    [] Shows that that is possible to separate the steering control from the balance control 
+    without linear velocity and direction angular velocity being constrained too much. 
+    [] conducts a 2DOF model of the WIP which  decouples the effect of yaw rate from the pitch rate. 
+
+    The system equations of motion in the WIP case are developed through the Lagrangian Method [][][] are shown to be 
     
-    \subsection{Dynamics Model}
-    The equations of motion are developed through the Lagrangian Method as per [][][]. 
-    Where total kinetic and potential engery of the system is given by eq(1) and the potential energy by eq(2).
-    The system is driven by two independently controlled DC motors, modeled in fig(5). The transfer function 
-    is obtained as eq(4). An alternative formulation of the transfer function is given by eq(5) which is used in section(3.8) 
-    to obtain the motors parameters through offline system identification techniques discussed in section 3.7.
-
-
-
-    \includegraphics[width=\textwidth]{DCMotorModel.png}
-
-    The system of equations (1)(2)(3) are linearized around the operating point given as eq(5) and after standard algebraic manipulation the 
+    The system of equations () are linearized around the equilibrium point $\theta\approx 0$  and after standard algebraic manipulation the 
     2DOF state space representation of the system is given by eq(6).
+
+
    
     \pagebreak{}
 
@@ -208,14 +242,59 @@
 
 
         \pagebreak{}
-        \subsubsection{Parameters}
+        \subsubsection{System Identification}
+
+
+        A series of experiments are conducted in order to obtain an estimate transfer function of the motors
+        
+        \begin{table}
+                \begin{tabular}{|r|c|c|c|c|c|c|}
+                    \vline 
+                    Gear Ratio & Rated Torque & Rated Speed & Rated Current & Stall Torque & Stall Current \\
+                     1:20 & 0.39 & 400 & 500 & 2 & 0.15 \\
+                    \vline
+                \end{tabular}
+                \caption{DC Motor Parameters}
+        \end{table}
+
+
+        \begin{figure}[H]
+            \includegraphics[width=\textwidth]{SysIDMotorSetUp.png}
+            \caption{System Identification Setup}
+        \end{figure}
+        Using the test bench setup shown in fig(6), a series of reference ramp, step, 
+        sine and chirp inputs are applied to each of the DC motors. 
+
+        \begin{figure}[H]
+            \centering
+            \subfloat{
+                \includegraphics[width=0.3\textwidth]{openstep.pdf}
+            }
+                \subfloat{
+                \includegraphics[height=0.2\textwidth]{speed_voltage_DCMotor.pdf}
+            }
+            \subfloat{
+                \includegraphics[width=0.3\textwidth]{openChirp.pdf}
+            }
+            \caption{Open Loop Speed Voltage experiments}
+        \end{figure}    
+        The resulting data, shown in fig(7) is then used by the linear system identification toolbox in MATLAB 
+        to obtain the transfer function of the DC motors as 
+        \begin{equation}
+            \begin{aligned}
+                \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot \left(N_1/N_2\right)}^2 \right)+K_t K_e }\cdot\left(N_1/N_2\right)
+            \end{aligned}
+        \end{equation}
+
+
+
+        \pagebreak{}
+        \subsubsection{Parameters }
         The system parameters are given in table(1). 
         The masses of the sub-compoentes obtanined by weighing,
         and estimates of the 3D printed parts mass are given by the slicer software. 
         The CAD Model computes the center of mass using these values and the COM is identified in fig(6).
         The using the approximate model as in fig(2) the moment of inertial is computed from standard formulas.
-        The motor parameters are obtained through offline system identification techniques
-        discussed in section(3.7). 
         \begin{table} [H]
             \centering
             \begin{tabular}{|c|c|c|c|}
@@ -224,28 +303,20 @@
                 \hline
                 $m$ & 1.5 & kg & Mass of the body \\
                 $l$ & 0.1 & m & Length of the body \\
-                $I$ & 0.01 & $kgm^2$ & Moment of inertia of the body \\
+                $J_b$ & 0.01 & $kgm^2$ & Moment of inertia of the body \\
                 $r$ & 0.03 & m & Radius of the wheel \\
-                $R$ & 1.5 & $\Omega$ & Resistance of the motor \\
-                $L$ & 0.1 & H & Inductance of the motor \\
+                $d$ & 0.132 & m & Wheel base \\
+                $R_a$ & 1.5 & $\Omega$ & Resistance of the motor \\
                 $K_t$ & 0.01 & Nm/A & Torque constant of the motor \\
                 $K_v$ & 0.01 & V/rad/s & Back EMF constant of the motor \\
-                $J$ & 0.01 & $kgm^2$ & Moment of inertia of the motor \\
-                $B$ & 0.01 & Nms/rad & Viscous damping of the motor \\
+                $J_w$ & 0.01 & $kgm^2$ & Moment of inertia of the wheel \\
                 \hline
             \end{tabular}
             \caption{System Parameters}
         \end{table}
 
-        \subsubsection{Open Loop Response}
-        The open loop response of the system is simulated in MATLAB to obtain fig(7).
-        This is compared to the response of a prototype system, shown in fig(8). 
-        Whose parameters are given in table(2). The same motors are used for both robots.
-        The prototype demonstrates that increasing the body mass whilst keeping the COM 
-        distance approximately the same results in a system whose poles are closer to the origin, 
-        suggesting a more stable system.
+       
         
-      
         \pagebreak{}
         \subsection{Software Architecture}
         The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. 
@@ -316,6 +387,8 @@
         If the inner loop dynamics are much faster than the outer loop, 
         then the inner loop can be approximated as a disturbance[].
 
+
+
         In order to determine the maximum operating frequency of the outer loop, 
         the inner motor speed loop is closed at 200Hz and the system is observed.
         
@@ -323,36 +396,9 @@
         are obtained as shown in table(2). This process however may cause damage to the motors 
         during the sustained oscillations at the critical gain. 
        
-        \begin{figure}[H]
-            \includegraphics[width=\textwidth]{SysIDMotorSetUp.png}
-            \caption{System Identification Setup}
-        \end{figure}
         
-        Using the test bench setup shown in fig2, a series of reference ramp, step, 
-        sine and chirp inputs are applied to each of the DC motors. 
-        The resulting data is then used by the linear system identification toolbox in MATLAB 
-        to obtain the transfer function of the DC motors, given in eq(4).
 
-        Similarly fig(3) shows the speed-current plot of each of the DC motors.
-
-        From these plots and empirical measurements the motor parameters are fitted to equation(4) and are obtained as shown in table(3).
-
-        \begin{table}[H]
-            \centering
-            \begin{tabular}{|c|c|c|c|}
-                \hline
-                Parameter & Value & Units & Description \\
-                \hline
-                $R$ & 1.5 & $\Omega$ & Resistance of the motor \\
-                $L$ & 0.1 & H & Inductance of the motor \\
-                $K_t$ & 0.01 & Nm/A & Torque constant of the motor \\
-                $K_v$ & 0.01 & V/rad/s & Back EMF constant of the motor \\
-                $J$ & 0.01 & $kgm^2$ & Moment of inertia of the motor \\
-                $B$ & 0.01 & Nms/rad & Viscous damping of the motor \\
-                \hline
-            \end{tabular}
-            \caption{Estimated Motor Parameters}
-        \end{table}
+        
 
         The frequency response of the transfer function is shown in fig(4) and its closed loop bandwidth is determined to be rads
 

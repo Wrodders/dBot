@@ -17,21 +17,19 @@ struct DiffDriveModel{
     // kinematic state
     float linearVel;    // m/s    
     float angularVel;   // angular vel [rad/s]
+    float posX;         // x position [m]
 }DiffDriveModel; // Deferential Drive Mobile Robot
 
 
 
 
 static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheelBase, 
-                                      const float linearVel_alpha, const float angularVel_alpha, 
-                                      const float linVelFiltAlpha, const float angVelFiltAlpha){
+                                      const float linearVel_alpha, const float angularVel_alpha){
     struct DiffDriveModel ddmr =  {
         .wheelR = wheelRadius,
         .wheelBase = wheelBase,
         .linearVelAlpha = linearVel_alpha,
         .angularVelAlpha = angularVel_alpha,
-        .linVelFiltAlpha = linVelFiltAlpha,
-        .angVelFiltAlpha = angVelFiltAlpha,
         .linearVel = 0.0f,
         .angularVel = 0.0f
     };
@@ -44,6 +42,7 @@ static void ddmrEstimateOdom(struct DiffDriveModel *const ddmr, const struct Mot
     ddmr->linearVel = iirLPF(ddmr->linearVelAlpha, speed, ddmr->linearVel);                                      // lpf filter
     float angVel = (motorLeft->shaftRPS - motorRight->shaftRPS) * ddmr->wheelR/ddmr->wheelBase ;                // ang vel in rad/s
     ddmr->angularVel = iirLPF(ddmr->angularVelAlpha, angVel, ddmr->angularVel);                                  // lpf filter
+    ddmr->posX += ddmr->linearVel * (LQR_CNTRL_PERIOD * MS_TO_S); // update position
 }
 
 #endif // DDMR_H

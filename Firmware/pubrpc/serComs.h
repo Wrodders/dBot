@@ -92,9 +92,11 @@ User defines the Application Specific Topics and Parameters
     X(28, P_IMU_A_YOFFSET, "P_IMU_A_YOFFSET")         \
     X(29, P_IMU_A_ZOFFSET, "P_IMU_A_ZOFFSET")         \
     X(30, P_IMU_MOUNT_OFFSET, "P_IMU_MOUNT_OFFSET")   \
-    X(31, P_LINVEL_FILT_A, "P_LINVEL_FILT_A")         \
-    X(32, P_ANGVEL_FILT_A, "P_ANGVEL_FILT_A")         \
-    X(33, NUM_PARAMS,   "NUM_PARAMS")                 \
+    X(31, P_K1, "P_K1")                               \
+    X(32, P_K2, "P_K2")                               \
+    X(33, P_K3, "P_K3")                               \
+    X(34, P_K4, "P_K4")                               \
+    X(35, NUM_PARAMS,   "NUM_PARAMS")                 \
     
   
 #define PARAM_ENUM(ID, NAME, MSG) NAME = ID,

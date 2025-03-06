@@ -1,5 +1,5 @@
 function [timestamps, timedelta, sensorData] = parseDataSet(csvFile)
-T = readtable(csvFile);
+T = readtable(csvFile, VariableNamingRule="preserve");
 
 % Check that there are at least two columns
 if width(T) < 2
