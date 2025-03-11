@@ -10,7 +10,5 @@ end
 timestamps = T{:,1};      % numeric timestamps as strings or numbers
 sensorData = T{:,2:end};  % sensor measurements
 
-for i=1:1:length(timestamps)-1  
-    timedelta(i) = timestamps(i+1) - timestamps(i); 
-end 
+timedelta = diff(timestamps);
 end
