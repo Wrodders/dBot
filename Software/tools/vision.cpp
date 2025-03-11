@@ -5,7 +5,7 @@
  *  @version 0.01
  * 
  * Gstreamer Pipeline:
- * Reads frames in YUV from a pipe.
+ * Reads frames in YUV from gstreamer appsrc and writes to appsink
  * For each captured frame generates a continuous trajectory as a set of linear and angular velocity commands
  * Performs interactive calibration of the camera using OpenCV and saves the calibration parameters to a file
  * Publishes the processed frames to the output pipe for visualization
@@ -26,105 +26,134 @@
  * | ROI  | Edge | window|
  * ----------------------|
  ************************************************************************************/
-
-
 #include "../inc/vision.hpp"
+#include <gst/gst.h>
+#include <atomic>
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+    #define DEFAULT_INPUT_PIPELINE "avfvideosrc device-index=0 do-timestamp=true ! videoconvert ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink"
+    #define OUTPUT_PIPELINE "appsrc ! videoconvert ! osxvideosink sync=false"
+    #define CONFIG_PATH "configs/robotConfig.json"
 
-
-
+#else   
+    #define DEFAULT_INPUT_PIPELINE "libcamerasrc ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink"
+    #define OUTPUT_PIPELINE "appsrc ! videorate ! videoconvert ! queue ! x264enc tune=zerolatency speed-preset=ultrafast quantizer=25 key-int-max=15 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=192.168.0.32 port=5002 sync=false"
+    #define CONFIG_PATH "/home/pi/prog/software/configs/robotConfig.json"
+#endif
 
 #define NODE_NAME "VISION"
 
-int main(int argc, char* argv[]) {
-    (void) argc;
-    (void) argv;
-    
-    //  -------------- Video IO Setup  ----------------- //
-    mkfifo(viz::INPUT_PIPE, 0666); 
-    mkfifo(viz::OUTPUT_PIPE, 0666); 
-    // Command to capture video using rpicam-vid with YUV420p output
-    FILE* in_pipe = fopen(viz::INPUT_PIPE, "r");
-    if (!in_pipe) {
-        syslog(LOG_CRIT, "Unable to open pipe to video input!");
+
+int run(int argc, char* argv[]) { 
+    std::cout << ("Starting Vision Pipeline") << std::endl;
+    openlog("vision", LOG_PID | LOG_CONS, LOG_USER);
+    // --------------- CLI Parsing ----------------- //
+    if (argc < 1) {
+        syslog(LOG_ERR, "Usage: %s <input_pipeline>\n", argv[0]);
+        return 1;
+    }
+    std::string input_pipeline = (argc > 1) ? argv[1] : DEFAULT_INPUT_PIPELINE;   
+    if (input_pipeline.empty()) {
+        syslog(LOG_ERR, "Error: Invalid Input Pipeline\n");
+        return 1;
+    }
+    // -------------- Video IO Setup  ----------------- //
+    cv::VideoCapture cap(input_pipeline, cv::CAP_GSTREAMER);
+    if (!cap.isOpened()) {
+        syslog(LOG_ERR, "Failed to open input pipeline!");
         return -1;
     }
-   
-    FILE* out_pipe = fopen(viz::OUTPUT_PIPE, "w");
-    if (!out_pipe) {
-        syslog(LOG_CRIT, "Unable to open pipe to video output!");
+
+    cv::VideoWriter writer(OUTPUT_PIPELINE, cv::CAP_GSTREAMER, 
+                           0, 30, cv::Size(viz::WIDTH, viz::HEIGHT), false); // grayscale output
+    if (!writer.isOpened()) {
+        syslog(LOG_ERR, "Failed to open output pipeline!");
         return -1;
     }
     // -------------- Runtime Parameters ----------------- //
     std::array<std::atomic<float>, viz::NUM_PARAMS> params;
-    ParameterMap param_map("configs/robotConfig.json", NODE_NAME);
+    ParameterMap param_map(CONFIG_PATH, NODE_NAME);
+    param_map.register_parameter(viz::P_PROG_MODE, params[viz::P_PROG_MODE], viz::val_prog_mode);
     param_map.register_parameter(viz::P_HRZ_HEIGHT, params[viz::P_HRZ_HEIGHT], viz::val_hrz_height);
     param_map.register_parameter(viz::P_TRFM_PAD, params[viz::P_TRFM_PAD], viz::val_trfm_pad);
     param_map.register_parameter(viz::P_EDGE, params[viz::P_EDGE], viz::val_edge);
-    param_map.register_parameter(viz::P_PROG_MODE, params[viz::P_PROG_MODE], viz::val_prog_mode);
     // initialize the parameters
+    params[viz::P_PROG_MODE].store(viz::M_CALIBRATE);
     params[viz::P_HRZ_HEIGHT].store(viz::HEIGHT / 2);
-    params[viz::P_TRFM_PAD].store(viz::WIDTH / 2);
+    params[viz::P_TRFM_PAD].store(200);
     params[viz::P_EDGE].store(viz::P_CANNY);
-    params[viz::P_PROG_MODE].store(viz::M_RUN);
+
+
+    std::array<cv::Point2f, 4> _dst_pts = { // homography transform destination points
+        cv::Point2f((viz::WIDTH / 2 - 200), viz::HEIGHT),
+        cv::Point2f((viz::WIDTH / 2 + 200), viz::HEIGHT),
+        cv::Point2f(0, 0), 
+        cv::Point2f(viz::WIDTH, 0)
+    };
+    
     // ------------- Command Server Coms Thread ----------------- //
     std::thread cmd_thread(viz::command_server, std::ref(param_map));
+    // ------------- Tracjectory Publisher Thread ----------------- //
+    std::thread traj_thread(nav::trajGen);
     // -------------- Vision Pipeline Allocations ----------------- //
-    std::array<uint8_t, viz::FRAME_SIZE> yuv_buffer; // serialized frame buffer
-    cv::Mat homography_matrix = cv::Mat::eye(3, 3, CV_64F); // identity matrix
+    cv::Mat y_plane(viz::HEIGHT, viz::WIDTH, CV_8UC1); // Single channel for Y plane
+    cv::Mat homography_matrix = cv::findHomography(viz::_src_pts, _dst_pts);
 
     // -------------- Vision Pipeline Loop ----------------- //
-    while(viz::_exit_trig == false) {
-        size_t bytes_read = fread(yuv_buffer.data(), 1, yuv_buffer.size(), in_pipe);
-        if (bytes_read != viz::FRAME_SIZE) {
-            syslog(LOG_ERR, "Unable to read frame from input pipe!");
-            continue; // skip frame if not complete
+    float progmode;
+    while (!viz::_exit_trig) {
+        // ------------ Read Frame ------------ //
+       
+        if (!cap.read(y_plane)) {  // Read the full frame
+            syslog(LOG_ERR, "Failed to read frame!");
+            viz::_exit_trig.store(true); // force exit
+            break;
         }
-        cv::Mat y_plane(viz::HEIGHT, viz::WIDTH, CV_8UC1, yuv_buffer.data()); // zero-copy
-        float progmode;
+        // ------------ Frame Processing ------------ //
         (void) param_map.get_value(viz::P_PROG_MODE, progmode);
-        switch((int)progmode){
+        switch ((int)progmode) {
             case viz::M_CALIBRATE:
+                syslog(LOG_INFO, "Calibrating Camera");
                 // Run Camera Intrinsic Calibration
-                break;
-            case viz::M_INIT:
-                // Initialize the pipeline
-                break;
-            case viz::M_PRE:
-                // Run Preprocessing Calibration
-                break;
-            case viz::M_POST:
-                // Checks for calibration parameters
-                // Checks 
+                // -- Update Transformation Matrix -- //
+
+                homography_matrix = cv::findHomography(viz::_src_pts, _dst_pts);
+                syslog(LOG_INFO, "Calibration Complete");
+                params[viz::P_PROG_MODE].store(viz::M_RUN);
                 break;
             case viz::M_RUN:
-                if(viz::pipeline(y_plane, homography_matrix, param_map) == -1){
-                    viz::_exit_trig.store(true); // force exit
-                    break;}
+                viz::pipeline(y_plane, homography_matrix, param_map);
                 break;
             default:
                 break;
         }
         // ------------ Serialize Output Frame ------------ //
-        std::memcpy(yuv_buffer.data(), y_plane.data, y_plane.total()); // overwrite the y_plane
-        uint8_t* u_plane = yuv_buffer.data() + (viz::WIDTH * viz::HEIGHT);
-        uint8_t* v_plane = u_plane + (viz::WIDTH * viz::HEIGHT / 4); // 
-        std::fill(u_plane, u_plane + (viz::WIDTH * viz::HEIGHT / 4), 128); // grayout the U and V planes
-        std::fill(v_plane, v_plane + (viz::WIDTH * viz::HEIGHT / 4), 128);
         try {
-            viz::write_frame(out_pipe, yuv_buffer);
-        } catch (const std::exception& e) {
-            syslog(LOG_ERR,"Exception in write_frame %s", e.what());
-            viz::_exit_trig.store(true); // force exit
+            writer.write(y_plane); // Write the Y plane (grayscale) to output pipeline
+        } catch (cv::Exception& e) {
+            syslog(LOG_ERR, "Failed to write frame! Sink may be closed.");
+            break;
         }
     }
-
+    
     // -------------- Cleanup ----------------- //
+    cap.release();
+    writer.release();
+
     viz::_exit_trig.store(true); // force exit
     cmd_thread.join(); 
-    fclose(in_pipe);
-    fclose(out_pipe);
-    remove(viz::INPUT_PIPE);
-    remove(viz::OUTPUT_PIPE);
+
+    closelog();
+
+    return 0;
+}
+
+int main(int argc, char* argv[]) {
+    #ifdef __APPLE__
+    gst_macos_main((GstMainFunc) run, argc, argv, NULL); // Workaround for Gstreamer on MacOS
+    #else
+    run(argc, argv);
+    #endif
     return 0;
 }

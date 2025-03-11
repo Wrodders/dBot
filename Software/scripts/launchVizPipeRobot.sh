@@ -1,7 +1,7 @@
 #!/bin/bash
 #--------------------------------------------------
 #  @file    launchVisionPi.sh
-#  @brief   Launches the vision Pipeline on Raspberry Pi.
+#  @brief   Launches the vision test Pipeline on Raspberry Pi.
 
 
 # Define named pipes

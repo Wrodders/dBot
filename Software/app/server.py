@@ -48,7 +48,6 @@ class WSHandler(websocket.WebSocketHandler):
         try:
             self.application.zmq_socket.send_multipart([b"TWSB", f"<BR{steering:.3f}\n".encode()])
             self.application.zmq_socket.send_multipart([b"TWSB", f"<BM{throttle:.3f}\n".encode()])
-            logging.info(f"Sent reset commands: Steering={steering}, Throttle={throttle}")
         except zmq.ZMQError as e:
             logging.error(f"ZMQ error: {str(e)}")
 
@@ -80,8 +79,8 @@ def main():
     context = zmq.Context.instance()
     zmq_socket = context.socket(zmq.PUB)
     zmq_socket.setsockopt(zmq.LINGER, 100)
-    zmq_socket.connect("ipc:///tmp/botcmds")
-    logging.info("ZMQ PUB connected to ipc:///tmp/botcmds")
+    zmq_socket.bind("ipc:///tmp/joycmds")
+    logging.info("ZMQ PUB connected to ipc:///tmp/joycmds")
 
     app = make_app(load_index_html())
     app.zmq_socket = zmq_socket

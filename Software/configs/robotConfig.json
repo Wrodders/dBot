@@ -1,15 +1,11 @@
 {
     "VISION": {
         "parameters": [
-            {"name": "HORIZON_HEIGHT_PX", "id": 0, "access": "W", "format": "%d", "description": "ROI Horizon height [px]"},
-            {"name": "TRANSFORM_PAD_PX",  "id": 1, "access": "W", "format": "%d", "description": "Center Bottom Padding [px]"},
-            {"name": "EDGE_FILT",         "id": 2, "access": "W", "format": "%d", "description": "Edge Filter Algorithm"},
-            {"name": "OUT_MODE",          "id": 3, "access": "W", "format": "%d", "description": "Output Mode"},
-            {"name": "N_WINDOWS",         "id": 4, "access": "W", "format": "%d", "description": "Number of Sliding Windows"},
-            {"name": "WIN_MARGIN_PX",     "id": 5, "access": "W", "format": "%d", "description": "Window Margin [px]"},
-            {"name": "WIN_MIN_PX",        "id": 6, "access": "W", "format": "%d", "description": "Window Threshold level"}
+            {"name": "PROG_MODE",         "id":0, "access": "W",  "format": "%d", "description": "Program Mode"},
+            {"name": "HORIZON_HEIGHT_PX", "id": 1, "access": "W", "format": "%d", "description": "ROI Horizon height [px]"},
+            {"name": "TRANSFORM_PAD_PX",  "id": 2, "access": "W", "format": "%d", "description": "Center Bottom Padding [px]"},
+            {"name": "EDGE_FILT",         "id": 3, "access": "W", "format": "%d", "description": "Edge Filter Algorithm"}
             ],
-
         "publishers": [
             {"name": "CMD_RET",         "id": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
             {"name": "ERROR",           "id": 1, "description": "Error Message", "format": "%s:%d", "args": "msg, timestamp"},
@@ -30,7 +26,7 @@
             {"name": "P_RKI",           "id": 7,   "access": "W",  "format": "%f",     "description":  "Right Motor Ki"},
             {"name": "P_BTRGT",         "id": 8,   "access": "W",  "format": "%f",     "description":  "Balance Target Angle"},
             {"name": "P_BKP",           "id": 9,   "access": "W",  "format": "%f",     "description":  "Balance Kp"},
-            {"name": "BKI0",            "id": 10,  "access": "W",  "format":  "%f",     "description":  "Balance Ki"},
+            {"name": "BKI0",           "id": 10,  "access": "W",  "format":  "%f",     "description":  "Balance Ki"},
             {"name": "P_BKD",           "id": 11,  "access": "W",  "format": "%f",     "description":  "Balance Kd"},
             {"name": "P_VTRGT",         "id": 12,  "access": "W",  "format": "%f",     "description":  "Voltage Target"},
             {"name": "P_VKP",           "id": 13,  "access": "W",  "format": "%f",     "description":  "Voltage Kp"},
@@ -53,8 +49,8 @@
             {"name": "P_IMU_MOUNT_OFFSET", "id": 30, "access": "W",   "format":"%f",     "description":  "IMU Mounting Offset"},
             {"name": "P_K1", "id": 31, "access": "W", "format":"%f", "description":"LQR K1"},
             {"name": "P_K2", "id": 32, "access": "W", "format":"%f", "description":"LQR K2"},
-            {"name": "P_K3", "id": 33, "access": "W", "format":"%f", "description":"LQR K2"},
-            {"name": "P_K4", "id": 34, "access": "W", "format":"%f", "description":"LQR K2"},
+            {"name": "P_K3", "id": 33, "access": "W", "format":"%f", "description":"LQR K3"},
+            {"name": "P_K4", "id": 34, "access": "W", "format":"%f", "description":"LQR K4"}
         ],
         "publishers": [
             {"name": "CMD_RET",     "id": 0,   "description": "Return Cmd Value",  "format": "%s", "args": "retval"},
@@ -66,7 +62,6 @@
                 "description": "Telemetry Data",   
                 "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", 
                 "args":  ["PITCH",    "ROLL",
-                          "PITCH_RATE", "ROLL_RATE",
                           "ACCEL_X", "ACCEL_Y",  "ACCEL_Z",
                           "GYRO_X",  "GYRO_Y",   "GYRO_Z",
                           "LEFT_SHAFT_RPS",  "LEFT_WHEEL_TRGT",  "LEFT_VOLTAGE", 

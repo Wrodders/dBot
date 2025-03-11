@@ -9,7 +9,7 @@ hostname=$(hostname)
 echo "Hostname: $hostname"
 
 # Stop only the services we actually have
-sudo systemctl stop twsb.service joystick.service vision.service 
+sudo systemctl stop twsb.service joystick.service vision.service
 #copy the services to /etc/systemd/system
 sudo cp /home/pi/prog/software/services/twsb.service /etc/systemd/system/
 sudo cp /home/pi/prog/software/services/joystick.service /etc/systemd/system/
@@ -23,6 +23,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now twsb.service
 sudo systemctl enable --now joystick.service
 sudo systemctl enable --now vision.service
+
 
 # Conditionally enable/start cam or vision
 

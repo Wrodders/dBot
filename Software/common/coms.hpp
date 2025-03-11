@@ -359,8 +359,16 @@ void coms_exec_rpc(const CommandMsg& cmd, ParameterMap& param_map, zmq::socket_t
 void coms_receive_asciicmd(zmq::socket_t& cmdSubSocket, struct CommandMsg& cmdFrame) {
     zmq::message_t topic_msg;
     zmq::message_t cmd_ret_data;
-    (void) cmdSubSocket.recv(topic_msg, zmq::recv_flags::none);
-    (void) cmdSubSocket.recv(cmd_ret_data, zmq::recv_flags::none); 
+    zmq::recv_result_t result = cmdSubSocket.recv(topic_msg, zmq::recv_flags::none);
+    if (!result) {
+        syslog(LOG_WARNING, "Failed to receive command topic");
+        return;
+    }
+    result = cmdSubSocket.recv(cmd_ret_data, zmq::recv_flags::none);
+    if (!result) {
+        syslog(LOG_WARNING, "Failed to receive command data");
+        return;
+    }
     // pack the data into the cmd frame
     cmdFrame.topic = std::string(static_cast<char*>(topic_msg.data()), topic_msg.size());
     cmdFrame.data = std::string(static_cast<char*>(cmd_ret_data.data()), cmd_ret_data.size());

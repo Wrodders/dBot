@@ -23,7 +23,7 @@ void handleCLI(int argc, char *argv[], std::string &socket_address, std::string 
                 socket_address = optarg;
                 break;
             case 't':
-                topic_string = optarg;
+                topic_string = optarg ? optarg : "";
                 break;
             case 'm':
                 mode = optarg;

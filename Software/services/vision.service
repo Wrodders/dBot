@@ -6,10 +6,10 @@ Description=Vision Processing
 After=network.target
 
 [Service]
-Type=exec
-User=root
-ExecStart=/bin/bash /home/pi/prog/software/scripts/launchVizPipeRobot.sh
-KillMode=mixed
+Type=simple
+User=pi
+ExecStart=/home/pi/prog/software/build/vision
+KillMode=process
 TimeoutStopSec=10
 
 # Resource Limits
@@ -18,6 +18,11 @@ MemoryMax=256M
 MemorySwapMax=64M
 IOWeight=150 
 Nice=-20 
+
+
+#Filesystem Access
+ReadOnlyPaths=/home/pi/prog/software/
+
 
 [Install]
 WantedBy=multi-user.target
