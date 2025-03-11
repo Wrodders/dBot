@@ -84,8 +84,9 @@
 
   %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
   \begin{abstract} % put abstract here. Limit is 1 page.
-    The highly dynamic Two Wheel Self Balancing Robot (TWSB)
-    has a large exploration space for high level control strategies. 
+    The highly dynamic Two Wheel Self Balancing Robot 
+    (TWSB) has a large exploration space for high level 
+    control strategies. 
     This reports presents an autonomous line racing TWSB utilizing 
     a monocular vision system on low cost hardware. 
     Cascaded PID and LQR controllers 
@@ -109,59 +110,45 @@
   \section{Introduction}
     The TWSB system is an example of a non-linear, under-actuated system which is inherently unstable[1].
     Compared to a differential drive platform, the TWSB's dynamics are more complex, enabling a 
-    wider range of high level robotic behaviors to be explored. \cite{RoboLimbo} []. 
+    wider range of high level robotic behaviors to be explored.
     The extra degree of freedom 
     presents some challenges when vision based control strategies are used. 
-    Techniques from [] and [] from the field of quad-rotor attitude control are explored to minimize the effect 
+    Techniques from  and [] from the field of quad-rotor attitude control are explored to minimize the effect 
     of the fundamental instability of the system.
 
-    This paper presents the design developemtn and validionof a TWSB robotic platform for automonus line racing. 
-    The system is designed to be low cost and easily aseembeld whilst providing suitabel protection, as testing 
-    of racing lines may lead to large forces on the system, fig(1)
+    This paper presents the design of a TWSB robotic platform, its suitability for further research on 
+    mobile robotics is validated by line tracking using a monocular vision system.
+    The system is designed to be low cost and easily assembled whilst providing suitable protection, 
+    as testing of aggressive racing lines may lead to large forces on the system, fig(1)
 
-    
-    As such many control strategies have been proposed to stabilize the system.[] 
-    Of these the most common are the LQR and Cascaded PID controllers. 
-    
-
-
-    Amongst the early works on the TWSB system,[1] achieved telle-operation on flat ground. 
-    This was implemented using a FPGA base DSP system. Advances in price to performance of emmbeded systems and MEMS sensors have allowed 
+    Amongst the early works on the TWSB system,[1] achieved teleoperation on flat ground. 
+    This was implemented using a FPGA based DSP system. 
+    Advances in price to performance of emmbeded systems and MEMS sensors have since allowed 
     [][][] to similarly obtain remote control of the TWSB system using a low powered microcontroller.
-    Having a stable platform and available computational resources, higher levels of autonomy can be developed. 
-    []Utilizes a camera as a matrix of binary intensity sensors and a rule based algorithm to successful track 
-    a line whilst balancing. [] Developed an end to end neural network to perform the same task and [] proposes 
-    a ConvNet based approach which utilizes all of the cameras RDB-D data to be able to 
+    With a stable mobile platform and available computational resources, higher levels of autonomy can be developed. 
+    [] Utilizes a camera as a matrix of binary intensity sensors and a rule based algorithm to successful track 
+    a line whilst balancing. [] Trained an end to end neural network to perform the same task and [] proposes 
+    a convolution neural network based approach which utilizes all of the cameras RDB-D data to be able to 
     autonomously navigate with human-centric social behavior. 
-    To the same end, [][][] develop wheeled robot navigation and realtime lane segmentation geometric computer vision techniques. 
-    [][] build a online data driven model of the mobile system and embed it in a ModelPredictive controller. This adaptive control strategy 
-    is shown to be robust to un-modeled environment and plant dynamics, allowing for autonomous aggressive maneuvers. 
-    This is implemented on a commercial GPU which allows for realtime operation of the optimization algorithm.
+    To the same end, [][][] develop wheeled robot navigation and realtime lane segmentation using 
+    geometric computer vision techniques. 
+    [][] build a online data driven model of the mobile system and emmbeded it in a Model Predictive Controller (MPC). 
+    This adaptive control strategy is shown to be robust to un-modeled environment and plant dynamics, 
+    allowing for autonomous aggressive maneuvers. 
+    Whilst major success has been achieved by linearization of the dynamics of classic inverted pendulum, 
+    [][] show that by using non-linear control strategies such as backstepping or sliding mode control
+    the system can be made to stabilize on an inclined plane and even limbo under a bar.
     \pagebreak{}
 
-
-
-
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
-  \section{Literature review} % edit section heading as appropriate
-
-    \subsection{Introduction}
-
-    This is now a MIMO control problem. numerous control strategies have been used to solve this problem, 
-    with different goals in mind. [dadsasd] presents a lqr controller which tracks 
-    the desired velocity, lending itself to tele-operative use cases, [sadasda] 
-    shows how a cascaded PID controller is used to perform position control, 
-    and [aasdasd] explores how a neural net can be used for swing up and balance control.
-    \subsection{Summary}
-  %%%%%%%%%%%%%%%%%% SECTION 3 %%%%%%%%%%%%%%%%%%
   \pagebreak{}
   \section{Mathematical Modeling} % edit section heading as appropriate
-    Significant research, both in simulation[][] and 
-    application[][][] has been done on the 1DOF inverted pendulum
-    on a cart as a bench mark for control techniques[]. This is often used as a baseline model for the TWSB problem
-    however higher order models are required to capture the dynamics of the TWSB system. [] Explores models of different fidelity 
+    Significant research, both in simulation[][] and application[][][] 
+    has been done on the 1DOF inverted pendulum on a cart as a bench mark for control techniques[]. 
+    This is often used as a baseline model for the TWSB problem however higher order models are 
+    required to capture the dynamics of the TWSB system. [] Explores models of different fidelity 
     and [] expands on this and developed a 3DOF model by decoupling the system based into 2 controllers which 
-    operate on the yaw and pitch rate independently. [trajectory tracking control for navigation of the inverse pendulum type] 
+    operate on the yaw and pitch rate independently.
     \pagebreak{}
     \subsection{DC Motor Model}    
     \begin{figure}[H]
@@ -171,11 +158,13 @@
     \end{figure}
     The system is driven by two independently voltage controlled DC motors through planetary gearboxes, 
     as is shown in Fig(2). 
-    DC motors execute a torque $t_r$, proportional to the armature current $i_a$, when a voltage $V_a$ is applied.
+    DC motors execute a torque $t_r$, proportional to the armature current $i_a$,
+    when a voltage $V_a$ is applied.
     The ratio of motors inductance $L_a$ and resistance $R_a$ determine the time constant $\tau_e$ of the motor. 
     That is the time it takes for $i_a$ to reach 63.2\% of its final value. []
     The gear ratio $n=N_2/N_1$ which amplifies the viscous damping coefficient 
-    $B_G$ and the moment of inertia $J_G$ with respect to the motor as $J_{\text{eq}} = J_G + J_r \cdot n^2$ and $B_{\text{eq}} = B_G \cdot n$.
+    $B_G$ and the moment of inertia $J_G$ with respect to the motor is obtained by
+    $J_{\text{eq}} = J_G + J_r \cdot n^2$ and $B_{\text{eq}} = B_G \cdot n$.
 
     The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage by the well-known transfer function
     \begin{equation}
@@ -185,15 +174,14 @@
     \end{equation}
     Where $\Omega_w$ is the laplace transform of the output speed, $J_r$ is the moment of inertia of the the rotor.
     The rotors viscous damping $B_r$ is assumed to be negligible, as is $B_G$. 
-    For small motors, $t\tau_e$ is small hence $L_a << R_a$ and the motor can be approximated as a first order system by[][]
+    For small motors, $t\tau_e$ is small hence $L_a << R_a$, [][], and the motor can be approximated as a first order system as
     \begin{equation}
         \begin{aligned}
-            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot n}^2 \right)+K_t K_e }\cdot\left(n\right)
+            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot n}^2 \right)+K_t K_e }\cdot\frac{1}{n}
         \end{aligned}
     \end{equation}
 
     \pagebreak{}
-
 
     \subsection{2DOF System Model}
 
@@ -238,37 +226,33 @@
         motors and monitor the 6 Axis IMU over I2C. It communicates with the 
         Raspberry Pi 5 over UART via a custom ASCII protocol discussed in section 3.3. 
         The system is powered by a a nominal 12V Li ion Battery pack. A USB-C CC-CV charger is used for quick 
-        and accessible recharging,critical for mobile robotics applications. Battery Voltage is monitors by the MCU
-        and the pack is protected by a BMS and a 3A poly-fuse.
+        and accessible recharging, critical for mobile robotics applications. 
+        Battery Voltage is monitored by the MCU and the pack is protected by a BMS and a 3A poly-fuse.
         A simple circuit adapted from[] is used to safely load share between the battery pack and the charger.
-
 
         \pagebreak{}
         \subsubsection{System Identification}
-
-
         A series of experiments are conducted in order to obtain an estimate transfer function of the motors
         
         \begin{table}[H]
             \centering
                 \begin{tabular}{|r|c|c|c|c|c|c|}
                     \hline 
-                    Gear Ratio & Rated Torque & Rated Speed & Rated Current & Stall Torque & Stall Current \\
+                    Gear Ratio & Rated Torque & Rated Speed  & Rated Current & Stall Current [A] & Stall Torque \\
                     \hline
-                     1:20 & 0.39 & 400 & 500 & 2 & 0.15 \\
+                     1:20  & 0.39 [RPM] & 400 [mA] & 500 [Nm/kg] & 2  [A] & 0.15 [Nm/Kg] \\
                     \hline
                 \end{tabular}
                 \caption{Manufacturer Provided Motor Parameters}
         \end{table}
-        Using the test bench setup shown in fig(6), a series of reference ramp, step, 
-        sine and chirp inputs are applied to each of the DC motors.  This uses the ComsTerm software described in section 3.3.
+        A realtime data aquististion and analysis software system developed in python, is used as test bench setup 
+        shown in fig(6), a series of reference ramp, step, sine and chirp inputs are applied to each of the DC motors.  
         \begin{figure}[H]
             \centering
             \includegraphics[height=0.45\textwidth]{SysIDMotorSetUp.png}
             \caption{System Identification Testbench Setup}
         \end{figure}
      
-
         \begin{figure}[H]
             \centering
             \subfloat{
@@ -282,8 +266,8 @@
             }
             \caption{Open Loop Speed Voltage experiments}
         \end{figure}    
-        The transfer function of the motor is obtained by fitting the data to a first order system with time delay.
-        The time delay is found to be 0.1s and the transfer function is given by eq(7).
+        The transfer function of the motor is obtained by fitting the data to a first order system 
+        with 95\% confidence intervals whose transfer function is given by eq(7).
         \begin{equation}
             \begin{aligned}
                 \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{0.1}{s+0.9}
@@ -293,7 +277,7 @@
         \pagebreak{}
         \subsubsection{Parameters }
         The system parameters are given in table(1). 
-        The masses of the sub-compoentes obtanined by weighing,
+        The mass of the sub-components obtained by weighing,
         and estimates of the 3D printed parts mass are given by the slicer software. 
         The CAD Model computes the center of mass using these values and the COM is identified in fig(6).
         The using the approximate model as in fig(2) the moment of inertial is computed from standard formulas.
@@ -317,8 +301,6 @@
             \caption{System Parameters}
         \end{table}
 
-       
-        
         \pagebreak{}
         \subsection{Software Architecture}
         The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. 
@@ -333,16 +315,18 @@
 
         The software is managed by systemd through services. 
         Several self-diagnosis tools are used for resource monitoring and auto recovery. 
-        For example both the MCU and the CPU monitor each other using watchdog timers.
+        For example, both the MCU and the CPU monitor each other using reset watchdog timers.
         Programs implement a runtime Remote Procedure Call (RPC) ASCII interface using 
-        a GET/SET/RUN pattern operating on runtime parameters. This significantly reduces the compile/flash/debug 
-        iteration time. A Gstreamer pipeline is setup a RSTP server which can be accessed on the network.
+        a GET/SET/RUN pattern operating on runtime parameters. 
+        This significantly reduces the compile/flash/debug iteration time. 
+        A GStreamer pipeline sets up an RSTP video server which can be accessed on the network.
         Core functionality is implemented in C++17. 
         \begin{figure} [H]
             \includegraphics[width=\textwidth]{FirmwareArch.pdf}
             \caption{Firmware Architecture}
         \end{figure}
-        Key components of the firmware are shown in fig(8).
+
+        Key components of the firmware are shown in Fig(9).
         It is implemented in c99 using the libopencm3 project[]. 
         The MCU also presents the same RPC ASCII interface over serial.
         The super-loop executes commands at 20Hz, 
@@ -350,61 +334,81 @@
 
         The data-aquististion system obtains a timestamped sample of the TWSB state 
         and telemetry values sampled by the MCU through the serial link.
-        This results in non-uniformly sampled data. Parsing the UART IO buffer on Linux 
-        and timestamp is bottlnekced by the CPU. An event driven system is used to minimize CPU overhead.   
-        Worst case jitter is observed, under CPU stress tests[] to be 1ms. This is acceptable for telemetry data, but
-        any further online or offline signal processing is resampled to a uniform rate using 
-        lagrange interpolation \cite{DataStreamProcessing}
+        This results in non-uniformly sampled data. Parsing the UART IO buffer 
+        is constrained by the scheduler. An event driven system is used to minimize CPU overhead.   
+        Worst case jitter is observed, under CPU stress tests[] to be 0.1ms. 
+        This is acceptable for telemetry data. 
         \pagebreak{}
     \subsection{State Estimation}
+    Information about as system may be obtained by 2 types of sources, 
+    mathematical models models as in eq(1) which can describe the time evolution of the chosen system variables 
+    and sensors converts energy due to a physical property into information[]. Both of which are approximation of the true state. 
+    The errors in these approximations is termed noise. [] postulates that there exits a difference between superposition 
+    of random noise sources and external distances or, interference and as such their effects should be considered and treated separately.
+    This is analogous to the separation principle in control theory[]. 
+
+    \subsubsection{Sensors Overview}
         For the TWSB system in eq(6) its state variables $\theta$ and $\dot x_b$ can be measured by the onboard IMU and the encoders.
         The motors incorporate a low cost 12 pulses per revolution quadrature encoder. This is of poor resolution as compared wth the
-        the 1000 pulses per revolution encoders used in []. The Hardware Decoder on the STM32 is used to increment the pulse count 
-        and the rotational speed is updated at each step of a fixed rate loop. The quantization error from the encoder at low speeds can 
-        be reduced by using a larger sample time but this might make the system less responsive.
-
-        The IMU is a 6 axis sensor which measures the linear acceleration and angular velocity of the system in its frame. 
-        The resultant 3D acceleration vector is used to obtain an estimate of the pitch angle $\hat\theta$ of the system.
-
-        This estimate is sensitive to noise as shown in fig(), contrasinlgly an estimate as obtained by the 
-        corresponding 3D angular velocity vector is less sensitive to noise, but is subject to drift, as shown in fig().
-
-        The Kalman Filter is commonly used [ros][][] in robotics to obtain the optimal estimate from complementary sensors whose 
-        noise characteristics are gaussian. The Kalman Filter is a recursive type estimator which uses a dynamical model of the system 
-        and the sensor model to obtain an estimate of the state of the system. [] and [] rely purely on a model of the IMU 
-        to obtain an estimate of $\theta$. 
-        Whereas [] implements an LQG controller which uses a model of the form of eq(1) to obtain an estimate of the full state.
-
+        the 5000 pulses per revolution encoders used in []. The hardware decoder peripheral on the STM32F411RE
+        is used to increment the pulse count and the rotational speed is updated at each step of a fixed rate loop[].
         
+        The IMU is a 6 axis MEMS sensor[] which measures the linear acceleration and angular velocity of the system in its frame. 
+        The resultant 3D acceleration $\vec{a}$ is used to obtain an 
+        estimate of the pitch angle as $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$
 
-        \begin{figure}
+        The variance of this estimate is small when the system is at rest, but grows larger when subject to vibration from the motors
+        as shown by the experiment in fig(6) where the TWSB placed horizontal at rest and motor control commands are issued. 
+        
+        Contrastingly an estimate as obtained by the corresponding 3D angular velocity vector is less sensitive to noise,[] 
+        but is subject to drift. 
+        \begin{figure}[H]
             \centering
-            \includegraphics[width=\textwidth]{openChirp.pdf}
-            \caption{Kalman Filter Estimation}
+            \includegraphics[width=0.75\textwidth]{accelNoiseModeling.pdf}
+            \caption{Noise Characteristics of accelerometer}
         \end{figure}
+        The Kalman Filter (KF) and its variants are widely used in robotics to fuse 
+        complementary sources of information[]. 
+        The ordinary KF is applicable to linear systems, under the assumptions that the
+        measurements are Gaussian and uncorrelated.[]
 
-        \subsubsection{Sensors Overview}
-        The TWSB system uses an Kalman Filter to obtain an estimate of theta, 
-        from the accelerometer and gyroscope readings of the IMU. 
-        This is polled at the maximum 1kHz using an interrupt according to the IMU datasheet[]. 
-        The kalman estimate is obtanined by eq(8)  after initilay observingin
-         a prediction and then an inovation step.
-        The state ransiion model is givenby [] as eq(9).  The system is initialized with a 
-        priori estimates of the state and covariance matrix. in eq(10-11). 
+        Even though the state transition model of the TWSB robot is non-linear, 
+        [][] show that the linear KF produces a suitably accurate estimate, enabling the robot to balance ± 1 degree.
+        This one order of magnitude than the worst case pitch limit from (equation). Beyond this, the small angle approximation is no longer valid, 
+        and the system is not locally linear. 
+        As a type of Bayesian filter, the KF represents current belief, or a posteriori state estimate $\hat{x}_k$,
+        as a Gaussian whose distribution is parameterized by its mean vector ($\mu_k$) and covariance matrix $\Sigma_k$[]. 
+        The KF is a recursive estimator which uses a linear dynamical model of the system, †
+        given the a priori belief $\hat x_{k-1}$ the current measurement $z_k$ and the control input $u_k$ 
+        to obtain a estimate state as at the $\hat\{x_{{k+1}| k}$ given
 
-        Fig(9) shows that the ertiamte stabalizses after 1 second, 
-        and is robust to noise from the acceleroemter. 
+
+        \begin{equation}
+            \hat{x^-}_{k} = A_k \hat{x}_{k|k-1} + B_k u_k
+        \end{equation}
+        
+        [] and [] rely purely on a model of the IMU 
+        to obtain an estimate of $\theta$. 
+        While [] implements an LQG controller which uses a model similar to eq(1) to obtain an estimate of the full state.
+        After and initial estimate of the state $\hat x_0,0$ is obtained the system is observed and 
+        for each measurement $z_n$ at sample period $T_s$ an estimate of the current state $\hat x_n,n$ is obtained.
+        The next state estimate $\hat x_n,n+1$ is predicted by the dynamical model of the system.
+
+
+
         \pagebreak{}
     \subsection{Control System}
-       
-        A simple PID controller opperatign on the pitch error is often enough to stabilize one of the systems dynamic variables[].
+
+        A simple PID controller operating on the pitch error is often enough to stabilize one 
+        of the systems dynamic variables[].
         However as shown by fig3, x position drifts. Since the linear velocity is coupled to the
-        pitch angle by eq(1), the pitch angle must be controlled to maintain a constant x velocity. 
+        pitch angle by eq(1), the target pitch angle must be controlled to maintain a constant x velocity. 
+        
 
         \subsubsection{Cascade PID}
 
         The TWSB achieves balance by osculating the pitch angle about the vertical axis. 
-        The lineariezed system of equatiosn in eq(4) is applicable 
+        The linearized system of equations in eq(4) is applicable 
         only when the pitch angle is small, this is taken to be 10 degrees. 
         A target maximum pitch oscitation is set to +-1 degree. 
         The TWSB also needs to be able to move along the $X'$ axis in its inertial frame.
@@ -414,8 +418,6 @@
         If the inner loop dynamics are much faster than the outer loop, 
         then the inner loop can be approximated as a disturbance[].
 
-
-
         In order to determine the maximum operating frequency of the outer loop, 
         the inner motor speed loop is closed at 200Hz and the system is observed.
         
@@ -423,11 +425,8 @@
         are obtained as shown in table(2). This process however may cause damage to the motors 
         during the sustained oscillations at the critical gain. 
        
-        
-
-        
-
-        The frequency response of the transfer function is shown in fig(4) and its closed loop bandwidth is determined to be rads
+        The frequency response of the transfer function is shown in fig(4) 
+        and its closed loop bandwidth is determined to be ... rads
 
         This is then used to obtain the PID gains in table(4) in MATLAB using pole-placement techniques
         \begin{table}[H]
@@ -475,12 +474,14 @@
         \pagebreak{}
         \subsubsection{LQR}
         A Linear Quadratic Regulator (LQR) is used to control the system in 2DOF space.
-        The system is linearized around the operating point given in eq(5) 
-        and the state space representation is given by eq(6).
+        This minimizes 
+        
+       
         Selecting the Q and R matrixes as eq(7) and eq(8) respectively, 
         the K feedback matrix in eq(9) is obtained by solving the Algebraic Riccati
         equation of the discretized system eq(10) in MATLAB.
-
+        sample frequency determine based on rise time of simulated closed loop model. 
+        by Nyquist the system must then be sampled at least 200Hz. 
          
 
     \subsection{Vision System}
@@ -528,8 +529,7 @@
     \subsection{Conclusions}
       \subsection{Future work}
   %%%%%%%%%%%%%%%%%% REFERENCES %%%%%%%%%%%%%%%%%%
-  clearpage % uncomment to start on a new page if wanted
-  \printbibliography[title={References},heading=bibintoc] % a single list of references for the whole thesis
+    \printbibliography[title={References},heading=bibintoc] 
   %%%%%%%%%%%%%%%%%% APPENDICES %%%%%%%%%%%%%%%%%%
   \begin{uomappendix} 
       \section{Code}
