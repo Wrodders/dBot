@@ -10,122 +10,130 @@
 % This is where the document title and author are set. Other details for the title page are set later
 % Note that if/when you edit these you may need to 'Recompile from scratch' to get the changes to display in the PDF. (In Overleaf, select the down arrow to the right of the 'Recompile' button)
 \begin{filecontents*}{\jobname.xmpdata}
-    \Title{Development of Two Wheel Self Balancing Platform for Monocular Vision Based Trajectory Tracking} % title of your thesis
+    \Title{Development of Two Wheel Self Balancing Line Following Robot} % title of your thesis
     \Author{Winston Scott 107067151} % should be student number rather than name to help with annoymous marking
     \Language{en-GB}
     \Copyrighted{True}
     % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
-  \end{filecontents*}
-  %%%%%%%%%%%%%%%%%% DOCUMENT SETUP %%%%%%%%%%%%%%%%%%
-  \documentclass{uom_eee_dissertation_casson} 
-  %%%%%%%%%%%%%%%%%% PACKAGES AND COMMANDS %%%%%%%%%%%%%%%%%%
-  % Packages
-  \usepackage{graphicx,psfrag,color} % for postscript graphics files
-    \graphicspath{ {./DesingImgs/} }
-  \usepackage{amsmath}               % assumes amsmath package installed
-    \allowdisplaybreaks[1]           % allow eqnarrays to break across pages
-  \usepackage{amssymb}               % assumes amsmath package installed 
-  \usepackage{url}                   % format hyperlinks correctly
-  \usepackage{rotating}              % allow portrait figures and tables
-  \usepackage{multirow}              % allows merging of rows in tables
-  \usepackage{lscape}                % allows pages to be typeset in landscape mode
-  \usepackage{tabularx}              % allows fixed width tables
-  \usepackage{verbatim}              % enhanced version of built-in verbatim environment
-  \usepackage{footnote}              % allows more control over footnote environments
-  \usepackage{float}                 % allows H option on floats to force here placement
-  \usepackage{booktabs}              % improve table line spacing
-  \usepackage{lipsum}                % for adding dummy text here
-  \usepackage[base]{babel}           % for proper hypthenation in lipsum sections
-  \usepackage{subcaption}            % for multiple sub-figures in a single float
-  % Add your packages here
-  %\usepackage{pdfcomment}            % for alt text for accessibility
-  \usepackage{booktabs}              % for better looking tables
-  % Then to add images use:
-  % \pdftooltip{\includegraphics[width=0.5\textwidth]{image.pdf}}{Alt-text here}
-  % This makes the text in the image non-select-able though (assuming it's a vector file)
-  
-  % Custom commands
-  \newcommand{\degree}{\ensuremath{^\circ}}
-  \newcommand{\sus}[1]{$^{\mbox{\scriptsize #1}}$} % superscript in text (e.g. 1st)
-  \newcommand{\sub}[1]{$_{\mbox{\scriptsize #1}}$} % subscript in text
-  \newcommand{\sect}[1]{Section~\ref{#1}}
-  \newcommand{\fig}[1]{Fig.~\ref{#1}}
-  \newcommand{\tab}[1]{Table~\ref{#1}}
-  \newcommand{\equ}[1]{(\ref{#1})}
-  \newcommand{\appx}[1]{Appendix~\ref{#1}}
-  %%%%%%%%%%%%%%%%%% REFERENCES SETUP %%%%%%%%%%%%%%%%%%
-  % Setup your references here. Change the reference style here if wanted
-  \usepackage[style=ieee,backend=biber,backref=true,hyperref=auto]{biblatex}
-  % Note backref=true adds a page number (and hyperlink) to each reference so you can easily go back from the references to the main document. You may prefer backref=false if you need to stick strictly to a given reference style
-  % Fixes which can't be applied in the .cls file
-  \DefineBibliographyStrings{english}{backrefpage = {cited on p\adddot},  backrefpages = {cited on pp\adddot}}
-  %  \renewcommand*{\bibfont}{\large}
-  % Add more .bib files here if wanted
-  \addbibresource{References.bib}
-  
-  %%%%%%%%%%%%%%%%%% START DOCUMENT %%%%%%%%%%%%%%%%%%
-  % Don't edit these lines, title and author are automatically taken from the document meta-data defined above
-  \begin{document}
-  \makeatletter
-  \title{\xmp@Title}
-  \studentid{\xmp@Author}
-  \makeatother
-  
-  % Set the below yourself
-  \course{Mechatronics and Robotics Engineering}  % "Master of Science in" is added automatically
-                                                     % Our courses are: Advanced Control and Systems Engineering, Advanced Control and Systems Engineering with Extended Research, Communications and Signal Processing, Communications and Signal Processing with Extended Research, Electrical Power Systems Engineering, Advanced Electrical Power Systems Engineering, Renewable Energy and Clean Technology, Renewable Energy and Clean Technology with Extended Research
-  \submitdate{2025}                                  % regulations ask only for the year, not month
-  \wordcount{1000}		                            % use \wordcount{} to set the count, \thewordcount to print in the text
-  \maketitle
+    \end{filecontents*}
+    %%%%%%%%%%%%%%%%%% DOCUMENT SETUP %%%%%%%%%%%%%%%%%%
+    \documentclass{uom_eee_dissertation_casson} 
+    %%%%%%%%%%%%%%%%%% PACKAGES AND COMMANDS %%%%%%%%%%%%%%%%%%
+    % Packages
+    \usepackage{graphicx,psfrag,color} % for postscript graphics files
+        \graphicspath{ {./images/} }   % where to look for images
+    \usepackage{amsmath}               % assumes amsmath package installed
+        \allowdisplaybreaks[1]         % allow eqnarrays to break across pages
+    \usepackage{amssymb}               % assumes amsmath package installed 
+    \usepackage{url}                   % format hyperlinks correctly
+    \usepackage{rotating}              % allow portrait figures and tables
+    \usepackage{multirow}              % allows merging of rows in tables
+    \usepackage{lscape}                % allows pages to be typeset in landscape mode
+    \usepackage{tabularx}              % allows fixed width tables
+    \usepackage{verbatim}              % enhanced version of built-in verbatim environment
+    \usepackage{footnote}              % allows more control over footnote environments
+    \usepackage{float}                 % allows H option on floats to force here placement
+    \usepackage{booktabs}              % improve table line spacing
+    \usepackage{lipsum}                % for adding dummy text here
+    \usepackage[base]{babel}           % for proper hypthenation in lipsum sections
+    \usepackage{subcaption}            % for multiple sub-figures in a single float
+    % Add your packages here
+    %\usepackage{pdfcomment}            % for alt text for accessibility
+    \usepackage{booktabs}              % for better looking tables
+    % Then to add images use:
+    % \pdftooltip{\includegraphics[width=0.5\textwidth]{image.pdf}}{Alt-text here}
+    % This makes the text in the image non-select-able though (assuming it's a vector file)
+    
+    % Custom commands
+    \newcommand{\degree}{\ensuremath{^\circ}}
+    \newcommand{\sus}[1]{$^{\mbox{\scriptsize #1}}$} % superscript in text (e.g. 1st)
+    \newcommand{\sub}[1]{$_{\mbox{\scriptsize #1}}$} % subscript in text
+    \newcommand{\sect}[1]{Section~\ref{#1}}
+    \newcommand{\fig}[1]{Fig.~\ref{#1}}
+    \newcommand{\tab}[1]{Table~\ref{#1}}
+    \newcommand{\equ}[1]{(\ref{#1})}
+    \newcommand{\appx}[1]{Appendix~\ref{#1}}
+    %%%%%%%%%%%%%%%%%% REFERENCES SETUP %%%%%%%%%%%%%%%%%%
+    % Setup your references here. Change the reference style here if wanted
+    \usepackage[style=ieee,backend=biber,backref=true,hyperref=auto]{biblatex}
+    % Note backref=true adds a page number (and hyperlink) to each reference so you can easily go back from the references to the main document. You may prefer backref=false if you need to stick strictly to a given reference style
+    % Fixes which can't be applied in the .cls file
+    \DefineBibliographyStrings{english}{backrefpage = {cited on p\adddot},  backrefpages = {cited on pp\adddot}}
+    %  \renewcommand*{\bibfont}{\large}
+    % Add more .bib files here if wanted
+    \addbibresource{References.bib}
+    
+    %%%%%%%%%%%%%%%%%% START DOCUMENT %%%%%%%%%%%%%%%%%%
+    % Don't edit these lines, title and author are automatically taken from the document meta-data defined above
+    \begin{document}
+    \makeatletter
+    \title{\xmp@Title}
+    \studentid{\xmp@Author}
+    \makeatother
+    
+    % Set the below yourself
+    \course{Mechatronics and Robotics Engineering}  % "Master of Science in" is added automatically
+                                                    % Our courses are: Advanced Control and Systems Engineering, Advanced Control and Systems Engineering with Extended Research, Communications and Signal Processing, Communications and Signal Processing with Extended Research, Electrical Power Systems Engineering, Advanced Electrical Power Systems Engineering, Renewable Energy and Clean Technology, Renewable Energy and Clean Technology with Extended Research
+    \submitdate{2025}                               % regulations ask only for the year, not month
+    \wordcount{1000}		                    % use \wordcount{} to set the count, \thewordcount to print in the text
+    \maketitle
 
-  %%%%%%%%%%%%%%%%%% LISTS OF CONTENT %%%%%%%%%%%%%%%%%%
-  \uomtoc
-  % other lists are not required, but can include \uomlof and \uomlot if really want to
+    %%%%%%%%%%%%%%%%%% LISTS OF CONTENT %%%%%%%%%%%%%%%%%%
+    \uomtoc
+    % other lists are not required, but can include \uomlof and \uomlot if really want to
 
-  %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
-  \begin{abstract} % put abstract here. Limit is 1 page.
+    %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
+    \begin{abstract} % put abstract here. Limit is 1 page.
     The highly dynamic Two Wheel Self Balancing Robot 
-    (TWSB) has a large exploration space for high level 
+    (TWSB) has a large exploration space for developing high level 
     control strategies. 
-    This reports presents an autonomous line racing TWSB utilizing 
-    a monocular vision system on low cost hardware. 
-    Cascaded PID and LQR controllers 
-    are explored as a SISO and MIMO control strategies. 
-    Discussion on software architecure 
-    for rapid develoepemtn on  emmbeded platoforms is also presented. 
-    An efficient line tracking algorithm is developed based 
-    on the SNR of a curvilinear transformation of the image, 
-    and is compared with common classical computer vision approaches.
-    The system is tested in a variety of conditions 
-    and demonstrates robustness to disturbances 
-    and can suitably track a line at high speeds.
+    This report presents the design decisions and algorithms developed for
+    an autonomous line racing TWSB robot utilizing a monocular vision system with low cost hardware. 
+    System identifications techniques are used to explore
+    cascaded PID and LQG control strategies.
+    A trajectory generation algorithm is proposed based on drivability, confidence 
+    and prominence of the detected line from a camera used as an intensity sensor. 
+    The performance of the the system is shown to be robust to different race tracks which
+    surface texture variation, lighting conditions, high speed straights and tight curves. 
+
     \begin{figure}[H]
-    \includegraphics[height=\textwidth]{bBot ISO Drawing v3.pdf}
-    \caption{3D CAD Render of the TWSB system}
+    \centering
+    \includegraphics[width=\textwidth]{CurveSequence.pdf}
+    \caption{Tracking a tight chicane at high speed}
     \end{figure}
 
   \end{abstract}%
   \clearpage
   %%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
-  \section{Introduction}
-    The TWSB system is an example of a non-linear, under-actuated system which is inherently unstable[1].
-    Compared to a differential drive platform, the TWSB's dynamics are more complex, enabling a 
-    wider range of high level robotic behaviors to be explored.
-    The extra degree of freedom 
-    presents some challenges when vision based control strategies are used. 
-    Techniques from  and [] from the field of quad-rotor attitude control are explored to minimize the effect 
-    of the fundamental instability of the system.
+    \section{Introduction}
+    The TWSB system is an example of a non-linear, under-actuated system that is inherently unstable.
+    Compared to a differential drive mobile platform, the TWSB's dynamics are more complex as
+    it is fundamentally a 3D system. Control of this extra degree of freedom enables a wider range 
+    of autonomous behaviors to be explored. Significant research, both in simulation[][] and application[][][] 
+    has been done on the similarly unstable 1DOF inverted pendulum on a cart as a bench mark for control techniques \cite{boubaker2013inverted}. 
+    Its low degree of freedom however is a limitation for real world applications like the service industry, 
+    which is dominated by wheeled robots. Whilst recently bipeds[][][] have gained attention 
+    due to the purposed ability to ingrate in human centric environments, 
+    their autonomous navigation is still an area of active research[]. 
+    
+    The TWSB robot finds a middle ground between the simplify of planar wheeled robots and the
+    behavioral complexity of bipeds.Its low cost and high mobility make is a suitable platform 
+    for research in the field of mobile robotics.
+    
+    Amongst the early works on the TWSB system,\cite{grasser2002joe} achieved teleoperation on flat ground. 
+    This was implemented using a FPGA based DSP system, which by decoupling the balancing and steering torques 
+    state-space control  is able to effectively navigating and turn on the spot. 
+    \cite{kim2005dynamic} formulates a higher fidelity dynamical model of the wheel inverted pendulum, 
+    using Kane's method in 3DOF space, and considers the limitations on performance of the robot on an 
+    inclined plane based on its physical design.[]'s model accounts for the coriolis effect arising by nature of rotation about the Z axis, or yaw rate. 
+    Advances in price-to-performance of emmbeded systems and breakthroughs in MEMS sensors \cite{MEMS} have since allowed 
+    \cite{diaz2023ros} \cite{juang2013design} \cite{} to similarly obtain remote control of the TWSB system using a low powered microcontroller.
+    With a stable mobile platform and available computational resources, many works
+    
+    This paper presents the design of a TWSB robotic platform, capable of autonomously navigating indoor line track. 
+    The line is taken to be of a significant contrast to the environment and computer vision algorithms are used to 
+    locate it. A racing algorithm is proposed based on 3 key metrics of the line; drivability, confidence and prominence.
 
-    This paper presents the design of a TWSB robotic platform, its suitability for further research on 
-    mobile robotics is validated by line tracking using a monocular vision system.
-    The system is designed to be low cost and easily assembled whilst providing suitable protection, 
-    as testing of aggressive racing lines may lead to large forces on the system, fig(1)
-
-    Amongst the early works on the TWSB system,[1] achieved teleoperation on flat ground. 
-    This was implemented using a FPGA based DSP system. 
-    Advances in price to performance of emmbeded systems and MEMS sensors have since allowed 
-    [][][] to similarly obtain remote control of the TWSB system using a low powered microcontroller.
-    With a stable mobile platform and available computational resources, higher levels of autonomy can be developed. 
     [] Utilizes a camera as a matrix of binary intensity sensors and a rule based algorithm to successful track 
     a line whilst balancing. [] Trained an end to end neural network to perform the same task and [] proposes 
     a convolution neural network based approach which utilizes all of the cameras RDB-D data to be able to 
@@ -138,43 +146,41 @@
     Whilst major success has been achieved by linearization of the dynamics of classic inverted pendulum, 
     [][] show that by using non-linear control strategies such as backstepping or sliding mode control
     the system can be made to stabilize on an inclined plane and even limbo under a bar.
+
+
     \pagebreak{}
 
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
-  \pagebreak{}
-  \section{Mathematical Modeling} % edit section heading as appropriate
-    Significant research, both in simulation[][] and application[][][] 
-    has been done on the 1DOF inverted pendulum on a cart as a bench mark for control techniques[]. 
-    This is often used as a baseline model for the TWSB problem however higher order models are 
-    required to capture the dynamics of the TWSB system. [] Explores models of different fidelity 
-    and [] expands on this and developed a 3DOF model by decoupling the system based into 2 controllers which 
-    operate on the yaw and pitch rate independently.
-    \pagebreak{}
+    \section{Mathematical Modeling} % edit section heading as appropriate
     \subsection{DC Motor Model}    
     \begin{figure}[H]
         \centering
-            \includegraphics[width=0.75\textwidth]{DCMotorModel.png}
+            \includegraphics[width=0.75\textwidth]{Diagrams/DcMotorModel.pdf}
         \caption{Gearbox DC Motor Model Diagram}
     \end{figure}
-    The system is driven by two independently voltage controlled DC motors through planetary gearboxes, 
-    as is shown in Fig(2). 
+    The system is driven by two independently voltage controlled DC motors through 
+    planetary gearboxes, as is shown in Fig(2). 
     DC motors execute a torque $t_r$, proportional to the armature current $i_a$,
     when a voltage $V_a$ is applied.
-    The ratio of motors inductance $L_a$ and resistance $R_a$ determine the time constant $\tau_e$ of the motor. 
-    That is the time it takes for $i_a$ to reach 63.2\% of its final value. []
+    The ratio of motors inductance $L_a$ and resistance $R_a$ determine the
+    time constant $\tau_e$ of the motor. That is the time it takes 
+    for $i_a$ to reach 63.2\% of its final value. []
     The gear ratio $n=N_2/N_1$ which amplifies the viscous damping coefficient 
     $B_G$ and the moment of inertia $J_G$ with respect to the motor is obtained by
     $J_{\text{eq}} = J_G + J_r \cdot n^2$ and $B_{\text{eq}} = B_G \cdot n$.
 
-    The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage by the well-known transfer function
+    The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage 
+    by the well-known[] transfer function
     \begin{equation}
         \begin{aligned}
-            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s^2 \cdot L_a R_a +\;s\left(R_a \cdot J_{\mathrm{eq}} +B_{\mathrm{eq}} \cdot L_a \right)+K_t {\cdot K}_e +R_a \cdot B_q }\cdot n
+            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s^2 \cdot L_a R_a +\;s\left(R_a \cdot J_{\mathrm{eq}} +B_{\mathrm{eq}} \cdot L_a \right)+K_t {\cdot K}_e +R_a \cdot B_q }\cdot\frac{1}{n}
         \end{aligned}
     \end{equation}
-    Where $\Omega_w$ is the laplace transform of the output speed, $J_r$ is the moment of inertia of the the rotor.
+    Where $\Omega_w$ is the laplace transform of the output speed, $J_r$ is 
+    the moment of inertia of the the rotor.
     The rotors viscous damping $B_r$ is assumed to be negligible, as is $B_G$. 
-    For small motors, $t\tau_e$ is small hence $L_a << R_a$, [][], and the motor can be approximated as a first order system as
+    For small motors, $t\tau_e$ is small hence $L_a << R_a$, [][], and the motor can be 
+    approximated as a first order system as
     \begin{equation}
         \begin{aligned}
             \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot n}^2 \right)+K_t K_e }\cdot\frac{1}{n}
@@ -186,7 +192,7 @@
     \subsection{2DOF System Model}
 
     \begin{figure}[H]
-        \includegraphics[width=\textwidth]{ModelingDiags.pdf}
+        \includegraphics[width=\textwidth]{Diagrams/ModelingDiags.pdf}
         \caption{2DOF Model}
     \end{figure}
 
@@ -195,7 +201,7 @@
     It however exits in a 3D space, and for the purposes of this paper must be able to rotate about the inertial Z axis. 
     [] Shows that that is possible to separate the steering control from the balance control 
     without linear velocity and direction angular velocity being constrained too much. 
-    [] conducts a 2DOF model of the WIP which  decouples the effect of yaw rate from the pitch rate. 
+   
 
     The system equations of motion in the WIP case are developed through the Lagrangian Method [][][] are shown to be 
     
@@ -206,9 +212,9 @@
    
     \pagebreak{}
 
-    \subsection{System Design}
+    \section{System Design}
         \begin{figure}[H]
-            \includegraphics[width=\textwidth]{bBot Drawing v3.pdf}
+            \includegraphics[width=\textwidth]{DesingImgs/bBot Drawing v3.pdf}
             \caption{CAD Drawing of the TWSB system}
         \end{figure}
 
@@ -217,21 +223,21 @@
         are soft-mounted in a roll cage like housing for protection against impacts. 
         \begin{figure}[H]
             \centering
-            \includegraphics[width=0.45\textwidth]{SystemOverview.pdf}
+            \includegraphics[width=0.55\textwidth]{Diagrams/SystemOverview.pdf}
             \caption{System Overview}
         \end{figure}
 
-        Two brushed DC motors are powered by an H bridge IC 
+        Two brushed DC motors are powered by an H-Bridge IC, DRV7783. 
         The STM32F411RE Microcontroller Unit (MCU) is used to control the 
-        motors and monitor the 6 Axis IMU over I2C. It communicates with the 
-        Raspberry Pi 5 over UART via a custom ASCII protocol discussed in section 3.3. 
-        The system is powered by a a nominal 12V Li ion Battery pack. A USB-C CC-CV charger is used for quick 
+        motors and monitor the 6 Axis Inertial Measurement Unit (IMU) over I2C. It communicates with the 
+        Raspberry Pi 5 over UART via a custom ASCII protocol discussed in section 2.4. 
+        The system is powered by a 12V nominal Li-ion Battery pack. A USB-C CC-CV charger is used for quick 
         and accessible recharging, critical for mobile robotics applications. 
-        Battery Voltage is monitored by the MCU and the pack is protected by a BMS and a 3A poly-fuse.
+        Battery voltage is monitored by the MCU and the pack is protected by a BMS and a 3A poly-fuse.
         A simple circuit adapted from[] is used to safely load share between the battery pack and the charger.
 
         \pagebreak{}
-        \subsubsection{System Identification}
+        \subsection{System Identification}
         A series of experiments are conducted in order to obtain an estimate transfer function of the motors
         
         \begin{table}[H]
@@ -256,13 +262,13 @@
         \begin{figure}[H]
             \centering
             \subfloat{
-                \includegraphics[width=0.3\textwidth]{openstep.pdf}
+                \includegraphics[width=0.3\textwidth]{Graphs/openstep.pdf}
             }
                 \subfloat{
-                \includegraphics[height=0.2\textwidth]{speed_voltage_DCMotor.pdf}
+                \includegraphics[height=0.2\textwidth]{Graphs/speed_voltage_DCMotor.pdf}
             }
             \subfloat{
-                \includegraphics[width=0.3\textwidth]{openChirp.pdf}
+                \includegraphics[width=0.3\textwidth]{Graphs/openChirp.pdf}
             }
             \caption{Open Loop Speed Voltage experiments}
         \end{figure}    
@@ -306,106 +312,136 @@
         The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. 
         Whilst this is a powerful tool, it is deemed too complex for the requirements of this project.
         Nevertheless some core concepts are used such as its 
-        decentralized message pattern shown in fig(7). ZeroMQ[] is used for 
+        decentralized message pattern shown in fig(8). ZeroMQ[] is used for 
         anonymous pub sub style communication between computational nodes.
         \begin{figure} [H]
-            \includegraphics[width=\textwidth]{CommunicationDataPath.pdf}  
-            \caption{InterProcess Communications Data Path}
+            \includegraphics[width=\textwidth]{Diagrams/CommunicationDataPath.pdf}  
+            \caption{Inter-process Communications Data Path}
         \end{figure}
 
-        The software is managed by systemd through services. 
-        Several self-diagnosis tools are used for resource monitoring and auto recovery. 
-        For example, both the MCU and the CPU monitor each other using reset watchdog timers.
-        Programs implement a runtime Remote Procedure Call (RPC) ASCII interface using 
+        The software, written in C++17, is managed by systemd as services[]. 
+        Self-diagnosis routines are used for resource monitoring and auto recovery. 
+        Programs implement a Remote Procedure Call (RPC) ASCII interface using 
         a GET/SET/RUN pattern operating on runtime parameters. 
         This significantly reduces the compile/flash/debug iteration time. 
-        A GStreamer pipeline sets up an RSTP video server which can be accessed on the network.
-        Core functionality is implemented in C++17. 
+        A GStreamer pipeline sets up an RSTP video server accessible over LAN.
+        OpenCV is used for optimized image processing.
         \begin{figure} [H]
-            \includegraphics[width=\textwidth]{FirmwareArch.pdf}
+            \includegraphics[width=\textwidth]{Diagrams/FirmwareArch.pdf}
             \caption{Firmware Architecture}
         \end{figure}
 
         Key components of the firmware are shown in Fig(9).
-        It is implemented in c99 using the libopencm3 project[]. 
+        It is implemented in c99 using CIMIS register definitions from the 
+        libopencm3 project[] as an exercise in low level programming. 
+        The resultant binary is 19KB with 892B of RAM used.
+        No dynamic memory allocation is used.
+        A simplified sprintf function from [] is the only external dependency.
         The MCU also presents the same RPC ASCII interface over serial.
-        The super-loop executes commands at 20Hz, 
-        and publishes its state at 100Hz.
+        which executes commands at 100Hz, and publishes telemetry at 50Hz.
 
-        The data-aquististion system obtains a timestamped sample of the TWSB state 
-        and telemetry values sampled by the MCU through the serial link.
-        This results in non-uniformly sampled data. Parsing the UART IO buffer 
-        is constrained by the scheduler. An event driven system is used to minimize CPU overhead.   
+        The data-aquististion system obtains a timestamped sample of the TWSB 
+        telemetry values transmitted by the MCU through a serial link.
+        This can result in non-uniformly sampled data as parsing the UART IO buffer 
+        is constrained by the OS scheduler, thus an event driven system is used to minimize CPU overhead.   
         Worst case jitter is observed, under CPU stress tests[] to be 0.1ms. 
         This is acceptable for telemetry data. 
         \pagebreak{}
-    \subsection{State Estimation}
-    Information about as system may be obtained by 2 types of sources, 
-    mathematical models models as in eq(1) which can describe the time evolution of the chosen system variables 
-    and sensors converts energy due to a physical property into information[]. Both of which are approximation of the true state. 
-    The errors in these approximations is termed noise. [] postulates that there exits a difference between superposition 
-    of random noise sources and external distances or, interference and as such their effects should be considered and treated separately.
-    This is analogous to the separation principle in control theory[]. 
+    \section{State Estimation}
+    Information about a system may be obtained from 2 types of sources; 
+    mathematical models models as in eq(1) which can describe the time evolution of the chosen system variables, 
+    and sensors that convert energy arising from a physical property into information[]. Both of which are approximation of the true state. 
+    The process of combining multiple sources of information is termed sensor fusion.
 
-    \subsubsection{Sensors Overview}
-        For the TWSB system in eq(6) its state variables $\theta$ and $\dot x_b$ can be measured by the onboard IMU and the encoders.
-        The motors incorporate a low cost 12 pulses per revolution quadrature encoder. This is of poor resolution as compared wth the
-        the 5000 pulses per revolution encoders used in []. The hardware decoder peripheral on the STM32F411RE
+    \subsection{Sensors Overview}
+        For the TWSB system in eq(6) its state variables $\theta$ and $\dot x_b$ can be measured by the onboard IMU and the wheel encoders.
+        The motors incorporates a low cost 12 pulses per revolution (ppr) quadrature encoder. The hardware decoder peripheral on the MCU
         is used to increment the pulse count and the rotational speed is updated at each step of a fixed rate loop[].
         
-        The IMU is a 6 axis MEMS sensor[] which measures the linear acceleration and angular velocity of the system in its frame. 
-        The resultant 3D acceleration $\vec{a}$ is used to obtain an 
-        estimate of the pitch angle as $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$
+        The IMU is a 6 axis MEMS sensor[] which measures the local linear acceleration 
+        and angular velocity.
+        The 3D acceleration $\vec{a}$ is used to obtain an 
+        estimate of the pitch angle as $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$. 
 
-        The variance of this estimate is small when the system is at rest, but grows larger when subject to vibration from the motors
-        as shown by the experiment in fig(6) where the TWSB placed horizontal at rest and motor control commands are issued. 
-        
-        Contrastingly an estimate as obtained by the corresponding 3D angular velocity vector is less sensitive to noise,[] 
-        but is subject to drift. 
+        The variance of this$\hat{\theta}$ is small when the system is at rest, but grows larger when subject to vibration from the motors
+        as shown by the experiment in fig(6) where the TWSB is placed horizontally at rest and motor control commands are issued. 
         \begin{figure}[H]
             \centering
-            \includegraphics[width=0.75\textwidth]{accelNoiseModeling.pdf}
-            \caption{Noise Characteristics of accelerometer}
+            \includegraphics[width=0.55\textwidth]{Graphs/accelNoiseModeling.pdf}
+            \caption{Motors induce high frequency noise in the accelerometer}
         \end{figure}
-        The Kalman Filter (KF) and its variants are widely used in robotics to fuse 
+
+        From Fig(10) it can be seen that the IMU is not mounted perfectly orthogonal to the body frame. 
+        This systematic error is removed by utilizing calibrated values in table obtained as per table(3).
+
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{c c c} 
+                \toprule
+                $a_{x_0}$ & $a_{y_0}$ & $a_{z_0}$ \\
+                \midrule
+                0.036453 & -0.0021066 & 0.133658 \\
+                \bottomrule
+            \end{tabular}
+            \caption{Accelerometer Mounting Offset (m/s$^{2}$)}
+        \end{table}
+        
+        
+        \pagebreak{}
+        \subsection{Kalman Filter}
+        The Kalman Filter (KF) and its variants[][][] are widely used in robotics to fuse 
         complementary sources of information[]. 
-        The ordinary KF is applicable to linear systems, under the assumptions that the
-        measurements are Gaussian and uncorrelated.[]
+        The ordinary KF is applicable to linear systems, as a type of Bayesian filter, 
+        the discreet representation of the KF represents current belief $bel(x_k)$ around the true state,
+        as a Gaussian whose distribution is parameterized by its mean $\mu_k$ and covariance matrix $P_k$ []. 
+
+        A new measurement is observed at each timestamp through the linear function $z_k = C_k x_k + R_k$. 
+        The measurement model $C_k$ is used to map the true state into the measurement space.
+        Here the process and measurement noise are Gaussian with zero mean and covariance $Q_k$ and $R_k$ respectively. 
+        The Kalman Gain computed by $ K_k = \bar{P_k} C_k^T \left(C_k \bar{P_k} C_k^T + R_k \right)^{-1}$, 
+        provides the optimal weighting between the beliefs from the prediction (4a) and measurement (4b). 
+     
+        \begin{subequations}
+            \begin{equation}
+                \bar{bel}(x_k) = \begin{cases}
+                        \bar{\mu}_k = F_k \mu_{k-1} + G_k u_k \\
+                        \bar{P}_k = F_k P_{k-1} F_k^T + Q_k
+                        \end{cases}
+                \end{equation}
+            \begin{equation}
+            bel(x_k) = \begin{cases}
+                \mu_k = \bar{\mu}_k + K_k \left(z_k - C_k \bar{\mu}_k \right) \\
+                P_k = \left(I - K_k C_k \right) \bar{P}_k
+            \end{cases}
+            \end{equation}
+
+        \end{subequations}
+
 
         Even though the state transition model of the TWSB robot is non-linear, 
-        [][] show that the linear KF produces a suitably accurate estimate, enabling the robot to balance ± 1 degree.
-        This one order of magnitude than the worst case pitch limit from (equation). Beyond this, the small angle approximation is no longer valid, 
-        and the system is not locally linear. 
-        As a type of Bayesian filter, the KF represents current belief, or a posteriori state estimate $\hat{x}_k$,
-        as a Gaussian whose distribution is parameterized by its mean vector ($\mu_k$) and covariance matrix $\Sigma_k$[]. 
-        The KF is a recursive estimator which uses a linear dynamical model of the system, †
-        given the a priori belief $\hat x_{k-1}$ the current measurement $z_k$ and the control input $u_k$ 
-        to obtain a estimate state as at the $\hat\{x_{{k+1}| k}$ given
-
-
-        \begin{equation}
-            \hat{x^-}_{k} = A_k \hat{x}_{k|k-1} + B_k u_k
-        \end{equation}
-        
-        [] and [] rely purely on a model of the IMU 
-        to obtain an estimate of $\theta$. 
-        While [] implements an LQG controller which uses a model similar to eq(1) to obtain an estimate of the full state.
-        After and initial estimate of the state $\hat x_0,0$ is obtained the system is observed and 
-        for each measurement $z_n$ at sample period $T_s$ an estimate of the current state $\hat x_n,n$ is obtained.
-        The next state estimate $\hat x_n,n+1$ is predicted by the dynamical model of the system.
-
+        [][] developed self balancing platforms capable of restricting oscillations about the 
+        operating point to ±1 degree, indicating the suitability of a linear model for the TWSB system. 
+        This one order of magnitude than the worst case pitch limit from (equation). Beyond this, the 
+        small angle approximation is no longer valid, and the system is not locally linear. 
+        fig(11) shows that the Kalman Filter's produces a smooth estimate of the pitch angle
+        for the experiment described in figure(10). It is observed that the angular momentum built up 
+        from the wheels is sufficient to disturb the system from rest, 
+        when there is a large change in set point; $k \approx [170, 380, 580]$
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.5\textwidth]{Graphs/SensorFusion.pdf}
+            
+            \caption{Sensor Fusion of accelerometer and gyroscope}
+        \end{figure}
 
 
         \pagebreak{}
-    \subsection{Control System}
-
-        A simple PID controller operating on the pitch error is often enough to stabilize one 
-        of the systems dynamic variables[].
+    \section{Control System}
+        A simple PID controller operating on the pitch error is often enough to mantain the TWSB balance.
         However as shown by fig3, x position drifts. Since the linear velocity is coupled to the
         pitch angle by eq(1), the target pitch angle must be controlled to maintain a constant x velocity. 
-        
 
-        \subsubsection{Cascade PID}
+        \subsection{Cascade PID}
 
         The TWSB achieves balance by osculating the pitch angle about the vertical axis. 
         The linearized system of equations in eq(4) is applicable 
@@ -452,27 +488,27 @@
         The final cascaded closed loop pid controller is shown in fig(5) with the gains in table(5)
 
         \begin{figure}[H]
-            \includegraphics[width=\textwidth]{CascadedPID.pdf}
+            \includegraphics[width=\textwidth]{Diagrams/cascade.pdf}
             \caption{Cascaded PID Controller}
         \end{figure}
 
         \begin{table}[H]
             \centering
-            \begin{tabular}{|r|r|r|r|c|c|c}
+            \begin{tabular}{|r|r|r|r|c|c|c|c}
                 \hline
-                & \multicolumn{4}{c|}{Process Variable}  \\
+                & \multicolumn{5}{c|}{Process Variable}  \\
                 \hline
-                Parameter & $v_b$ & $\theta$  & $\omega_L$ & $\omega_R$ \\
+                Parameter & $v_b$ & $\theta$  & $\omega_L$ & $\omega_R$ & $\dot{\psi_b}$ \\
                 \hline      
-                $K_p$ & 0.1 & 0.1 & 0.1 & Nm \\
-                $K_i$ & 0.01 & 0.01 & 0.01 & Nms \\
-                $K_d$ & 0.01 & 0.01 & 0.01 & Nm/s \\
+                $K_p$ & 2.2 & 0.19 & 2.4 & 2.9 & 0.8 \\
+                $K_i$ & 0.8 & 5.6 & 24.8 & 24.8 & 2\\
+                $K_d$ & 0 & 0.003 & 0 & 0  &  0\\
                 \hline
             \end{tabular}
             \caption{PID Gains}
         \end{table}
         \pagebreak{}
-        \subsubsection{LQR}
+        \subsection{LQR}
         A Linear Quadratic Regulator (LQR) is used to control the system in 2DOF space.
         This minimizes 
         
@@ -482,42 +518,31 @@
         equation of the discretized system eq(10) in MATLAB.
         sample frequency determine based on rise time of simulated closed loop model. 
         by Nyquist the system must then be sampled at least 200Hz. 
-         
 
-    \subsection{Vision System}
-        \subsubsection{Curvilinear Transformation}
-        The planar two wheel self balancing robot, now modeled as a point P, subject to the differential drive constraints, 
-        can be instantaneously described as following some segment or radius r. This arc segment forms part of a continuous spline. 
-        The curvature of the spline is given by the inverse of the radius of the circle that best fits the arc segment.
-        Where a positive curvature indicates a right turn and a negative curvature indicates a left turn.
-        The forward direction is x, and left if y. using the side of the angle between the robots heading and the observed center line can be used as the derivative term.
-        adding the curvature K, 
-            \subsubsection{Camera Calibration}
-            \begin{figure}
-            \includegraphics[width=\textwidth]{PinHoleModel.pdf}
-            \caption{Pin Hole Camera Model}
-            \end{figure}
-
-            \subsubsection{IMU Based Software Stabilization Methods}
-            \subsubsection{Perspective Transformation}
-            \begin{figure}
-            \includegraphics[width=\textwidth]{VisionPipelineRes.png}
-            \end{figure}
-            \subsubsection{Polynomial Fitting}
-            \subsubsection{Trajectory Generation}
-
-    \subsection{Trajectory Tracking}
-        \subsubsection{Pure Persuit}
-        \begin{figure}
-            \includegraphics[width=\textwidth]{PurePersuit.pdf}
-            \caption{Pure Pursuit Algorithm}
-        \end{figure}
-        \subsubsection{Model Predictive Control}
+        \pagebreak{}
+    \section{Vision System}
+    \begin{figure}[H]
+        \centering
+        \begin{subfigure}[c]{0.35\textwidth}  % Make this a bit smaller
+            \centering
+            \rotatebox{90}{\includegraphics[height=\textwidth]{TrajTrak.jpeg}}  % Increase height for better visibility
+            \caption{Race Track}
+        \end{subfigure}
+        \hspace{0.05cm}  % Adds horizontal space between the subfigures
+        \begin{subfigure}[c]{0.6\textwidth}  % Adjusted width to match
+            \centering
+            \includegraphics[width=\textwidth]{Graphs/DeadReckoningTrackMap.pdf}
+            \caption{Map built offline using dead reckoning}
+        \end{subfigure}
+        \caption{Trajectory Tracking and Map Visualization}
+    \end{figure}
+    
+    
+    \pagebreak{}
 
 
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
   \section{Results and discussion} % edit section heading as appropriate
-    \subsection{Introduction}
     \subsection{Balance Performance}
     \includegraphics[width=\textwidth]{V1Colated.png}
     \subsection{Operational Robustness}
