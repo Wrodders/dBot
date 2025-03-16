@@ -1,6 +1,6 @@
-    \Title{Development of Two Wheel Self Balancing Platform for Monocular Vision Based Trajectory Tracking} % title of your thesis
-    \Author{Winston Scott 107067151} % should be student number rather than name to help with annoymous marking
-    \Language{en-GB}
-    \Copyrighted{True}
-    % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
-  
+     \Title{Development of Two Wheel Self Balancing Line Following Robot} % title of your thesis
+     \Author{Winston Scott 107067151} % should be student number rather than name to help with annoymous marking
+     \Language{en-GB}
+     \Copyrighted{True}
+     % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
+ 

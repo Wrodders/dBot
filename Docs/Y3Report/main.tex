@@ -9,15 +9,17 @@
 %%%%%%%%%%%%%%%%%% META DATA SETUP %%%%%%%%%%%%%%%%%%
 % This is where the document title and author are set. Other details for the title page are set later
 % Note that if/when you edit these you may need to 'Recompile from scratch' to get the changes to display in the PDF. (In Overleaf, select the down arrow to the right of the 'Recompile' button)
-\begin{filecontents*}{\jobname.xmpdata}
-    \Title{Development of Two Wheel Self Balancing Line Following Robot} % title of your thesis
-    \Author{Winston Scott 107067151} % should be student number rather than name to help with annoymous marking
-    \Language{en-GB}
-    \Copyrighted{True}
-    % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
-    \end{filecontents*}
+\IfFileExists{\jobname.xmpdata}{}{
+  \begin{filecontents*}{\jobname.xmpdata}
+       \Title{Development of Two Wheel Self Balancing Line Following Robot} % title of your thesis
+       \Author{Winston Scott 107067151} % should be student number rather than name to help with annoymous marking
+       \Language{en-GB}
+       \Copyrighted{True}
+       % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
+   \end{filecontents*}
+}
     %%%%%%%%%%%%%%%%%% DOCUMENT SETUP %%%%%%%%%%%%%%%%%%
-    \documentclass{uom_eee_dissertation_casson} 
+    \documentclass[12pt]{uom_eee_dissertation_casson} 
     %%%%%%%%%%%%%%%%%% PACKAGES AND COMMANDS %%%%%%%%%%%%%%%%%%
     % Packages
     \usepackage{graphicx,psfrag,color} % for postscript graphics files
@@ -61,7 +63,7 @@
     \DefineBibliographyStrings{english}{backrefpage = {cited on p\adddot},  backrefpages = {cited on pp\adddot}}
     %  \renewcommand*{\bibfont}{\large}
     % Add more .bib files here if wanted
-    \addbibresource{References.bib}
+    \addbibresource{references.bib }
     
     %%%%%%%%%%%%%%%%%% START DOCUMENT %%%%%%%%%%%%%%%%%%
     % Don't edit these lines, title and author are automatically taken from the document meta-data defined above
@@ -107,47 +109,74 @@
   %%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
     \section{Introduction}
     The TWSB system is an example of a non-linear, under-actuated system that is inherently unstable.
-    Compared to a differential drive mobile platform, the TWSB's dynamics are more complex as
-    it is fundamentally a 3D system. Control of this extra degree of freedom enables a wider range 
-    of autonomous behaviors to be explored. Significant research, both in simulation[][] and application[][][] 
-    has been done on the similarly unstable 1DOF inverted pendulum on a cart as a bench mark for control techniques \cite{boubaker2013inverted}. 
-    Its low degree of freedom however is a limitation for real world applications like the service industry, 
-    which is dominated by wheeled robots. Whilst recently bipeds[][][] have gained attention 
-    due to the purposed ability to ingrate in human centric environments, 
-    their autonomous navigation is still an area of active research[]. 
+    Compared to the differential drive mobile platform, the TWSB's has to to exert constant torque 
+    control to maintain itself upright whilst moving and when its stationary. An order of complexity 
+    above the TWSB are quadrotors, which have to maintain attitude in 6 DOF space.  
+    Significant research, both in simulation[][] and application[][]
+    has been done on the similarly unstable 1DOF inverted pendulum on a cart, as a bench mark 
+    for control techniques \cite{boubaker2013inverted}.By restricting the TWSB to 
+    only 2DOF space similar behaviors to that of the inverted pendulum can be controlled.
+    The TWSB robot is a cost effective platform for research in on higher complexity control strategies 
+    less commonly applied wheeled robots.[][] 
+
+    As such, control of this unstable degree of freedom enables a wider range 
+    of autonomous behaviors to be explored \cite{RoboLimbo} \cite{jeong2008wheeled} \cite{Browning2004TurningSI}. 
+    These require the system to be built around a hierarchical level of abstraction, 
+    where the planning and navigation algorithms are decoupled from the low-level stability control of the system.
+
+    Amongst the early works on the TWSB system \cite{grasser2002joe} designed a TWSB robot 
+    and capable of disturbance rejection and static stability on an inclined plane.
+    This was implemented using a FPGA based DSP system, which by decoupling the balancing and steering torques in
+    state-space, and LQR controller regulates the motors torque allowing intuitive linear velocity 
+    and angular rate references to be used to navigate by teleoperation.
     
-    The TWSB robot finds a middle ground between the simplify of planar wheeled robots and the
-    behavioral complexity of bipeds.Its low cost and high mobility make is a suitable platform 
-    for research in the field of mobile robotics.
+    Advances in price-to-performance of emmbeded systems and in low cost inertial MEMS sensors \cite{MEMS} 
+    have since allowed \cite{juang2013design} \cite{Velazquez2016VelocityAM} similarly 
+    obtain remote control of the TWSB system using a low powered microcontroler.
+    This is achieved by using a cascaded PID controller  of similar nature to the 
+    ones commonly used in quadrotors control[]
+
+    The recent interest in reinforcement leaning has also been applied to the TWSB system \cite{kober2013reinforcement}. 
+    The proposed neural networks act as non linear function approximations to the systems dynamics. These methods 
+    are shown to be robust to unmolded dynamics \cite{guo2021optimal}.By using brushless motors, 
+    which lead themselves torque control when used in direct drive systems are able to achieve a
+    regulating the pitch angle of the TWSB system,
+    using a PID controller, whist minimizing position drifts which arise at the instant of 
+    non load induced by the backlash resulting in vibrations when balancing on the spot. 
+
+    In mobile robotics, the ability to navigate requires osm from of perception. LIDARs are common as the information 
+    they encode lend naturally to path planning algorithms such as [][]. Another common multimodal 
+    sensors is the CMOS camera, which measures intensity of light at each pixel, and in stereo can be used
+    to efficiently infer depth[] and is a suitable alternative to a point-cloud obtained by lidar. Monocular 
+    vision systems are desired due to their simplicity however the redundancy of the stereo vision pair is 
+    beneficial in safety critical applications[]. Both these sensors provide a rich information 
+    about he environment which can be used to develop  long term path planning algorithms. 
     
-    Amongst the early works on the TWSB system,\cite{grasser2002joe} achieved teleoperation on flat ground. 
-    This was implemented using a FPGA based DSP system, which by decoupling the balancing and steering torques 
-    state-space control  is able to effectively navigating and turn on the spot. 
-    \cite{kim2005dynamic} formulates a higher fidelity dynamical model of the wheel inverted pendulum, 
-    using Kane's method in 3DOF space, and considers the limitations on performance of the robot on an 
-    inclined plane based on its physical design.[]'s model accounts for the coriolis effect arising by nature of rotation about the Z axis, or yaw rate. 
-    Advances in price-to-performance of emmbeded systems and breakthroughs in MEMS sensors \cite{MEMS} have since allowed 
-    \cite{diaz2023ros} \cite{juang2013design} \cite{} to similarly obtain remote control of the TWSB system using a low powered microcontroller.
-    With a stable mobile platform and available computational resources, many works
-    
-    This paper presents the design of a TWSB robotic platform, capable of autonomously navigating indoor line track. 
+    This paper presents the design of a TWSB robotic platform, capable of autonomously navigating an indoor line track. 
     The line is taken to be of a significant contrast to the environment and computer vision algorithms are used to 
     locate it. A racing algorithm is proposed based on 3 key metrics of the line; drivability, confidence and prominence.
 
-    [] Utilizes a camera as a matrix of binary intensity sensors and a rule based algorithm to successful track 
-    a line whilst balancing. [] Trained an end to end neural network to perform the same task and [] proposes 
-    a convolution neural network based approach which utilizes all of the cameras RDB-D data to be able to 
+    \cite{visionlinetwsb} Utilizes a camera as a matrix of binary intensity sensors 
+    and a rule based algorithm to  follow a line whilst balancing. A similar method by \cite{ghani2011two} uses 
+    infrared sensors. \cite{nntwsbvison} trained an end to end neural network to perform the same task and [] proposes 
+    a convolution neural network based approach which utilizes and RDB-Depth camera's data to be able to 
     autonomously navigate with human-centric social behavior. 
-    To the same end, [][][] develop wheeled robot navigation and realtime lane segmentation using 
+    To the same end, [] develops planar wheeled robot navigation algorithms through lane segmentation using 
     geometric computer vision techniques. 
-    [][] build a online data driven model of the mobile system and emmbeded it in a Model Predictive Controller (MPC). 
-    This adaptive control strategy is shown to be robust to un-modeled environment and plant dynamics, 
-    allowing for autonomous aggressive maneuvers. 
+
     Whilst major success has been achieved by linearization of the dynamics of classic inverted pendulum, 
-    [][] show that by using non-linear control strategies such as backstepping or sliding mode control
-    the system can be made to stabilize on an inclined plane and even limbo under a bar.
-
-
+    \cite{AdvancedWIP} explores using non-linear control strategies such as backstepping or sliding mode control.
+    [][] build a online data driven model of a mobile system and emmbeded it in a Model Predictive Controller (MPC). 
+    This adaptive control strategy is shown to be robust to un-modeled environment and plant dynamics, 
+    allowing for autonomous aggressive maneuvers along a mapped track.
+    
+    This project explores the cascaded PID and LQR control strategies for balancing and stabilizing 
+    the TWSB system at its operating configuration. The robot algorithmically infers and follows an unknown line 
+    using a monocular camera. Sensor fusion and system identification techniques are used develop a system model 
+    which is used to architect the control system. A hardware in the loop software architecure is 
+    implemented enabling telemetry data and control commands to be exchanged between the robot 
+    and a remote computer. Visualization of this multimodal telemetry data provides simple
+    means to validate performance. 
     \pagebreak{}
 
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
@@ -165,57 +194,112 @@
     The ratio of motors inductance $L_a$ and resistance $R_a$ determine the
     time constant $\tau_e$ of the motor. That is the time it takes 
     for $i_a$ to reach 63.2\% of its final value. []
-    The gear ratio $n=N_2/N_1$ which amplifies the viscous damping coefficient 
-    $B_G$ and the moment of inertia $J_G$ with respect to the motor is obtained by
-    $J_{\text{eq}} = J_G + J_r \cdot n^2$ and $B_{\text{eq}} = B_G \cdot n$.
+    The gear ratio, $n=N_2/N_1$ transmits the torque to the wheel, 
+    where $N_1$ and $N_2$ are the number of teeth on the input and output gears respectively.
+    The equivalent viscous damping 
+    $B_G$ and the moment of inertia $J_G$ with respect to the motor are given by
+    \begin{equation}
+        J_{\text{eq}} = J_G + J_r \cdot n^2 
+    \end{equation}
+    With $J_r$ representing the moment of inertia of the the rotor.
 
     The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage 
-    by the well-known[] transfer function
+    by the well-known transfer function
     \begin{equation}
         \begin{aligned}
             \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s^2 \cdot L_a R_a +\;s\left(R_a \cdot J_{\mathrm{eq}} +B_{\mathrm{eq}} \cdot L_a \right)+K_t {\cdot K}_e +R_a \cdot B_q }\cdot\frac{1}{n}
         \end{aligned}
+        'label{eq:DCMotor}
     \end{equation}
-    Where $\Omega_w$ is the laplace transform of the output speed, $J_r$ is 
-    the moment of inertia of the the rotor.
+    Where $\Omega_w$ is the laplace transform of the output speed, 
     The rotors viscous damping $B_r$ is assumed to be negligible, as is $B_G$. 
-    For small motors, $t\tau_e$ is small hence $L_a << R_a$, [][], and the motor can be 
+    For small motors, $\tau_e$ is small and $L_a << R_a$, [][], hence the motor can be 
     approximated as a first order system as
     \begin{equation}
         \begin{aligned}
-            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + \left(J_G +{J_r \cdot n}^2 \right)+K_t K_e }\cdot\frac{1}{n}
+            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + J_{eq}\cdot n^2+K_t K_e }\cdot\frac{1}{n}
         \end{aligned}
+        \label{eq:DCMotorSimple}
     \end{equation}
 
+    Where $K_t$ is the torque constant of the motor and $K_e$ is the back EMF constant.
+    The parameters of the motor are identified and discussed in section 3.1. 
     \pagebreak{}
 
     \subsection{2DOF System Model}
 
-    \begin{figure}[H]
-        \includegraphics[width=\textwidth]{Diagrams/ModelingDiags.pdf}
-        \caption{2DOF Model}
+    \begin{figure}[h]
+        \centering
+        \begin{subfigure}[b]{0.4\textwidth}
+            \includegraphics[width=\textwidth]{Diagrams/ModelingDiagsWIP.pdf}
+            \caption{Wheeled Inverted Pendulum}
+            \label{fig:WIP}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.4\textwidth}
+            \includegraphics[width=\textwidth]{Diagrams/ModelingDiagsDDMR.pdf}
+            \caption{Differential Drive Mobile Robot}
+            \label{fig:DDMR}
+        \end{subfigure}
+        \caption{Two Degree of Freedom System}
+        \label{fig:2DOF}
     \end{figure}
 
-    The TWSB robot is modeled as two separate 2DOF systems as shown in fig(4), 
+
+    The TWSB robot is modeled as two separate 2DOF systems as shown in \fig{2DOF},
     namely a wheeled inverted pendulum (WIP) and a differential drive robot (DDMR).
-    It however exits in a 3D space, and for the purposes of this paper must be able to rotate about the inertial Z axis. 
-    [] Shows that that is possible to separate the steering control from the balance control 
-    without linear velocity and direction angular velocity being constrained too much. 
-   
+    It however exits in a 3D space, and for the purposes of this report must be able to rotate about the inertial Z axis. 
+    \cite{kim2015dynamic} considers the dynamics of the coriolis force arising from the yaw rate of the body, $\omega_b$. 
+    The robot developed in this paper is of small stature and these effects are assumed to be negligible.
 
-    The system equations of motion in the WIP case are developed through the Lagrangian Method [][][] are shown to be 
+    Various approaches have been proposed for steering and trajectory control of the TWSB 
+    system \cite{yue2018efficient} \cite{micaelli1993trajectory} and \cite{pratama2015movement} 
+    \cite{zhou2019turning}. Modeling the steering control signal as a disturbance to the wheel speed control a allows for
+    the stabilization of the WIP  to be considered separately \cite{SelfContainedMobileTWSB}.
+
+    The motion of the DDMR is bounded by its non-holonomic constraints[], it navigates in the $x' y'$ plane by
+    regulating the input references linear velocity $v_b$ and angular velocity $\omega_{b}$. from [] it can be seen that 
+    a large wheel radius $r$ and slender base, amplifies the difference in the wheel speeds, $\omega_L$ and $\omega_R$. 
+    This results in very small disturbances to the wheel velocities being sufficient to adequately steer the TWSB. 
+    Conversely small wheels minimize the effects of backlash in the drive train, these effects are most notcible when the TWSB 
+    is required to maintain static stability. This project is mainly concerned with the 
+    navigation the TWSB system and as such relatively large wheels are used, together with the simplified 2DOF model. 
     
-    The system of equations () are linearized around the equilibrium point $\theta\approx 0$  and after standard algebraic manipulation the 
-    2DOF state space representation of the system is given by eq(6).
+    The derivation of the linearized 2DOF model for the TWSB is well known[][] Incorporating \ref{eq:DCMotorSimple}
+    with state space model obtained by \cite{Velazquez2016VelocityAM} the system in \ref{fig:WIP} is described by 
+    \begin{equation}
+        \left\lbrack \begin{array}{c}
+        {\dot{x} }_b \\
+        {\ddot{x} }_b \\
+        \dot{\theta} \\
+        \ddot{\theta} 
+        \end{array}\right\rbrack =\left\lbrack \begin{array}{cccc}
+        0 & 1 & 0 & 0\\
+        0 & \frac{2n^2 K_e K_t }{r^2 R_a \cdot W_1 } & -\frac{M_b^2 L^2 g\;}{W_1 \left(J_b -M_c L^2 \right)} & 0\\
+        0 & 0 & 0 & 1\\
+        0 & \frac{2n^2 K_e K_t }{r^2 R_a \cdot W_1 \left(\frac{J_b }{M_b }+L\right)} & \frac{{-M}_b^2 L^2 g}{W_1 \left(\frac{J_b }{M_b }+L\right)\left(\left(J_b -M_c L^2 \right)+{\mathrm{gW}}_1 \right)} & 0
+        \end{array}\right\rbrack \cdot \left\lbrack \begin{array}{c}
+        x_b \\
+        {\dot{x} }_b \\
+        \theta \\
+        \dot{\theta} 
+        \end{array}\right\rbrack +\left\lbrack \begin{array}{c}
+        0\\
+        -\frac{2{n\;K}_t }{r\;R_a W_1 }\\
+        0\\
+        -\frac{2n\;K_t }{r\;R_a W_1 \left(\frac{J_b }{M_b }+L\right)}
+        \end{array}\right\rbrack \cdot V_a
+    \end{equation} 
 
+    with $W_1 =2\left(-\frac{n^2 J_{\mathrm{eq}} +J_b }{r^2 }-M_w \right)-M_b +\;\frac{M_b^2 L^2 }{J_b +M_b L^2 }$ 
 
-   
     \pagebreak{}
 
     \section{System Design}
         \begin{figure}[H]
             \includegraphics[width=\textwidth]{DesingImgs/bBot Drawing v3.pdf}
             \caption{CAD Drawing of the TWSB system}
+            \label{fig:CAD}
         \end{figure}
 
         The TWSB body is 3D printed out of PLA plastic in 3 parts for minimal assembly.
@@ -238,8 +322,7 @@
 
         \pagebreak{}
         \subsection{System Identification}
-        A series of experiments are conducted in order to obtain an estimate transfer function of the motors
-        
+        A set of experiments are conducted to obtain an estimate transfer function of the motors.
         \begin{table}[H]
             \centering
                 \begin{tabular}{|r|c|c|c|c|c|c|}
@@ -251,14 +334,18 @@
                 \end{tabular}
                 \caption{Manufacturer Provided Motor Parameters}
         \end{table}
-        A realtime data aquististion and analysis software system developed in python, is used as test bench setup 
-        shown in fig(6), a series of reference ramp, step, sine and chirp inputs are applied to each of the DC motors.  
+        A telemetry and analysis software system developed in python. It is used as test bench setup 
+        shown in \ref{fig:SysIDSetup}, a series of reference ramp, step, sine and chirp inputs are applied to each motor.  
         \begin{figure}[H]
             \centering
             \includegraphics[height=0.45\textwidth]{SysIDMotorSetUp.png}
             \caption{System Identification Testbench Setup}
+            \label{fig:SysIDSetUp}
         \end{figure}
-     
+
+        This software system is also utilized for huristic tuning of runtime parameters of the control an vision systems. 
+        The program is able to visualize data streams in real time, and provides a useful insight into
+        the effects of the control system on the plant.
         \begin{figure}[H]
             \centering
             \subfloat{
@@ -272,21 +359,21 @@
             }
             \caption{Open Loop Speed Voltage experiments}
         \end{figure}    
-        The transfer function of the motor is obtained by fitting the data to a first order system 
-        with 95\% confidence intervals whose transfer function is given by eq(7).
+        The transfer function of the motor is obtained by fitting the data to a first order system.
+        The transfer function bellow is given with with 95\% confidence intervals by MATLAB's System Identification Toolbox.
         \begin{equation}
             \begin{aligned}
                 \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{0.1}{s+0.9}
             \end{aligned}
         \end{equation}
-
         \pagebreak{}
         \subsubsection{Parameters }
         The system parameters are given in table(1). 
         The mass of the sub-components obtained by weighing,
         and estimates of the 3D printed parts mass are given by the slicer software. 
-        The CAD Model computes the center of mass using these values and the COM is identified in fig(6).
-        The using the approximate model as in fig(2) the moment of inertial is computed from standard formulas.
+        The CAD Model computes the center of mass using these values and the COM is identified in \ref{fig:CAD}.
+        The Motor parameters and estimated as per [] using the manufaturuers datasheet[] summaized in table(2).
+    
         \begin{table} [H]
             \centering
             \begin{tabular}{|c|c|c|c|}
@@ -306,6 +393,18 @@
             \end{tabular}
             \caption{System Parameters}
         \end{table}
+
+
+        the effect in in small varations of the systems parametes is 
+        shown in \fig{paramuncertitny}. The plant is observable and controllable for these values.
+        A sensitivity analysis is conducted to determine the effect of the system parameters on the
+        stability of the system.
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.55\textwidth]{Graphs/openstep.pdf}
+            \caption{Sensitivity Analysis}
+            \label{fig:paramuncertitny} 
+        \end{figure}
 
         \pagebreak{}
         \subsection{Software Architecture}
@@ -363,7 +462,7 @@
         The 3D acceleration $\vec{a}$ is used to obtain an 
         estimate of the pitch angle as $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$. 
 
-        The variance of this$\hat{\theta}$ is small when the system is at rest, but grows larger when subject to vibration from the motors
+        The variance of this $\hat{\theta}$ is small when the system is at rest, but grows larger when subject to vibration from the motors
         as shown by the experiment in fig(6) where the TWSB is placed horizontally at rest and motor control commands are issued. 
         \begin{figure}[H]
             \centering
@@ -528,6 +627,7 @@
             \rotatebox{90}{\includegraphics[height=\textwidth]{TrajTrak.jpeg}}  % Increase height for better visibility
             \caption{Race Track}
         \end{subfigure}
+       
         \hspace{0.05cm}  % Adds horizontal space between the subfigures
         \begin{subfigure}[c]{0.6\textwidth}  % Adjusted width to match
             \centering
@@ -554,7 +654,7 @@
     \subsection{Conclusions}
       \subsection{Future work}
   %%%%%%%%%%%%%%%%%% REFERENCES %%%%%%%%%%%%%%%%%%
-    \printbibliography[title={References},heading=bibintoc] 
+    \printbibliography
   %%%%%%%%%%%%%%%%%% APPENDICES %%%%%%%%%%%%%%%%%%
   \begin{uomappendix} 
       \section{Code}

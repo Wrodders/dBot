@@ -1,0 +1,43 @@
+{
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "lualatex->biber->lualatex->lualatex",
+            "tools": [
+                "lualatex",
+                "biber",
+                "lualatex",
+                "lualatex"
+            ]
+        }
+    ],
+    
+    "latex-workshop.latex.tools": [
+        {
+            "name": "lualatex",
+            "command": "lualatex",
+            "args": [
+                "-interaction=nonstopmode",
+                "-synctex=1",
+                "main.tex"
+            ]
+        },
+        {
+            "name": "biber",
+            "command": "biber",
+            "args": [
+                "main"
+            ]
+        }
+    ],
+    
+    "latex-workshop.view.pdf.viewer": "tab",
+    
+    "latex-workshop.latex.autoBuild.run": "onSave",
+    "cSpell.words": [
+        "beneifiifla",
+        "heigherachrial",
+        "linearization",
+        "mantaninign",
+        "suffeinceet"
+    ]
+}
