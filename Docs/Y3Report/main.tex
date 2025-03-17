@@ -465,7 +465,6 @@
             \hfill
             \begin{subfigure}[b]{0.45\textwidth}
             \includegraphics[width=\textwidth]{Graphs/1HzSine.pdf}
-
             \caption{Open Loop Sine Response}
             \label{fig:opensine}
             \end{subfigure}
@@ -690,34 +689,85 @@
         disturb the system from rest seen at $k \approx [170, 380, 580]$.
         \pagebreak{}
     \section{Control System}
-        A simple PID controller operating on the pitch error is tested in simscape multibody, 
-        This manages to stabilize the pitch angle however as shown by fig, x position drifts. For intuitive control laws
-        to be applied to the TWSB system, as opposed to the force control used in the simscape model, the system must 
-        be stable about its equilibrium point without causing undue effects on the DDMR model.
-        The TWSB achieves balance by controlling the oscillations of the pitch angle about the vertical axis. 
-        The linearized system of equations in \ref{eq:2DOF} is applicable 
-        only when the pitch angle is small, this is taken to be $±10$ degrees. 
-        A target maximum pitch oscitation is set to $±1$ degree. 
-        The TWSB needs to be able to move along the $X'$ axis in its inertial frame.
-        [] reviews control strategies immplemented in the mobile robotics litracture. The choice 
-        of control strategy is found to be depending on the availabel hardware and modeling complexity. 
-        [] develops a high fidelity model and simulation study of a WIP platofrm usign low cost sensors and actuators, 
-        yet is able to achieve a high level of performance. Conversly a simpler control strategy is used by [] as the robot is
-        fittted with brushless motors which can be redily torque controlled, and the system is able to be 
-        navigated with a simple PID controller.
-        
-        These controllers note the drawbacks of desining a single controller for the entire system, and so in cases
-        where the goal is to achive a hugh leeel of atonony [][] use slinigmg mode controll in order to tune varrious controllers 
-        aggressivly for differeent requeiremtns and automantilay smothly swithc between them.
+        Autonomy in mobile robotics is commonly a hierarchical problem, composed of high level path planning, 
+        or task allocation,and low level control of the actuators, successful implementations must design 
+        solutions to both of these probelms in a complementary manner. 
+               
+        \cite{patle2019review} reviews planning strategies implemented in the mobile robotics literature. 
+        The choice of strategy is found to be dependant on the available hardware and modeling complexity. 
+        \cite{yamamoto2008nxtway} develops a high fidelity model and simulation study of a WIP platform 
+        using low cost sensors and actuators, yet is able to achieve a high level of performance.
+        Conversely a simpler PID regulator is used by [] as the robot is fitted with brushless motors
+        which can be readily torque controlled. 
+        In cases where the goal is to achieve high levels of autonomy, [][] use sliding mode 
+        control in order to utilize  aggressively tuned various controllers for different requirements and 
+        automatically and smoothly switch between these.
 
-        Recently the computational requwireses needed for Model Predictive Control (MPC) have been reduced and 
-        effecive impeenatiosn of such optimizers have been used in small mobile robots[][][]. 
+        Parameter uncertainty is a common issue in controlling mobile robotics, and approximations of these often lead to 
+        discrepancies between the mathematical optimal solutions found in simulation \cite{eide2011lqg} 
+        and in real world performance. This often leads to designers experimentally tuning algorithms. These kinds of 
+        feedback algorithms perform purely reactive corrections; an error measurement 
+        is required at each time step to compute the control law, $u$. By nature of this, the signals utilized in these 
+        regulators often have direct physical relations to the plant, providing intuition to the designer for initial values through 
+        elementary unit analysis. For example the input-outut data of the sleected actuators obtained in \ref{fig:openloop}, 
+        one can natruly see that a large inegral action is needed to overcome the steady state error at low speeds, since the 
+        open loop plants resonse is of the same shape as the referencc, the propotinal and derivative constants in the velocity PID
+        algorithm formualted in descreet time as 
+
+            
+        Will have a much smaller effect of the close loop response. 
+        Methods such as Ziegler-Nichols formulate approaches to black-box tuning of a plant through observing the systems 
+        performance under sustained sustained instability. Whilst providing a systematic tuning strategy performance validation 
+        in the model-free cases such as the PID algorithm must be evaluated at runtime, 
+        thus in cases of unstable or safety critical systems common in process control[][].
         
-        Parameter uncertainty is a common issue in bailing models for mobile robotics, and approximaions of these lead to 
-        discrepeancies between theoptimal solutions found in simulation and in real world perfoamcne. [][] develop a 
-        data driven approach to observe the system and infer its parameters. A model from these is then used in feedback control. 
-        [] in a similar vein follows this approach and emmbeded a neural network as an online function approximate to learn the to 
-        predict the systems dynamics. This prediction is then used as part of a trajectory planner in race-line optimization. 
+        To this end, the field of adaptive control proposes dealing with these uncertainties by designing controllers which may learn 
+        by online trial-and-error data,  statistical teqchcinies like regression based transfer function estimated form of
+        input-output data. physics informed models taken under statistical distributions of belief. \cite{benosman2018model}. 
+    
+        However in the case of unstable systems, can be destructive,
+
+
+        
+        
+        \cite{williams2016aggressive} in a similar vein embeds
+        a neural network as an online function approximate to learn predictions of the systems dynamics. 
+        This prediction is then used as part of a trajectory planner in race-line optimization. 
+
+        Some modern microcontroler have sufficient computational power requirements needed for Model Predictive Control (MPC) and 
+        effective imprecations of such optimizers have been used in small mobile robots \cite{nguyen2024tinympc}. 
+
+        An attractive aspect of predictive approaches to control is that they lend themselves naturally to 
+        planning long horizons, or tasks. These methods utilizes numeral simulation techniques to evolve the system 
+        over time stimate the distibutions of state probabilites from a monte-calrlo sampling of control actions. The optimal
+        contol sequence is then chosen from these samples through a cost fucntion. 
+        
+
+        
+        The autonomous behavior of the TWSB 
+        robot explored in this paper is that of path following in an unknown environment, where no prior 
+        map is available. As such the control system has 3 goals, namely disturbance rejection of the
+        pitch angle; this is required such that the system is robust to the environment, 
+        regulating of linear velocity set-points, so the TWSB location in its body frame is controlled, 
+        and tracking a trajectory obtained by a high level planner discussed in section 6. 
+
+        A simple PID controller operating on the pitch error is tested in simscape multibody; 
+        a physics based siulation where the control law 
+        is an applided force to a prismatic joint. This force is coupled through the revolute 
+        joint to the pitch angle as descried by \ref{eq:2DOF}.
+        This manages to stabilize the pitch angle however as shown by fig, x position drifts.
+
+        The TWSB achieves balance by controlling the oscillations of the pitch angle about the 
+        vertical axis. The linearized system of equations in \ref{eq:2DOF} is applicable 
+        only when the pitch angle is small, this is taken to be $\theta < ±10$ degrees. 
+ 
+        In the sequence the low level controls are developed to meet these requirements:
+        \begin{enumerate}
+            \item The pitch angle must be regulated to $±1$ degree.
+            \item The global $x$ position should be controlled by a linear velocity reference.
+        \end{enumerate}
+        allowing for teleoperation where a operator is tasked with the navigation of the robot. 
+
 
 
 
@@ -726,7 +776,10 @@
         \subsection{Cascade PID}
         Since the linear velocity is coupled to the
         pitch angle, the target pitch angle must be controlled to maintain a constant x velocity. 
-        This is achieved by regulating the pitch angle about equilibrium or 0 degrees.
+        This is achieved by regulating the pitch angle about equilibrium. In cascade control, the term main process varibale 
+        is usuauly the o
+
+        This approach in theory, should also be a able to minitigate the effects of mounting offset of the IMU. 
 
         A cascaded pid controller is used to control the pitch angle and the linear velocity. 
         Control of the position $(x_g,y_g)$ is left to a higher level planner.  
@@ -800,6 +853,9 @@
 
         \pagebreak{}
         \section{Vision System}
+
+        Map building is a popular approach for navigation as it allows for a large 
+        context of the environment to be considered and guarantees can be made such as obstacle avoidance and optimal path selection \cite{Macenski_2020}. 
 
         \subsection{Camera Sensor}
 
