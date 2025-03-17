@@ -12,6 +12,7 @@
 #ifndef IMU_H
 #define IMU_H
 #define RAD_TO_DEG 57.295779513082320876798154814105
+#define DEG_TO_RAD 0.01745329251994329576923690768489
 /* Inertial Measurement State Estimator
 Accelerometer and Gyroscope Data Low Pass Filtered. 
 Complementary Filter Applied to Fuse Measurements into Angle Estimate
@@ -139,33 +140,33 @@ static float imuKalPredict(struct Kalman* kal, const float newAngle, const float
 }
 
 static void imuKalUpdate(struct IMU* imu){
-    // Update Kalman Filter with latest data
-    float xRate = imu->lpf.gyro.x;
-    float yRate = imu->lpf.gyro.y;
+    // Working Variables
+    float rollRate = imu->lpf.gyro.x;
+    float pitchRate = imu->lpf.gyro.y;
     float ax = imu->lpf.accel.x;
     float ay = imu->lpf.accel.y;
     float az = imu->lpf.accel.z;
-    float ax2 = ax * ax;
+    float ax2 = ax * ax; // utility variables
     float az2 = az * az;
 
     float roll_estimate; // Compute Roll estimate from lpf accelerometer
     float rollsqrt = sqrt(ax2 + az2);
     if(rollsqrt != 0.0f){roll_estimate = atan(ay / rollsqrt) * RAD_TO_DEG;} // Fix -180=180
     else{roll_estimate = 0.0f;} 
-    if (fabs(imu->kal.pitch) > 90){xRate *= -1;} // Invert Rate if Pitch is > 90   
-    imu->kal.roll= imuKalPredict(&imu->kal.rollK, roll_estimate, xRate, imu->dt);
+    if (fabs(imu->kal.pitch) > 90){rollRate *= -1;} // Invert Rate if Pitch is > 90   
+    imu->kal.roll= imuKalPredict(&imu->kal.rollK, roll_estimate, rollRate, imu->dt);
 
     // Estimate Pitch From Accelerometer
-    float pitch_estimate = atan2(-ax, az ) * RAD_TO_DEG;
+    float pitch_estimate = atan2(-ax, az ) * RAD_TO_DEG; // Compute Pitch estimate from lpf accelerometer
     if ((pitch_estimate < -90 && imu->kal.pitch > 90) || (pitch_estimate > 90 && imu->kal.pitch < -90)){
         imu->kal.pitchK.angle = pitch_estimate; // Reset the Angle when the IMU has moved 180 degrees
         imu->kal.pitch = pitch_estimate; 
     }
     else{
-        imu->kal.pitch = imuKalPredict(&imu->kal.pitchK, pitch_estimate, yRate, imu->dt);
+        imu->kal.pitch = imuKalPredict(&imu->kal.pitchK, pitch_estimate, pitchRate, imu->dt);
     }
-    imu->kal.rollRate = xRate - imu->kal.rollK.bias;
-    imu->kal.pitchRate = yRate - imu->kal.pitchK.bias;
+    imu->kal.rollRate = rollRate - imu->kal.rollK.bias; // Update angle rate
+    imu->kal.pitchRate = pitchRate - imu->kal.pitchK.bias; 
 }
 
 

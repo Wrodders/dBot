@@ -38,9 +38,9 @@ static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheel
 
 //@Brief: Compute Inverse Kinematic State of Mobile Robot using Wheel Odometry
 static void ddmrEstimateOdom(struct DiffDriveModel *const ddmr, const struct Motor *const motorLeft, const struct Motor *const motorRight){
-    float speed =  RPS_TO_MPS * (motorLeft->shaftRPS + motorRight->shaftRPS) * 0.5f;                            // convert to mps 
+    float speed =  RPS_TO_MPS * (motorLeft->wheelRPS + motorRight->wheelRPS) * 0.5f;                            // convert to mps 
     ddmr->linearVel = iirLPF(ddmr->linearVelAlpha, speed, ddmr->linearVel);                                      // lpf filter
-    float angVel = (motorLeft->shaftRPS - motorRight->shaftRPS) * ddmr->wheelR/ddmr->wheelBase ;                // ang vel in rad/s
+    float angVel = (motorLeft->wheelRPS - motorRight->wheelRPS) * ddmr->wheelR/ddmr->wheelBase ;                // ang vel in rad/s
     ddmr->angularVel = iirLPF(ddmr->angularVelAlpha, angVel, ddmr->angularVel);                                  // lpf filter
     ddmr->posX += ddmr->linearVel * (LQR_CNTRL_PERIOD * MS_TO_S); // update position
 }

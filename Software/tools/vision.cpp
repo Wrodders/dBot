@@ -1,8 +1,6 @@
 /************************************************************************************
  *  @file    vision.cpp
- *  @brief   Monocular Vision Trajectory Generations
- *  @date    2025-01-05
- *  @version 0.01
+ *  @brief   Monocular Vision Navigation
  * 
  * Gstreamer Pipeline:
  * Reads frames in YUV from gstreamer appsrc and writes to appsink
@@ -16,7 +14,7 @@
  * these modify runtime parameters through config managers
  * Outputs CMD_RET/VISION messages to the message socket
  * 
- * Target Frame Rate: 25 Hz
+ * Target Frame Rate: 30 Hz
  * Output frame for visualization
  * 
  *         640px           
@@ -42,22 +40,17 @@
     #define CONFIG_PATH "/home/pi/prog/software/configs/robotConfig.json"
 #endif
 
-#define NODE_NAME "VISION"
-
-
 int run(int argc, char* argv[]) { 
     std::cout << ("Starting Vision Pipeline") << std::endl;
     openlog("vision", LOG_PID | LOG_CONS, LOG_USER);
     // --------------- CLI Parsing ----------------- //
-    if (argc < 1) {
-        syslog(LOG_ERR, "Usage: %s <input_pipeline>\n", argv[0]);
-        return 1;
-    }
+    // --------------- CLI Parsing ----------------- //
     std::string input_pipeline = (argc > 1) ? argv[1] : DEFAULT_INPUT_PIPELINE;   
     if (input_pipeline.empty()) {
         syslog(LOG_ERR, "Error: Invalid Input Pipeline\n");
         return 1;
     }
+
     // -------------- Video IO Setup  ----------------- //
     cv::VideoCapture cap(input_pipeline, cv::CAP_GSTREAMER);
     if (!cap.isOpened()) {
@@ -72,33 +65,21 @@ int run(int argc, char* argv[]) {
         return -1;
     }
     // -------------- Runtime Parameters ----------------- //
-    std::array<std::atomic<float>, viz::NUM_PARAMS> params;
-    ParameterMap param_map(CONFIG_PATH, NODE_NAME);
-    param_map.register_parameter(viz::P_PROG_MODE, params[viz::P_PROG_MODE], viz::val_prog_mode);
-    param_map.register_parameter(viz::P_HRZ_HEIGHT, params[viz::P_HRZ_HEIGHT], viz::val_hrz_height);
-    param_map.register_parameter(viz::P_TRFM_PAD, params[viz::P_TRFM_PAD], viz::val_trfm_pad);
-    param_map.register_parameter(viz::P_EDGE, params[viz::P_EDGE], viz::val_edge);
+    std::array<std::atomic<float>, viz::NUM_PARAMS> _params;
+    ParameterMap param_map(CONFIG_PATH, viz::NODE_NAME);
+    param_map.register_parameter(viz::P_PROG_MODE, _params[viz::P_PROG_MODE], viz::val_prog_mode);
+    param_map.register_parameter(viz::P_LOOK_HRZ_HEIGHT, _params[viz::P_LOOK_HRZ_HEIGHT], viz::val_hrz_height);
     // initialize the parameters
-    params[viz::P_PROG_MODE].store(viz::M_CALIBRATE);
-    params[viz::P_HRZ_HEIGHT].store(viz::HEIGHT / 2);
-    params[viz::P_TRFM_PAD].store(200);
-    params[viz::P_EDGE].store(viz::P_CANNY);
+    param_map.set_value(viz::P_PROG_MODE, viz::M_CALIBRATE);
+    param_map.set_value(viz::P_LOOK_HRZ_HEIGHT, 330);
 
-
-    std::array<cv::Point2f, 4> _dst_pts = { // homography transform destination points
-        cv::Point2f((viz::WIDTH / 2 - 200), viz::HEIGHT),
-        cv::Point2f((viz::WIDTH / 2 + 200), viz::HEIGHT),
-        cv::Point2f(0, 0), 
-        cv::Point2f(viz::WIDTH, 0)
-    };
-    
     // ------------- Command Server Coms Thread ----------------- //
     std::thread cmd_thread(viz::command_server, std::ref(param_map));
     // ------------- Tracjectory Publisher Thread ----------------- //
-    std::thread traj_thread(nav::trajGen);
+    std::thread traj_thread(nav::trajGenServer);
     // -------------- Vision Pipeline Allocations ----------------- //
     cv::Mat y_plane(viz::HEIGHT, viz::WIDTH, CV_8UC1); // Single channel for Y plane
-    cv::Mat homography_matrix = cv::findHomography(viz::_src_pts, _dst_pts);
+    cv::Mat homography_matrix = cv::findHomography(viz::_src_pts, viz::_dst_pts);
 
     // -------------- Vision Pipeline Loop ----------------- //
     float progmode;
@@ -110,6 +91,11 @@ int run(int argc, char* argv[]) {
             viz::_exit_trig.store(true); // force exit
             break;
         }
+        if(y_plane.empty()) {
+            syslog(LOG_ERR, "Empty Frame!");
+            viz::_exit_trig.store(true); // force exit
+            break;
+        }
         // ------------ Frame Processing ------------ //
         (void) param_map.get_value(viz::P_PROG_MODE, progmode);
         switch ((int)progmode) {
@@ -117,13 +103,22 @@ int run(int argc, char* argv[]) {
                 syslog(LOG_INFO, "Calibrating Camera");
                 // Run Camera Intrinsic Calibration
                 // -- Update Transformation Matrix -- //
-
-                homography_matrix = cv::findHomography(viz::_src_pts, _dst_pts);
+                homography_matrix = cv::findHomography(viz::_src_pts, viz::_dst_pts);
                 syslog(LOG_INFO, "Calibration Complete");
-                params[viz::P_PROG_MODE].store(viz::M_RUN);
+                param_map.set_value(viz::P_PROG_MODE, viz::M_RUN);
                 break;
-            case viz::M_RUN:
+            case viz::M_RUN: // Run the autonomous visual navigation 
                 viz::pipeline(y_plane, homography_matrix, param_map);
+                break;
+            case viz::M_SEG_FLOOR: // Visualize the segmented floor
+                viz::estimateDrivability(y_plane);
+                // draw line at horizon
+                float horizon;
+                param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horizon);
+                cv::line(y_plane, cv::Point(0, (int)horizon), cv::Point(viz::WIDTH, (int)horizon), cv::Scalar(255), cv::LINE_8);
+                break;
+            case viz::M_VIZ:
+                // Pass through the frame for remote visualization
                 break;
             default:
                 break;
@@ -136,7 +131,6 @@ int run(int argc, char* argv[]) {
             break;
         }
     }
-    
     // -------------- Cleanup ----------------- //
     cap.release();
     writer.release();

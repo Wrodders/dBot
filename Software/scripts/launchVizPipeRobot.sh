@@ -3,13 +3,6 @@
 #  @file    launchVisionPi.sh
 #  @brief   Launches the vision test Pipeline on Raspberry Pi.
 
-
-# Define named pipes
-VIDEO_IN="/tmp/video_in"
-VIDEO_OUT="/tmp/video_out"
-
-
-
 # Determine the port based on the hostname
 HOSTNAME=$(hostname)
 hostname
@@ -27,20 +20,13 @@ case $HOSTNAME in
     "bot") 
         cd /home/pi/prog/software
 
-        # Ensure no old pipes exist
-        rm -f $VIDEO_IN $VIDEO_OUT
-
-        # Create named pipes
-        sudo mkfifo $VIDEO_IN
-        sudo mkfifo $VIDEO_OUT
         PORT=5002 # Raspbeyr PI 5 uses software encoder
         ROT=5
         gst-launch-1.0 -v libcamerasrc ! \
-        video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! \
-         videorate ! videoconvert ! video/x-raw,format=I420 ! queue ! \
-          x264enc tune=zerolatency speed-preset=ultrafast quantizer=25 key-int-max=15 ! \
-           h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=192.168.0.32  port=5002
-
+            video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! \
+            videorate ! videoconvert ! video/x-raw,format=I420 ! queue ! \
+            x264enc tune=zerolatency speed-preset=ultrafast quantizer=25 key-int-max=15 ! \
+            h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=192.168.0.32  port=5002
         ;;
     *)
         echo "[ERROR] Device hostname not recognized"

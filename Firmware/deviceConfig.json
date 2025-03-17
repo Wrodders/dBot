@@ -45,14 +45,15 @@
             {"name": "TELEM",       
                 "id": 4,   
                 "description": "Telemetry Data",   
-                "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", 
+                "format": "%0.3f:%0.3:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", 
                 "args":  ["PITCH",    "ROLL",
                           "ACCEL_X", "ACCEL_Y",  "ACCEL_Z",
                           "GYRO_X",  "GYRO_Y",   "GYRO_Z",
                           "LEFT_SHAFT_RPS",  "LEFT_WHEEL_TRGT",  "LEFT_VOLTAGE", 
                           "RIGHT_SHAFT_RPS", "RIGHT_WHEEL_TRGT", "RIGHT_VOLTAGE", 
                           "LINEAR_VEL",      "LIN_VEL_TRGT",     "BALANCE_ANGLE",
-                          "ANGULAR_VEL",     "ANG_VEL_TRGT",     "STEER_DIFF"]
+                          "ANGULAR_VEL",     "ANG_VEL_TRGT",     "STEER_DIFF",
+                            "XPOS", "LQR_U"]
             }
 
         ]

@@ -49,7 +49,7 @@ User defines the Application Specific Topics and Parameters
 //                                ±  100  .  999   /0            
 #define MAX_SERIALIZED_FLOAT_SIZE (1 + 3 + 1 + 3 + 1)
 
-#define SERIALIZED_TELEM_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
+#define SERIALIZED_TELEM_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
 #define SERIALIZED_ERROR_FMT  "%s"
 #define SERIALIZED_INFO_FMT   "%s"
 #define SERIALIZED_DEBUG_FMT  "%s"
@@ -158,7 +158,8 @@ static const char* publisherString(enum Publishers pub){
     X(17,  T_ANGULAR_VEL,        "ANGULAR_VEL")         \
     X(18,  T_ANG_VEL_TRGT,       "ANG_VEL_TRGT")        \
     X(19,  T_STEER_DIFF,         "STEER_DIFF")          \
-    X(20,  T_NUM_TELEM_VARS,     "NUM__TELEM_VARS")     \
+    X(20,  T_XPOS,                "XPOS")               \
+    X(21,  T_NUM_TELEM_VARS,     "NUM__TELEM_VARS")     \
 
 #define TELEMETRY_ENUM(ID, NAME, MSG) NAME = ID,
 #define TELEMETRY_STRING(ID, NAME, MSG) case NAME: return MSG;

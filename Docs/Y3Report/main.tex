@@ -209,15 +209,15 @@
         \begin{aligned}
             \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s^2 \cdot L_a R_a +\;s\left(R_a \cdot J_{\mathrm{eq}} +B_{\mathrm{eq}} \cdot L_a \right)+K_t {\cdot K}_e +R_a \cdot B_q }\cdot\frac{1}{n}
         \end{aligned}
-        'label{eq:DCMotor}
+        \label{eq:DCMotor}
     \end{equation}
     Where $\Omega_w$ is the laplace transform of the output speed, 
     The rotors viscous damping $B_r$ is assumed to be negligible, as is $B_G$. 
-    For small motors, $\tau_e$ is small and $L_a << R_a$, [][], hence the motor can be 
+    For small motors, $\tau_e$ is small and $L_a << R_a$, hence the motor can be 
     approximated as a first order system as
     \begin{equation}
         \begin{aligned}
-            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + J_{eq}\cdot n^2+K_t K_e }\cdot\frac{1}{n}
+            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + J_{eq}+K_t K_e }\cdot\frac{1}{n}
         \end{aligned}
         \label{eq:DCMotorSimple}
     \end{equation}
@@ -227,7 +227,6 @@
     \pagebreak{}
 
     \subsection{2DOF System Model}
-
     \begin{figure}[h]
         \centering
         \begin{subfigure}[b]{0.4\textwidth}
@@ -241,31 +240,52 @@
             \caption{Differential Drive Mobile Robot}
             \label{fig:DDMR}
         \end{subfigure}
-        \caption{Two Degree of Freedom System}
+        \caption{Robot motion decoupled by levels of abstraction}
         \label{fig:2DOF}
     \end{figure}
 
-
-    The TWSB robot is modeled as two separate 2DOF systems as shown in \fig{2DOF},
-    namely a wheeled inverted pendulum (WIP) and a differential drive robot (DDMR).
-    It however exits in a 3D space, and for the purposes of this report must be able to rotate about the inertial Z axis. 
-    \cite{kim2015dynamic} considers the dynamics of the coriolis force arising from the yaw rate of the body, $\omega_b$. 
-    The robot developed in this paper is of small stature and these effects are assumed to be negligible.
-
-    Various approaches have been proposed for steering and trajectory control of the TWSB 
-    system \cite{yue2018efficient} \cite{micaelli1993trajectory} and \cite{pratama2015movement} 
-    \cite{zhou2019turning}. Modeling the steering control signal as a disturbance to the wheel speed control a allows for
-    the stabilization of the WIP  to be considered separately \cite{SelfContainedMobileTWSB}.
-
-    The motion of the DDMR is bounded by its non-holonomic constraints[], it navigates in the $x' y'$ plane by
-    regulating the input references linear velocity $v_b$ and angular velocity $\omega_{b}$. from [] it can be seen that 
-    a large wheel radius $r$ and slender base, amplifies the difference in the wheel speeds, $\omega_L$ and $\omega_R$. 
-    This results in very small disturbances to the wheel velocities being sufficient to adequately steer the TWSB. 
-    Conversely small wheels minimize the effects of backlash in the drive train, these effects are most notcible when the TWSB 
-    is required to maintain static stability. This project is mainly concerned with the 
-    navigation the TWSB system and as such relatively large wheels are used, together with the simplified 2DOF model. 
+    Wheeled mobile robots are typically restricted to navigation in the 2D Cartesian plane, their motion models are often simplified and 
+    abstract the non linear dynamics of friction and acceleration is assumed to be constant. 
+    Effective control and planning algorithms for such platforms require the designer to obtain a mathematical model, 
+    the differences in models arise form the nature of the goal of the planner, the available control signals and the sensors 
+    used to estimate the configuration of the robot \cite{ClassificationWheeled}. 
+    In this paper, the TWSB decomposed into 2 commonly studied 2DOF systems, as in \ref{fig:2DOF} and their behavior is analyzed
+    in a highearical manner where DDMR model is only valid if the WIP is stable.cfg
     
-    The derivation of the linearized 2DOF model for the TWSB is well known[][] Incorporating \ref{eq:DCMotorSimple}
+    The DDMR modeled in \ref{fig:DDMR} navigates under the pure rolling assumption, that is, the wheels do not slip 
+    and the inerial forces arising from acceleration in the $x'$ direction are negligible \cite{KinematicWheeled}. 
+    The motion of the DDMR is bounded by its non-holonomic constraints[], that is no lateral motion is allowed along the $y'$ axis. 
+
+    The  DDMR's non linear kinematic model in the global frame is 
+    \begin{equation}
+        \begin{bmatrix}
+            \dot{x}_b \\
+            \dot{y}_b \\
+            \dot{\theta}
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+            \frac{r}{2} \cos \theta & \frac{r}{2} \cos \theta \\
+            \frac{r}{2} \sin \theta & \frac{r}{2} \sin \theta \\
+            -\frac{r}{2L} & \frac{r}{2D}
+        \end{bmatrix}
+        \begin{bmatrix}
+            \omega_L \\
+            \omega_R
+        \end{bmatrix}
+        \label{eq:DDMR}
+    \end{equation}
+    Where $r$ is the radius of the wheel and $D$ is the distance between the wheels.
+    from \ref{eq:DDMR} it can be seen that a large wheel radius $r$ amplifies the resultant effect of difference in the wheel 
+    speeds, $\omega_L$ and $\omega_R$. This leads to very small disturbances to the wheel velocities being sufficient 
+    to adequately steer the TWSB. Conversely small wheels minimize the effects of backlash in the drive train, these effects are most notable 
+    when the TWSB is required to maintain static stability. \cite{kim2015dynamic} considers the dynamics of the coriolis force 
+    arising from the yaw rate of the body, $\omega_b$. The robot developed in this paper is of small stature and these effects 
+    are assumed to be negligible. This project is mainly concerned with the navigation the TWSB system and as such 
+    relatively large wheels are used. This allows for a simplified dynamics model of the Wheel Inverted Pendulum 
+    in \ref{fig:WIP} to simulate the balancing of the TWSB in 2DOF space as per \cite{SelfContainedMobileTWSB}.
+
+    The derivation of the linearized 2DOF model for the TWSB is well known[][]. Incorporating \ref{eq:DCMotorSimple}
     with state space model obtained by \cite{Velazquez2016VelocityAM} the system in \ref{fig:WIP} is described by 
     \begin{equation}
         \left\lbrack \begin{array}{c}
@@ -289,6 +309,7 @@
         0\\
         -\frac{2n\;K_t }{r\;R_a W_1 \left(\frac{J_b }{M_b }+L\right)}
         \end{array}\right\rbrack \cdot V_a
+        \label{eq:2DOF}
     \end{equation} 
 
     with $W_1 =2\left(-\frac{n^2 J_{\mathrm{eq}} +J_b }{r^2 }-M_w \right)-M_b +\;\frac{M_b^2 L^2 }{J_b +M_b L^2 }$ 
@@ -320,93 +341,6 @@
         Battery voltage is monitored by the MCU and the pack is protected by a BMS and a 3A poly-fuse.
         A simple circuit adapted from[] is used to safely load share between the battery pack and the charger.
 
-        \pagebreak{}
-        \subsection{System Identification}
-        A set of experiments are conducted to obtain an estimate transfer function of the motors.
-        \begin{table}[H]
-            \centering
-                \begin{tabular}{|r|c|c|c|c|c|c|}
-                    \hline 
-                    Gear Ratio & Rated Torque & Rated Speed  & Rated Current & Stall Current [A] & Stall Torque \\
-                    \hline
-                     1:20  & 0.39 [RPM] & 400 [mA] & 500 [Nm/kg] & 2  [A] & 0.15 [Nm/Kg] \\
-                    \hline
-                \end{tabular}
-                \caption{Manufacturer Provided Motor Parameters}
-        \end{table}
-        A telemetry and analysis software system developed in python. It is used as test bench setup 
-        shown in \ref{fig:SysIDSetup}, a series of reference ramp, step, sine and chirp inputs are applied to each motor.  
-        \begin{figure}[H]
-            \centering
-            \includegraphics[height=0.45\textwidth]{SysIDMotorSetUp.png}
-            \caption{System Identification Testbench Setup}
-            \label{fig:SysIDSetUp}
-        \end{figure}
-
-        This software system is also utilized for huristic tuning of runtime parameters of the control an vision systems. 
-        The program is able to visualize data streams in real time, and provides a useful insight into
-        the effects of the control system on the plant.
-        \begin{figure}[H]
-            \centering
-            \subfloat{
-                \includegraphics[width=0.3\textwidth]{Graphs/openstep.pdf}
-            }
-                \subfloat{
-                \includegraphics[height=0.2\textwidth]{Graphs/speed_voltage_DCMotor.pdf}
-            }
-            \subfloat{
-                \includegraphics[width=0.3\textwidth]{Graphs/openChirp.pdf}
-            }
-            \caption{Open Loop Speed Voltage experiments}
-        \end{figure}    
-        The transfer function of the motor is obtained by fitting the data to a first order system.
-        The transfer function bellow is given with with 95\% confidence intervals by MATLAB's System Identification Toolbox.
-        \begin{equation}
-            \begin{aligned}
-                \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{0.1}{s+0.9}
-            \end{aligned}
-        \end{equation}
-        \pagebreak{}
-        \subsubsection{Parameters }
-        The system parameters are given in table(1). 
-        The mass of the sub-components obtained by weighing,
-        and estimates of the 3D printed parts mass are given by the slicer software. 
-        The CAD Model computes the center of mass using these values and the COM is identified in \ref{fig:CAD}.
-        The Motor parameters and estimated as per [] using the manufaturuers datasheet[] summaized in table(2).
-    
-        \begin{table} [H]
-            \centering
-            \begin{tabular}{|c|c|c|c|}
-                \hline
-                Parameter & Value & Units & Description \\
-                \hline
-                $m$ & 1.5 & kg & Mass of the body \\
-                $l$ & 0.1 & m & Length of the body \\
-                $J_b$ & 0.01 & $kgm^2$ & Moment of inertia of the body \\
-                $r$ & 0.03 & m & Radius of the wheel \\
-                $d$ & 0.132 & m & Wheel base \\
-                $R_a$ & 1.5 & $\Omega$ & Resistance of the motor \\
-                $K_t$ & 0.01 & Nm/A & Torque constant of the motor \\
-                $K_v$ & 0.01 & V/rad/s & Back EMF constant of the motor \\
-                $J_w$ & 0.01 & $kgm^2$ & Moment of inertia of the wheel \\
-                \hline
-            \end{tabular}
-            \caption{System Parameters}
-        \end{table}
-
-
-        the effect in in small varations of the systems parametes is 
-        shown in \fig{paramuncertitny}. The plant is observable and controllable for these values.
-        A sensitivity analysis is conducted to determine the effect of the system parameters on the
-        stability of the system.
-        \begin{figure}[H]
-            \centering
-            \includegraphics[width=0.55\textwidth]{Graphs/openstep.pdf}
-            \caption{Sensitivity Analysis}
-            \label{fig:paramuncertitny} 
-        \end{figure}
-
-        \pagebreak{}
         \subsection{Software Architecture}
         The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. 
         Whilst this is a powerful tool, it is deemed too complex for the requirements of this project.
@@ -446,6 +380,115 @@
         Worst case jitter is observed, under CPU stress tests[] to be 0.1ms. 
         This is acceptable for telemetry data. 
         \pagebreak{}
+
+    
+        \subsubsection{Parameters }
+        The system parameters are given in table(1). 
+        The mass of the sub-components obtained by weighing,
+        and estimates of the 3D printed parts mass are given by the slicer software. 
+        The CAD files are used in MATLAB's Multibody Simulink environment, which 
+        computes the center of mass and the moments of inertia.
+        The Motor parameters and estimated as per [] using the manufacturers dataset[] summarized in table(2).
+    
+        \begin{table} [H]
+            \centering
+            \begin{tabular}{|c|c|c|c|}
+                \hline
+                Parameter & Value & Units & Description \\
+                \hline
+                $m$ & 1.5 & kg & Mass of the body \\
+                $l$ & 0.1 & m & Length of the body \\
+                $J_b$ & 0.01 & $kgm^2$ & Moment of inertia of the body \\
+                $r$ & 0.03 & m & Radius of the wheel \\
+                $d$ & 0.132 & m & Wheel base \\
+                $R_a$ & 1.5 & $\Omega$ & Resistance of the motor \\
+                $K_t$ & 0.01 & Nm/A & Torque constant of the motor \\
+                $K_v$ & 0.01 & V/rad/s & Back EMF constant of the motor \\
+                $J_w$ & 0.01 & $kgm^2$ & Moment of inertia of the wheel \\
+                \hline
+            \end{tabular}
+            \caption{System Parameters}
+        \end{table}
+
+
+
+        \pagebreak{}
+
+        \subsection{System Identification}
+        A set of experiments are conducted to obtain an estimate transfer function of the motors.
+        \begin{table}[H]
+            \centering
+                \begin{tabular}{|r|c|c|c|c|c|c|}
+                    \hline 
+                    Gear Ratio & Rated Torque & Rated Speed  & Rated Current & Stall Current & Stall Torque \\
+                    \hline
+                     1:20  & 0.39 Nm & 600 rpm & 500 mA & 2 A & 0.15 Nm/Kg \\
+                    \hline
+                \end{tabular}
+                \caption{Manufacturer Provided Motor Parameters}
+        \end{table}
+        A telemetry and analysis software system developed in python. It is used as test bench setup 
+        shown in \ref{fig:SysIDSetUp}, a series of reference ramp, step, sine and chirp inputs 
+        are applied to each motor, the resultant input outputs are shown in \ref{fig:openloop}.
+       
+        \begin{figure}[H]
+            \centering
+            \includegraphics[height=0.45\textwidth]{SysIDMotorSetUp.png}
+            \caption{System Identification Testbench Setup}
+            \label{fig:SysIDSetUp}
+        \end{figure}
+        The test suit contains a timeseries signal generators, with preview and playback functionality.
+        The Systems logs and messages are displayed in a terminal window, and the user is able to fully configure 
+        each nodes runtime parameters remotely over a network connection, utilizing the RPC ASCII protocol.
+        A line plotter, is configured by JSON to display any number of signals.
+        This architecture allows for repeatability in obtaining robot data, something 
+        is is a challenge in mobile robotics[]. 
+        
+        This software system is also utilized for huristic tuning of the control
+        and vision systems. The program is able to visualize control signal streams in soft real time, 
+        and provides a useful insight into the effects of the control system on the plant.
+
+        \begin{figure}[H]
+            \centering
+            \begin{subfigure}[b]{0.45\textwidth}
+            \includegraphics[width=\textwidth]{Graphs/openstep.pdf}
+            \caption{Open Loop Step Response}
+            \label{fig:openstep}
+            \end{subfigure}
+            \hfill
+            \begin{subfigure}[b]{0.45\textwidth}
+            \includegraphics[width=\textwidth]{Graphs/1HzSine.pdf}
+
+            \caption{Open Loop Sine Response}
+            \label{fig:opensine}
+            \end{subfigure}
+            \caption{Open Loop no Load Speed Voltage Experiments}
+            \label{fig:openloop}
+        \end{figure}
+
+
+        From these experiments it is clear that the motor is has significant deadzones, 
+        and the input output relationship is non linear at low speeds. When the motor is operating at its rated currnet, 
+        seen by the experiments in \ref{fig:speedvolt}, its its linearity is improved. The maximum no load speed is  
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.5\textwidth]{Graphs/SpeedVoltageCurve.pdf}
+            \caption{Speed Voltage Relationship}
+            \label{fig:speedvolt}
+        \end{figure}
+
+        This non-linearity is a result of the motors backlash, which is a common issue in low cost gearboxes.
+        \cite{grasser2002joe} utilizes a low pass filter to mitigate some of the more sever effects of 
+        this deadline; mechanical vibration increased thermal stress and noise. 
+        In the case of the TWSB system, when it is stationary, 
+        the actuators will not be static and are required to be operating mostly is a sinusoidal version, 
+        similar to \ref{fig:opensine} in order to regulate the pitch angle of the body.
+        Considering this a closed loop controller is developed in section 4.1 to regulate the motors speed,
+         and maintain the device is it operating region. 
+    \pagebreak{}
+
+
+
     \section{State Estimation}
     Information about a system may be obtained from 2 types of sources; 
     mathematical models models as in eq(1) which can describe the time evolution of the chosen system variables, 
@@ -460,19 +503,30 @@
         The IMU is a 6 axis MEMS sensor[] which measures the local linear acceleration 
         and angular velocity.
         The 3D acceleration $\vec{a}$ is used to obtain an 
-        estimate of the pitch angle as $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$. 
+        estimate of the pitch angle as    $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$
 
         The variance of this $\hat{\theta}$ is small when the system is at rest, but grows larger when subject to vibration from the motors
-        as shown by the experiment in fig(6) where the TWSB is placed horizontally at rest and motor control commands are issued. 
+        as shown by the experiment in \ref{fig:accelNoise} where the TWSB is placed horizontally at rest and motor control commands are issued. 
         \begin{figure}[H]
             \centering
-            \includegraphics[width=0.55\textwidth]{Graphs/accelNoiseModeling.pdf}
-            \caption{Motors induce high frequency noise in the accelerometer}
+            \begin{subfigure}[b]{0.5\textwidth}
+
+                \includegraphics[width=\textwidth]{Graphs/accelNoiseReadings.pdf}
+                \caption{Accelerometer is sensitive to motor vibrations}
+                \label{fig:accelRaw}
+                
+            \end{subfigure}
+            \hfill
+            \begin{subfigure}[b]{0.45\textwidth}
+                \includegraphics[width=\textwidth]{Graphs/noisyPitchEst.pdf}
+                \caption{Wide Variance on pitch estimate at rest}
+                \label{fig:pitchNoise}
+            \label{fig:accelNoise}
+            \end{subfigure}
+            \caption{Accelerometer Noise}   
         \end{figure}
 
-        From Fig(10) it can be seen that the IMU is not mounted perfectly orthogonal to the body frame. 
-        This systematic error is removed by utilizing calibrated values in table obtained as per table(3).
-
+        From \ref{fig:pitchNoise} it can be seen that the IMU is not mounted perfectly orthogonal to the body frame. 
         \begin{table}[H]
             \centering
             \begin{tabular}{c c c} 
@@ -481,59 +535,90 @@
                 \midrule
                 0.036453 & -0.0021066 & 0.133658 \\
                 \bottomrule
+
             \end{tabular}
             \caption{Accelerometer Mounting Offset (m/s$^{2}$)}
+            \label{tab:accelOffset}
         \end{table}
+        This systematic error is removed by utilizing calibrated values in table obtained as per \ref{tab:accelOffset}.
         
         
         \pagebreak{}
         \subsection{Kalman Filter}
-        The Kalman Filter (KF) and its variants[][][] are widely used in robotics to fuse 
-        complementary sources of information[]. 
+        The Kalman Filter (KF) and its variants  are widely used in robotics to fuse 
+        complementary sources of information \cite{Thrun2005ProbabilisticRobotics} \cite{perez2023quadcopter} \cite{Moore2014AGE}.
         The ordinary KF is applicable to linear systems, as a type of Bayesian filter, 
         the discreet representation of the KF represents current belief $bel(x_k)$ around the true state,
-        as a Gaussian whose distribution is parameterized by its mean $\mu_k$ and covariance matrix $P_k$ []. 
+        as a Gaussian whose distribution is parameterized by its mean $\mu_k$ and covariance matrix $P_k$.
 
         A new measurement is observed at each timestamp through the linear function $z_k = C_k x_k + R_k$. 
         The measurement model $C_k$ is used to map the true state into the measurement space.
         Here the process and measurement noise are Gaussian with zero mean and covariance $Q_k$ and $R_k$ respectively. 
-        The Kalman Gain computed by $ K_k = \bar{P_k} C_k^T \left(C_k \bar{P_k} C_k^T + R_k \right)^{-1}$, 
-        provides the optimal weighting between the beliefs from the prediction (4a) and measurement (4b). 
-     
+        The Kalman Gain computed as \ref{eq:KalmanGain} provides the optimal weighting between t
+        he beliefs from the prediction \ref{eq:KalmanPredict} and the measurement update \ref{eq:KalmanUpdate}.
+
+
         \begin{subequations}
             \begin{equation}
                 \bar{bel}(x_k) = \begin{cases}
                         \bar{\mu}_k = F_k \mu_{k-1} + G_k u_k \\
                         \bar{P}_k = F_k P_{k-1} F_k^T + Q_k
                         \end{cases}
-                \end{equation}
+                \label{eq:KalmanPredict}
+            \end{equation}
+            \begin{equation}
+                K_k = \bar{P_k} C_k^T \left(C_k \bar{P_k} C_k^T + R_k \right)^{-1}
+                \label{eq:KalmanGain}
+            \end{equation}
             \begin{equation}
             bel(x_k) = \begin{cases}
                 \mu_k = \bar{\mu}_k + K_k \left(z_k - C_k \bar{\mu}_k \right) \\
                 P_k = \left(I - K_k C_k \right) \bar{P}_k
             \end{cases}
+            \label{eq:KalmanUpdate}
             \end{equation}
-
+            \label{eq:KalmanAlgorithm}
         \end{subequations}
-
-
         Even though the state transition model of the TWSB robot is non-linear, 
-        [][] developed self balancing platforms capable of restricting oscillations about the 
-        operating point to ±1 degree, indicating the suitability of a linear model for the TWSB system. 
-        This one order of magnitude than the worst case pitch limit from (equation). Beyond this, the 
-        small angle approximation is no longer valid, and the system is not locally linear. 
-        fig(11) shows that the Kalman Filter's produces a smooth estimate of the pitch angle
-        for the experiment described in figure(10). It is observed that the angular momentum built up 
-        from the wheels is sufficient to disturb the system from rest, 
-        when there is a large change in set point; $k \approx [170, 380, 580]$
+        \cite{SelfContainedMobileTWSB} \cite{ooi2003balancing} 
+        developed self balancing platforms capable of restricting oscillations about the 
+        operating point to $±1$ degree. This one order of magnitude than the worst case pitch limit of $±10$ degrees.
+        Beyond this, the small angle approximation is no longer valid, and the system is not locally linear. 
+
+        The state transition model used by the KF, can be choses to model the TWSB system \ref{eq:2DOF} as a step towards 
+        full state feedback, or solely the dynamics of the IMU.  Both approaches have had success in the literature[][][]. 
+        An alternative approach is to use a simplification of the noise modeling used by classical baysian saticitcs and 
+        assume that the noise covariance are time invariant, the complementary filter \cite{ComplimentaryKalman} 
+        is a popular choice for this due to its low mathematical complexity. Other simimplifications like assuming the grysocope 
+        bias is constant[] have also been used to reduce the computational complexity of the KF.
+
+        The MPU6050 6-Axis IMU can estimate the pitch through the gyroscope measurement $\vec\omega_{gyro}$ and the accelerometer measurement $\vec a_{x}$.
+        \begin{equation}
+            \begin{aligned}
+                \dot\theta = \omega_{gyro} + \beta + \gamma
+            \end{aligned}
+            \label{eq:gyroBias}
+        \end{equation}
+
+            
+
+
+
+       
+
+
         \begin{figure}[H]
             \centering
             \includegraphics[width=0.5\textwidth]{Graphs/SensorFusion.pdf}
-            
             \caption{Sensor Fusion of accelerometer and gyroscope}
+            \label{fig:SensorFusion}
         \end{figure}
 
-
+       
+        \ref{fig:SensorFusion} shows that the Kalman Filter's produces a smooth estimate of the pitch angle
+        under the experiment described in \ref{fig:accelNoise}. It is observed that when there is a 
+        large change in the motors set-point  the angular momentum built up from the wheels is sufficient to 
+        disturb the system from rest seen at $k \approx [170, 380, 580]$.
         \pagebreak{}
     \section{Control System}
         A simple PID controller operating on the pitch error is often enough to mantain the TWSB balance.

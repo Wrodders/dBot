@@ -13,9 +13,10 @@ cleanup() {
 
 # Trap exit signals to clean up properly
 trap cleanup SIGINT SIGTERM EXIT
+FILE="recordings/recRaw7.mp4"
 
 
-PIPELINE="filesrc location=recordings/rec2.mp4 ! qtdemux ! queue ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink"
+PIPELINE="filesrc location=$FILE ! qtdemux ! queue ! h264parse ! avdec_h264 ! videoconvert ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink"
 
-./build/vision $PIPELINE
+./build/vision "$PIPELINE"
 

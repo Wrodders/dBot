@@ -20,7 +20,7 @@ float uuid = 3.14159;
 //@Brief: Motor Speed Control Loop
 static void runMotorSpeedLoop(struct Motor *m){
     motorEstSpeed(m);
-    m->speedCtrl.out = pidRun(&m->speedCtrl, m->shaftRPS);
+    m->speedCtrl.out = pidRun(&m->speedCtrl, m->wheelRPS);
     motorSetVoltage(m, m->speedCtrl.out);
 }
 //@Brief: Balance Angle Control Loop
@@ -42,7 +42,17 @@ static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PI
     pidSetRef(balanceAngleCtrl, -velCtrl->out); // Sets Balance Reference point to reach desired velocity
 }
 // ********** LQR FUNCTIONS ***************************************//
+void runLQR(struct LQR *lqr, struct Motor *motorL, struct Motor *motorR){
+    float xpos = *lqr->state.x[0];
+    float linVel = *lqr->state.x[1];
+    float pitch = *lqr->state.x[2] * DEG_TO_RAD;
+    float pitchRate = *lqr->state.x[3] * DEG_TO_RAD;
+    
+    lqr->u = -lqr->K[0] * xpos - lqr->K[1] * linVel - lqr->K[2] * pitch - lqr->K[3] * pitchRate;
 
+    motorSetVoltage(motorL, lqr->u);
+    motorSetVoltage(motorR, lqr->u);
+}
 // ********* SUPER LOOP **************** // 
 int main(void){
     float nextMode = 0;
@@ -83,7 +93,8 @@ int main(void){
     struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
     // LQR Controller
-    struct LQR lqr ={.K = {LQR_K1, LQR_K2, LQR_K3, LQR_K4}};
+    struct LQR lqr ={.K[0] = LQR_K1, .K[1] = LQR_K2, .K[2] = LQR_K3, .K[3] = LQR_K4, 
+        .state.x = {&ddmr.posX, &ddmr.linearVel, &imu.kal.pitch, &imu.kal.pitchRate}};
 
     // ***************************** COMMUNICATIONS ******************************************************** // 
     struct Coms coms = comsInit();
@@ -133,8 +144,8 @@ int main(void){
     comsRegisterParam(&coms, P_IMU_MOUNT_OFFSET, "%f", &imu.sensor->mount_offset);
     comsRegisterParam(&coms, P_K1, "%f", &lqr.K[0]);
     comsRegisterParam(&coms, P_K2, "%f", &lqr.K[1]);
-    comsRegisterParam(&coms, P_K3, "%f", &lqr.K[3]);
-    comsRegisterParam(&coms, P_K4, "%f", &lqr.K[4]);
+    comsRegisterParam(&coms, P_K3, "%f", &lqr.K[2]);
+    comsRegisterParam(&coms, P_K4, "%f", &lqr.K[3]);
 
     // ************************************************************** //
     comsSendMsg(&coms, &ser1, PUB_INFO, "POST PASSED");
@@ -192,8 +203,9 @@ int main(void){
                     motorEnable(&motorR);
                     pidClear(&velCtrl);
                     pidClear(&balanceAngleCtrl);
+                    ddmr.posX = 0.0f;
                     nextMode = CASCADE;
-                    comsSendMsg(&coms, &ser1, PUB_INFO, "PARK => CASCADE");
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "PARK => RUN");
                 }
                 break;
             case CASCADE:
@@ -201,7 +213,7 @@ int main(void){
                     motorDisable(&motorL);
                     motorDisable(&motorR);
                     nextMode = PARK;
-                    comsSendMsg(&coms, &ser1, PUB_INFO, "RUN => PARK "); 
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "CASCADE => PARK "); 
                     break;
                 }
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
@@ -224,29 +236,19 @@ int main(void){
                     motorDisable(&motorL);
                     motorDisable(&motorR);
                     nextMode = PARK;
-                    comsSendMsg(&coms, &ser1, PUB_INFO, "RUN => PARK "); 
+                    comsSendMsg(&coms, &ser1, PUB_INFO, "LQR => PARK "); 
                     break;
                 }
                 if(CHECK_PERIOD(lqrTask, loopTick)){
-                    // LQR Controller
+                    // Update State 
                     ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     motorEstSpeed(&motorL);
                     motorEstSpeed(&motorR);
-                    float x[4] = {imu.kal.pitch, imu.kal.pitchRate, ddmr.posX,ddmr.linearVel};
-                    float u[2] = {velCtrl.ref, steerCtrl.ref};
-                    for (int i = 0; i < 2; i++){
-                        u[i] = 0;
-                        for (int j = 0; j < 4; j++){
-                            u[i] += lqr.K[i*4 + j] * x[j];
-                        }
-                    }
-
-                    motorSetVoltage(&motorL, u[0]);
-                    motorSetVoltage(&motorR, u[1]);
+                    // TEMP untill observer is implemented
+                    runLQR(&lqr, &motorL, &motorR);
                     lqrTask.lastTick = loopTick;
                 }
                 break;
-
             case TUNE_MOTOR:
                 motorEnable(&motorL);
                 motorEnable(&motorR);
@@ -290,10 +292,11 @@ int main(void){
             comsSendMsg(&coms, &ser1, PUB_TELEM,    imu.kal.pitch,      imu.kal.roll, 
                                                     imu.lpf.accel.x,    imu.lpf.accel.y,        imu.lpf.accel.z,
                                                     imu.lpf.gyro.x,     imu.lpf.gyro.y,         imu.lpf.gyro.z,
-                                                    motorL.shaftRPS,    motorL.speedCtrl.ref,   motorL.speedCtrl.out,
-                                                    motorR.shaftRPS,    motorR.speedCtrl.ref,   motorR.speedCtrl.out,
+                                                    motorL.wheelRPS,    motorL.speedCtrl.ref,   motorL.speedCtrl.out,
+                                                    motorR.wheelRPS,    motorR.speedCtrl.ref,   motorR.speedCtrl.out,
                                                     ddmr.linearVel,     velCtrl.ref,            balanceAngleCtrl.ref, 
-                                                    ddmr.angularVel,    steerCtrl.ref,          steerCtrl.out);
+                                                    ddmr.angularVel,    steerCtrl.ref,          steerCtrl.out,
+                                                    ddmr.posX, lqr.u);
             
             
             // Handle RX Messages 

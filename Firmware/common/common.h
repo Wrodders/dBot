@@ -27,7 +27,7 @@
 #define WSPEED_CNTRL_PERIOD    2
 #define BAL_CNTRL_PERIOD       5
 #define VEL_CNTRL_PERIOD       10
-#define LQR_CNTRL_PERIOD       5
+#define LQR_CNTRL_PERIOD       2
 // *********** GLOBAL CONSTANTS *************************** //
 #define M_PI                3.14159265358979323846f
 #define ENC_CPR             12.00f    // Counts per Revolution
@@ -39,7 +39,7 @@
 #define VSYS                10.00f    // Nominal System Voltage [3s Li ion 10.2-12.6V]
 #define VMOTOR_MAX          9.00      // Scale duty to nominal motor voltage
 #define BAT_CAPACITY        2300      // mAh
-#define MOTOR_DEADBAND      0.0f      // Volts
+#define MOTOR_DEADBAND      0.0f      // 
 // *********** UNIT CONVERSIONS *************************** //
 const float MOTOR_CPR       = ENC_CPR * GEAR_RATIO * EDGE_NUM;
 const float MS_TO_S         = 0.001f; // s
@@ -84,15 +84,15 @@ const float VEL_MAX         = RPS_MAX * RPS_TO_MPS; // m/s
 #define VEL_ALPHA   1.0
 // Angular Velocity Control
 #define STEER_KP    0.7
-#define STEER_KI    0.001
+#define STEER_KI    2.0
 #define STEER_KD    0.0
 #define STEER_ALPHA 1.0
 
 // Full State Feedback Controller
-#define LQR_K1      -0.3980
-#define LQR_K2      -2.0416
-#define LQR_K3      -62.0196
-#define LQR_K4      -2.0854
+#define LQR_K1      3.3274
+#define LQR_K2      14.1156
+#define LQR_K3      2.216
+#define LQR_K4      -14.7079
 
 
 // *********** GLOBAL VARIABLES ******************************************** //

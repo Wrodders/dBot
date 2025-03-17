@@ -35,7 +35,7 @@ struct Motor {
     struct Encoder *enc;    // Encoder
     struct PID torqueCtrl;  // Torque PID Controller
     struct PID speedCtrl;   // Shaft Rotation Speed PI Controller
-    float shaftRPS;         // Estimated angular speed rps
+    float wheelRPS;         // Estimated angular speed rps
     float alpha;            // speed lowpass filter parameter
     float maxVel;           // Saturation
     float vMax;             // Maximum Voltage
@@ -171,8 +171,8 @@ static void motorEstSpeed(struct Motor* motor) {
     dCount = (dCount + (UINT16_MAX + 1)) % (UINT16_MAX + 1); // wrap around on overflow
     if (dCount > (UINT16_MAX / 2)) { dCount -= (UINT16_MAX + 1);}  // Convert to signed range [-32768, 32767]
     motor->enc->lastCount = mCount; 
-    float measuredRPS = (float)dCount * TICKS_TO_RPS * -motor->flipDir * motor->enc->flipDir; // convert to rotations per second
-    motor->shaftRPS = iirLPF(motor->alpha, measuredRPS, motor->shaftRPS); 
+    float measuredRPS = (float)dCount * TICKS_TO_RPS * -motor->flipDir * motor->enc->flipDir; // convert to rotations per second at gearbox output
+    motor->wheelRPS = iirLPF(motor->alpha, measuredRPS, motor->wheelRPS); 
 }
 
 
