@@ -170,13 +170,18 @@
     This adaptive control strategy is shown to be robust to un-modeled environment and plant dynamics, 
     allowing for autonomous aggressive maneuvers along a mapped track.
     
-    This project explores the cascaded PID and LQR control strategies for balancing and stabilizing 
-    the TWSB system at its operating configuration. The robot algorithmically infers and follows an unknown line 
-    using a monocular camera. Sensor fusion and system identification techniques are used develop a system model 
-    which is used to architect the control system. A hardware in the loop software architecure is 
+    This project develops indoor navigational strategies for the TWSB mobile robot. Autonomy is built upon a stabilizing 
+    feedback controller, cascaded PID and LQR control strategies are explored for balancing and stabilizing the robots position. 
+    Once this these requirements are met the 
+    robot is able to be teleported intuitively using a smartphone web-based interface. The rest of the paper is 
+    concerned with incorporating the multimodal 
+    sensor data from the camera to develop line racing algorithms. 
+    
+    The robot algorithmically infers and follows an unknown line 
+    using a monocular camera. A hardware in the loop software architecure is 
     implemented enabling telemetry data and control commands to be exchanged between the robot 
-    and a remote computer. Visualization of this multimodal telemetry data provides simple
-    means to validate performance. 
+    and a remote computer. Visualization of this telemetry data provides simple
+    means to validate the robots performance. 
     \pagebreak{}
 
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
@@ -343,7 +348,9 @@
 
         \subsection{Software Architecture}
         The modern standard for robotics software is the Robot Operating System 2 (ROS2)[]. 
-        Whilst this is a powerful tool, it is deemed too complex for the requirements of this project.
+        Whilst this is a powerful tool, it is deemed too complex for the requirements of this project
+        as the initial hardware prototype of the TWSB system utilized a Raspberry Pi Zero 2W, 
+        its 512MB of RAM is limiting. 
         Nevertheless some core concepts are used such as its 
         decentralized message pattern shown in fig(8). ZeroMQ[] is used for 
         anonymous pub sub style communication between computational nodes.
@@ -579,8 +586,9 @@
             \end{equation}
             \label{eq:KalmanAlgorithm}
         \end{subequations}
-        Even though the state transition model of the TWSB robot is non-linear, 
-        \cite{SelfContainedMobileTWSB} \cite{ooi2003balancing} 
+     
+        Even though the state transition model of the TWSB robot is non-linear
+        \cite{ooi2003balancing} 
         developed self balancing platforms capable of restricting oscillations about the 
         operating point to $±1$ degree. This one order of magnitude than the worst case pitch limit of $±10$ degrees.
         Beyond this, the small angle approximation is no longer valid, and the system is not locally linear. 
@@ -589,52 +597,139 @@
         full state feedback, or solely the dynamics of the IMU.  Both approaches have had success in the literature[][][]. 
         An alternative approach is to use a simplification of the noise modeling used by classical baysian saticitcs and 
         assume that the noise covariance are time invariant, the complementary filter \cite{ComplimentaryKalman} 
-        is a popular choice for this due to its low mathematical complexity. Other simimplifications like assuming the grysocope 
-        bias is constant[] have also been used to reduce the computational complexity of the KF.
-
+        is a popular choice for this due to its low mathematical complexity. 
+     
+        An early work on  attitude control of the TWSB system by \cite{SelfContainedMobileTWSB} directly integrates the gyroscope and its bias 
+        and despite the bias drift, is able to be stabilized whilst moving. 
         The MPU6050 6-Axis IMU can estimate the pitch through the gyroscope measurement $\vec\omega_{gyro}$ and the accelerometer measurement $\vec a_{x}$.
+
         \begin{equation}
             \begin{aligned}
-                \dot\theta = \omega_{gyro} + \beta + \gamma
+                \begin{bmatrix}
+                    \theta_{g{k}} \\
+                    \beta_{k} 
+                \end{bmatrix}
+                &= 
+                \begin{bmatrix}
+                    1 & -\Delta t \\
+                    0 & 1
+                \end{bmatrix}
+                \begin{bmatrix}
+                    \theta_{g{k-1}} \\
+                    \beta_{k-1}
+                \end{bmatrix}
+                +
+                \begin{bmatrix}
+                    \Delta t \\
+                    0
+                \end{bmatrix}
+                + \begin{bmatrix}
+                    -\rho_{k-1}\cdot\Delta t \\
+                    \rho_b
+                \end{bmatrix}
             \end{aligned}
-            \label{eq:gyroBias}
+            \label{eq:gyroBias1}
         \end{equation}
-
-            
-
-
-
-       
-
+        
+        \begin{equation}
+            \begin{aligned}
+                z_k &= \begin{bmatrix}
+                    1 & 0
+                \end{bmatrix}
+                \begin{bmatrix}
+                    \theta_k \\
+                    \nu_{g{k}}
+                \end{bmatrix}
+                + \begin{bmatrix}
+                    \rho_{a{k}}
+                \end{bmatrix}
+            \end{aligned}
+            \label{eq:gyroBias2}
+        \end{equation}
+        
 
         \begin{figure}[H]
             \centering
-            \includegraphics[width=0.5\textwidth]{Graphs/SensorFusion.pdf}
+            \includegraphics[width=0.8\textwidth]{Graphs/SensorFusion.pdf}
             \caption{Sensor Fusion of accelerometer and gyroscope}
             \label{fig:SensorFusion}
         \end{figure}
 
+        The MPU6050 parameters are obtained from the dataset[] as 
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|c|c|c|}
+                \hline
+                Parameter & Value & Units \\
+                \hline
+                $a_{sensitivity}$ & 16384 & LSB/g \\
+                $g_{sensitivity}$ & 131 & LSB/deg/s \\
+                \hline
+            \end{tabular}
+            \caption{MPU6050 Parameters}
+        \end{table}
+        The kalman gain matrix is obtained operating the motors to simulate typical high frequency conditions 
+        and tuning the process and measurement noise matrices.
+        \begin{table}[H]
+            \centering
+            \begin{tabular}{|c|c|c|}
+                \hline
+                Parameter & Value & Units \\
+                \hline
+                $Q$ & 0.01 & $rad^2$ \\
+                $R$ & 0.01 & $rad^2$ \\
+                \hline
+            \end{tabular}
+            \caption{Kalman Filter Noise Parameters}
+        \end{table}
+
        
         \ref{fig:SensorFusion} shows that the Kalman Filter's produces a smooth estimate of the pitch angle
-        under the experiment described in \ref{fig:accelNoise}. It is observed that when there is a 
+        under conditions of the experiment in \ref{fig:accelNoise}. It is observed that when there is a 
         large change in the motors set-point  the angular momentum built up from the wheels is sufficient to 
         disturb the system from rest seen at $k \approx [170, 380, 580]$.
         \pagebreak{}
     \section{Control System}
-        A simple PID controller operating on the pitch error is often enough to mantain the TWSB balance.
-        However as shown by fig3, x position drifts. Since the linear velocity is coupled to the
-        pitch angle by eq(1), the target pitch angle must be controlled to maintain a constant x velocity. 
+        A simple PID controller operating on the pitch error is tested in simscape multibody, 
+        This manages to stabilize the pitch angle however as shown by fig, x position drifts. For intuitive control laws
+        to be applied to the TWSB system, as opposed to the force control used in the simscape model, the system must 
+        be stable about its equilibrium point without causing undue effects on the DDMR model.
+        The TWSB achieves balance by controlling the oscillations of the pitch angle about the vertical axis. 
+        The linearized system of equations in \ref{eq:2DOF} is applicable 
+        only when the pitch angle is small, this is taken to be $±10$ degrees. 
+        A target maximum pitch oscitation is set to $±1$ degree. 
+        The TWSB needs to be able to move along the $X'$ axis in its inertial frame.
+        [] reviews control strategies immplemented in the mobile robotics litracture. The choice 
+        of control strategy is found to be depending on the availabel hardware and modeling complexity. 
+        [] develops a high fidelity model and simulation study of a WIP platofrm usign low cost sensors and actuators, 
+        yet is able to achieve a high level of performance. Conversly a simpler control strategy is used by [] as the robot is
+        fittted with brushless motors which can be redily torque controlled, and the system is able to be 
+        navigated with a simple PID controller.
+        
+        These controllers note the drawbacks of desining a single controller for the entire system, and so in cases
+        where the goal is to achive a hugh leeel of atonony [][] use slinigmg mode controll in order to tune varrious controllers 
+        aggressivly for differeent requeiremtns and automantilay smothly swithc between them.
+
+        Recently the computational requwireses needed for Model Predictive Control (MPC) have been reduced and 
+        effecive impeenatiosn of such optimizers have been used in small mobile robots[][][]. 
+        
+        Parameter uncertainty is a common issue in bailing models for mobile robotics, and approximaions of these lead to 
+        discrepeancies between theoptimal solutions found in simulation and in real world perfoamcne. [][] develop a 
+        data driven approach to observe the system and infer its parameters. A model from these is then used in feedback control. 
+        [] in a similar vein follows this approach and emmbeded a neural network as an online function approximate to learn the to 
+        predict the systems dynamics. This prediction is then used as part of a trajectory planner in race-line optimization. 
+
+
+
+     
 
         \subsection{Cascade PID}
-
-        The TWSB achieves balance by osculating the pitch angle about the vertical axis. 
-        The linearized system of equations in eq(4) is applicable 
-        only when the pitch angle is small, this is taken to be 10 degrees. 
-        A target maximum pitch oscitation is set to +-1 degree. 
-        The TWSB also needs to be able to move along the $X'$ axis in its inertial frame.
+        Since the linear velocity is coupled to the
+        pitch angle, the target pitch angle must be controlled to maintain a constant x velocity. 
         This is achieved by regulating the pitch angle about equilibrium or 0 degrees.
 
         A cascaded pid controller is used to control the pitch angle and the linear velocity. 
+        Control of the position $(x_g,y_g)$ is left to a higher level planner.  
         If the inner loop dynamics are much faster than the outer loop, 
         then the inner loop can be approximated as a disturbance[].
 
@@ -704,24 +799,21 @@
         by Nyquist the system must then be sampled at least 200Hz. 
 
         \pagebreak{}
-    \section{Vision System}
-    \begin{figure}[H]
-        \centering
-        \begin{subfigure}[c]{0.35\textwidth}  % Make this a bit smaller
-            \centering
-            \rotatebox{90}{\includegraphics[height=\textwidth]{TrajTrak.jpeg}}  % Increase height for better visibility
-            \caption{Race Track}
-        \end{subfigure}
-       
-        \hspace{0.05cm}  % Adds horizontal space between the subfigures
-        \begin{subfigure}[c]{0.6\textwidth}  % Adjusted width to match
-            \centering
-            \includegraphics[width=\textwidth]{Graphs/DeadReckoningTrackMap.pdf}
-            \caption{Map built offline using dead reckoning}
-        \end{subfigure}
-        \caption{Trajectory Tracking and Map Visualization}
-    \end{figure}
-    
+        \section{Vision System}
+
+        \subsection{Camera Sensor}
+
+        \subsubsection{Calibration}
+
+        \subsection{Robust Line Detection Algorithms}
+
+        \subsection{Navigation requirements}
+
+        \subsection{Indoor Drivability Segmentation}
+
+        \subsection{Racing Algorithms}
+
+        \subsection{Predictive Trajectory Generation}
     
     \pagebreak{}
 
@@ -729,9 +821,24 @@
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
   \section{Results and discussion} % edit section heading as appropriate
     \subsection{Balance Performance}
-    \includegraphics[width=\textwidth]{V1Colated.png}
+
     \subsection{Operational Robustness}
     \subsection{Line Trajectory Tracking}
+    \begin{figure}[H]
+        \centering
+        \begin{subfigure}[b]{0.45\textwidth}
+           
+            \includegraphics[height=1.3\textwidth]{TrajTrak.jpeg}
+            \caption{Race Track}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.45\textwidth}
+            \includegraphics[width=\textwidth]{Graphs/DeadReckoningTrackMap.pdf}
+            \caption{Map built offline using dead reckoning}
+        \end{subfigure}
+        \caption{Trajectory Tracking and Map Visualization}
+        \label{fig:TrajTrack}
+    \end{figure}
     \subsection{More detail}
     \subsection{Summary}
   %%%%%%%%%%%%%%%%%% SECTION 5 %%%%%%%%%%%%%%%%%%
