@@ -10,7 +10,7 @@ StartLimitBurst=3
 [Service]
 Type=simple
 User=pi
-ExecStart=/home/pi/prog/software/build/twsbComs /dev/ttyAMA0 115200
+ExecStart=/home/pi/prog/software/build/twsbComs /dev/ttyAMA0 230400
 Restart=on-failure
 RestartSec=5s
 KillMode=process

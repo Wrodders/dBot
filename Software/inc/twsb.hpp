@@ -33,6 +33,7 @@ int config_serial_port(const std::string& port, int baud) {
         case 38400: speed = B38400; break;
         case 57600: speed = B57600; break;
         case 115200: speed = B115200; break;
+        case 230400: speed = B230400; break;
         default: 
             close(serial_port_fd);
             throw std::runtime_error("Unsupported baud rate.");

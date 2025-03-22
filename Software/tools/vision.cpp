@@ -83,6 +83,7 @@ int run(int argc, char* argv[]) {
 
     // -------------- Vision Pipeline Loop ----------------- //
     float progmode;
+    struct viz::WallDetection walls = {0, 0};
     while (!viz::_exit_trig) {
         // ------------ Read Frame ------------ //
        
@@ -111,11 +112,11 @@ int run(int argc, char* argv[]) {
                 viz::pipeline(y_plane, homography_matrix, param_map);
                 break;
             case viz::M_SEG_FLOOR: // Visualize the segmented floor
-                viz::estimateDrivability(y_plane);
-                // draw line at horizon
-                float horizon;
-                param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horizon);
-                cv::line(y_plane, cv::Point(0, (int)horizon), cv::Point(viz::WIDTH, (int)horizon), cv::Scalar(255), cv::LINE_8);
+                walls = viz::estimateDrivability(y_plane);
+                // Segment the wall and floor from floor_y
+                cv::line(y_plane, cv::Point(0, walls.floor_y), cv::Point(viz::WIDTH, walls.floor_y), cv::Scalar(255), 10);
+
+                cv::GaussianBlur(y_plane(cv::Rect(0, 0, viz::WIDTH, walls.floor_y)), y_plane(cv::Rect(0, 0, viz::WIDTH, walls.floor_y)), cv::Size(51, 51), 0);
                 break;
             case viz::M_VIZ:
                 // Pass through the frame for remote visualization
