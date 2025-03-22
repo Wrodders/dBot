@@ -35,8 +35,17 @@ User defines the Application Specific Topics and Parameters
 #define SOF_BYTE '<'    // hex 0x3C 
 #define EOF_BYTE  '\n'  // 
 #define DELIM_BYTE ':'  // hex 0x3A
-#define MAX_MSG_DATA_SIZE 512
-#define MSG_OVERHEAD_SIZE  4 // SOF ID LEN EOF
+#define MSG_OVERHEAD_SIZE  3 // SOF ID  EOF
+
+#define MAX_SERIALIZED_FLOAT_SIZE 8 //-999.999    
+
+#define SERIALIZED_TELEM_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
+#define SERIALIZED_ERROR_FMT  "%s"
+#define SERIALIZED_INFO_FMT   "%s"
+#define SERIALIZED_DEBUG_FMT  "%s"
+#define SERIALIZED_CMDRET_FTM "%s"
+// 22 Floats + 21 Delimiters 
+#define MAX_MSG_DATA_SIZE MAX_SERIALIZED_FLOAT_SIZE * 22 + 21
 
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
 #define PROT_CMD_IDX 0  // Command position in Frame
@@ -46,14 +55,6 @@ User defines the Application Specific Topics and Parameters
                             // Allows for IDs [A, Z] + [a,z] = 52 unique IDs available
 
 
-//                                ±  100  .  999   /0            
-#define MAX_SERIALIZED_FLOAT_SIZE (1 + 3 + 1 + 3 + 1)
-
-#define SERIALIZED_TELEM_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
-#define SERIALIZED_ERROR_FMT  "%s"
-#define SERIALIZED_INFO_FMT   "%s"
-#define SERIALIZED_DEBUG_FMT  "%s"
-#define SERIALIZED_CMDRET_FTM "%s"
 
 // *********** Parameters **************************** //
 #define PARAM_REGISTERS(X)                            \

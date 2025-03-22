@@ -21,7 +21,7 @@
 #endif
 // ************* Task Execution Periods ******************** // 
 #define COMSCMD_PERIOD         20  // ms
-#define COMSPUB_PERIOD         50  // ms
+#define COMSPUB_PERIOD         10  // ms
 #define BLINK_PERIOD           200 // ms
 #define IMU_PERIOD             1
 #define WSPEED_CNTRL_PERIOD    2

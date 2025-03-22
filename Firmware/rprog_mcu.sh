@@ -40,7 +40,7 @@ flash_stm32flash() {
     ssh "$PI_USER@$PI_IP" << EOF
         echo "Entering FW update mode..."
         sudo systemctl stop twsb.service
-        stty -F "$SERIAL_PORT" 115200
+        stty -F "$SERIAL_PORT" 230400
         echo '<BB0\n' > $SERIAL_PORT 
         sleep 1
         stm32flash -R -w "$REMOTE_BIN_DIR/$BIN_FILENAME" -v "$SERIAL_PORT"

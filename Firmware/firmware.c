@@ -14,7 +14,7 @@
 
 // ********** GLOBAL STATIC BUFFERS ***************************************// ACCESS THROUGH RING BUFFER 
 uint8_t rx1_buf_[512] = {0};
-uint8_t tx1_buf_[256] = {0};
+uint8_t tx1_buf_[2048] = {0};
 float uuid = 3.14159;
 // ********** CASCADED PID FUNCTIONS ***************************************//
 //@Brief: Motor Speed Control Loop
@@ -68,7 +68,7 @@ int main(void){
                             NVIC_USART1_IRQ, 
                             rx1_buf_, ARRAY_SIZE(rx1_buf_), 
                             tx1_buf_, ARRAY_SIZE(tx1_buf_));
-    serialConfig(&ser1, 115200, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
+    serialConfig(&ser1, 230400, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
    
     // IMU 
     i2cInit(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
@@ -288,17 +288,6 @@ int main(void){
         }
         // ********** Communications ********************************************************************** //
         if(CHECK_PERIOD(comsCmdTask, loopTick)){
-            // TX Publishing Telemetry
-            comsSendMsg(&coms, &ser1, PUB_TELEM,    imu.kal.pitch,      imu.kal.roll, 
-                                                    imu.lpf.accel.x,    imu.lpf.accel.y,        imu.lpf.accel.z,
-                                                    imu.lpf.gyro.x,     imu.lpf.gyro.y,         imu.lpf.gyro.z,
-                                                    motorL.wheelRPS,    motorL.speedCtrl.ref,   motorL.speedCtrl.out,
-                                                    motorR.wheelRPS,    motorR.speedCtrl.ref,   motorR.speedCtrl.out,
-                                                    ddmr.linearVel,     velCtrl.ref,            balanceAngleCtrl.ref, 
-                                                    ddmr.angularVel,    steerCtrl.ref,          steerCtrl.out,
-                                                    ddmr.posX, lqr.u);
-            
-            
             // Handle RX Messages 
             while(rbEmpty(&ser1.rxRB)==false){
                 if(comsGrabCmdMsg(&coms, &ser1)){
@@ -307,6 +296,21 @@ int main(void){
             }
             comsCmdTask.lastTick = loopTick;
         }
+        if(CHECK_PERIOD(comsPUBTask, loopTick)){
+            // TX Publishing Telemetry
+            comsSendMsg(&coms, &ser1, PUB_TELEM,    imu.kal.pitch,      imu.kal.roll, 
+                imu.lpf.accel.x,    imu.lpf.accel.y,        imu.lpf.accel.z,
+                imu.lpf.gyro.x,     imu.lpf.gyro.y,         imu.lpf.gyro.z,
+                motorL.wheelRPS,    motorL.speedCtrl.ref,   motorL.speedCtrl.out,
+                motorR.wheelRPS,    motorR.speedCtrl.ref,   motorR.speedCtrl.out,
+                ddmr.linearVel,     velCtrl.ref,            balanceAngleCtrl.ref, 
+                ddmr.angularVel,    steerCtrl.ref,          steerCtrl.out,
+                ddmr.posX, lqr.u);
+
+            
+            comsPUBTask.lastTick = loopTick;
+        }
+
         // ********* DEBUG LED ******************************************************************* // 
         if(CHECK_PERIOD(blinkTask, loopTick)){
             gpio_toggle(led.port, led.pin);
