@@ -21,7 +21,7 @@ struct PID{
 
 static inline void pidEnable(struct PID *pid){pid->en = true;}                  
 static inline void pidDisable(struct PID *pid){pid->en = false;}
-static inline void pidClear(struct PID *pid){pid->iTerm=0;} 
+static inline void pidClear(struct PID *pid){pid->iTerm=0; pid->lastErr=0; pid->out=0; pid->ref=0; pid->error=0;}  
 static inline void pidSetKp(struct PID *pid, float kp){pid->kp = kp;}  
 static inline void pidSetKi(struct PID *pid, float ki){pid->ki = ki * pid->dt;} // precompute save calculations 
 static inline void pidSetKd(struct PID *pid, float kd){pid->kd = kd / pid->dt;} //

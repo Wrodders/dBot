@@ -89,6 +89,7 @@ static void motorEnable(struct Motor *motor){
 }
 // @Brief: Stops Motor Driver
 static void motorDisable(struct Motor *motor){
+    pidClear(&motor->speedCtrl);
     pidDisable(&motor->speedCtrl);
     gpio_clear(motor->drv.en.port, motor->drv.en.pin); // disable driver board
 }

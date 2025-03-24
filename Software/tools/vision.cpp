@@ -72,6 +72,7 @@ int run(int argc, char* argv[]) {
     ParameterMap param_map(CONFIG_PATH, viz::NODE_NAME);
     param_map.register_parameter(viz::P_PROG_MODE, _params[viz::P_PROG_MODE], viz::val_prog_mode);
     param_map.register_parameter(viz::P_LOOK_HRZ_HEIGHT, _params[viz::P_LOOK_HRZ_HEIGHT], viz::val_hrz_height);
+    param_map.register_parameter(viz::P_MAX_VEL, _params[viz::P_MAX_VEL], viz::val_max_vel);
 
     // initialize the parameters
     param_map.set_value(viz::P_PROG_MODE, viz::M_CALIBRATE);
@@ -126,7 +127,7 @@ int run(int argc, char* argv[]) {
                 
                 walls = viz::estimateWallHorizon(y_plane);
                 
-                param_map.set_value(viz::P_LOOK_HRZ_HEIGHT, walls.floor_y);
+                //param_map.set_value(viz::P_LOOK_HRZ_HEIGHT, walls.floor_y);
 
                 cv::Mat wall_frame = y_plane(cv::Rect(0, 0, viz::WIDTH, walls.floor_y)); // SubFrame for visualization
                 cv::Rect floor_roi;

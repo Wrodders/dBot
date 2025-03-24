@@ -40,40 +40,45 @@ namespace nav {
     std::condition_variable _twist_cv;
 
     //@brief: Computes velocity references from prominence, confidence and drivability
-    void pathFollower(const int peakIdx, const int peakWidth, const int peakProminence) {
+    void pathFollower(const int peakIdx, const int curveWidth, const int curveConfidance) {
         // Normalize the cross-track error to -1 to 1
         float crossTrackError = (peakIdx - 320) / 320.0f;
-        bool trackLost = (peakProminence < 50 || peakWidth > 400);
+        bool trackLost = (curveConfidance < 50 || curveWidth > 600);
     
         // Trajectory object to hold speed and w_rate
         Trajectory twist;
 
         if (trackLost) {
             // If track is lost, stop movement and set no rotation
-            twist.w_rate = 0.0f;
+            //twist.w_rate = 0.0f;
             twist.speed = 0.0f;
         } else {    
             // Width-based speed adjustment 
-            float widthFactor = 1.0f - std::min(peakWidth / 640.0f, 1.0f); // Larger width = slower speed
+            float widthFactor = 1.0f - std::min(curveWidth / 640.0f, 1.0f); // Larger width = slower speed
     
             // Prominence-based speed adjustment
-            float prominenceFactor = 1.0f - std::min(peakProminence / 255.0f, 1.0f); // Low prominence = slower speed
+            float prominenceFactor = 1.0f - std::min(curveConfidance / 255.0f, 1.0f); // Low prominence = slower speed
     
             // Combined speed factor: both width and prominence affect the speed
             float speedFactor = 0.3f * (widthFactor - prominenceFactor*0.3);
     
             // Limit the maximum speed to 0.2 and ensure it never goes below 0
-            twist.speed = std::clamp(speedFactor, 0.0f, 0.3f);
-    
+            //twist.speed = 0;
             // Adjust rotation rate based on cross-track error
             // deadband to prevent small errors from causing rotation
-            crossTrackError = std::abs(crossTrackError) < 0.05f ? 0.0f : crossTrackError;
+            //crossTrackError = std::abs(crossTrackError) < 0.05f ? 0.0f : crossTrackError;
+            
+            static float rateCruvature = 0.0f;
+            rateCruvature = iir_filter(crossTrackError, rateCruvature, 0.3f);
+            
 
-            twist.w_rate = std::clamp(crossTrackError, -0.6f, 0.6f);
+            twist.w_rate = std::clamp(crossTrackError*0.5f, -0.6f, 0.6f);
         }
+
+        
     
         // Debugging output to check the values
-        std::cout << "W Rate: " << twist.w_rate << " Speed: " << twist.speed << std::endl;
+        //std::cout << "W Rate: " << twist.w_rate << " Speed: " << twist.speed << std::endl;
     
         // Push the trajectory twist to the queue for the robot control
         {
@@ -101,9 +106,9 @@ namespace nav {
             std::string msg = "<BR" + std::to_string(twist.w_rate) + "\n";
             traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
             traj_pubsock.send(zmq::message_t(msg.c_str(), msg.size()), zmq::send_flags::none);
-            std::string msg2 = "<BM" + std::to_string(twist.speed) + "\n";
-            traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
-            traj_pubsock.send(zmq::message_t(msg2.c_str(), msg2.size()), zmq::send_flags::none);
+            //std::string msg2 = "<BM" + std::to_string(twist.speed) + "\n";
+            //traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
+            //traj_pubsock.send(zmq::message_t(msg2.c_str(), msg2.size()), zmq::send_flags::none);
         }   
     }
 }
@@ -114,7 +119,7 @@ const char* NODE_NAME = "VISION";
 enum { M_CALIBRATE = 0, M_PATHFOLLOW,M_PERSUIT, M_SEG_FLOOR, M_VIZ, NUM_MODES };
 
 // -------------- Parameter IDs -------------- //
-enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, NUM_PARAMS }; 
+enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, NUM_PARAMS }; 
 
 // -------------- Global Variables -------------- //
 std::atomic<bool> _exit_trig(false);
@@ -202,7 +207,7 @@ void findTrackEstimate(cv::Mat& roiFrame, const cv::Mat& homography) {
 
 // Compute histogram with appropriate types
 void computeHistogram(const cv::Mat& edges, cv::Mat& hist) {
-    cv::Mat bottom_half = edges(cv::Rect(0, edges.rows / 4, edges.cols, edges.rows *3/ 4));
+    cv::Mat bottom_half = edges(cv::Rect(0, edges.rows / 2, edges.cols, edges.rows / 2));
     cv::reduce(bottom_half, hist, 0, cv::REDUCE_SUM, CV_32F);
     cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);  // Normalize to 0-255 range
     cv::GaussianBlur(hist, hist, cv::Size(21, 1), 0, 0);
@@ -453,6 +458,9 @@ void command_server(ParameterMap& param_map) {
 static inline bool val_hrz_height(float val) { return (val > 0 && val < HEIGHT); }
 static inline bool val_trfm_pad(float val)   { return (val > 0 && val < WIDTH); }
 static inline bool val_prog_mode(float val)  { return (val >= 0 && val < NUM_MODES); }
+static inline bool val_max_vel(float val)    { return (val > 0 && val < 1); }
+
+
 
 } // namespace viz
 

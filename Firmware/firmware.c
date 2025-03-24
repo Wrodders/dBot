@@ -192,6 +192,8 @@ int main(void){
                     pidClear(&steerCtrl);
                     motorDisable(&motorL);
                     motorDisable(&motorR);
+                    motorStop(&motorL);
+                    motorStop(&motorR); 
                     nextMode = PARK;
                     comsSendMsg(&coms, &ser1, PUB_INFO, "INIT => PARK ");
                 }
@@ -203,6 +205,7 @@ int main(void){
                     motorEnable(&motorR);
                     pidClear(&velCtrl);
                     pidClear(&balanceAngleCtrl);
+                    pidClear(&steerCtrl);
                     ddmr.posX = 0.0f;
                     nextMode = CASCADE;
                     comsSendMsg(&coms, &ser1, PUB_INFO, "PARK => RUN");
