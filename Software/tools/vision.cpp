@@ -24,159 +24,130 @@
  * | ROI  | Edge | window|
  * ----------------------|
  ************************************************************************************/
-#include "../inc/vision.hpp"
 #include <gst/gst.h>
 #include <atomic>
-#include <opencv2/highgui/highgui.hpp>  // For showing frames
+#include <chrono>
+#include <opencv2/opencv.hpp> 
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
-    #define DEFAULT_INPUT_PIPELINE "avfvideosrc device-index=0 do-timestamp=true ! videoconvert ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink"
+    #define DEFAULT_INPUT_PIPELINE "avfvideosrc device-index=0 do-timestamp=true ! videoconvert ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink drop=true sync=false max-buffers=1"
     #define OUTPUT_PIPELINE "appsrc ! videoconvert ! osxvideosink sync=false"
     #define CONFIG_PATH "configs/robotConfig.json"
 
 #else   
-    #define DEFAULT_INPUT_PIPELINE "libcamerasrc ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink"
+    #define DEFAULT_INPUT_PIPELINE "libcamerasrc ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink drop=true sync=false max-buffers=1"
     #define OUTPUT_PIPELINE "appsrc ! videorate ! videoconvert ! queue ! x264enc tune=zerolatency speed-preset=ultrafast quantizer=25 key-int-max=15 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=192.168.0.32 port=5002 sync=false"
     #define CONFIG_PATH "/home/pi/prog/software/configs/robotConfig.json"
 #endif
 
-int run(int argc, char* argv[]) { 
-    std::cout << ("Starting Vision Pipeline") << std::endl;
+
+#include "../common/coms.hpp"
+#include "../inc/vision.hpp"
+#include "../inc/calibration.hpp"
+#include "../inc/navigation.hpp"
+#include "../inc/cmdserver.hpp"
+
+
+int run(int argc, char* argv[]) {
+    std::cout << "Starting Vision Pipeline (OpenCV GStreamer)" << std::endl;
     openlog("vision", LOG_PID | LOG_CONS, LOG_USER);
 
     // --------------- CLI Parsing ----------------- //
-    std::string input_pipeline = (argc > 1) ? argv[1] : DEFAULT_INPUT_PIPELINE;   
-    bool debug_mode = (argc > 2 && std::string(argv[2]) == "--debug");  // Check for debug argument
-    if (input_pipeline.empty()) {
-        syslog(LOG_ERR, "Error: Invalid Input Pipeline\n");
-        return 1;
-    }
+    std::string input_pipeline = (argc > 1) ? argv[1] : DEFAULT_INPUT_PIPELINE;
+    bool debug_mode = (argc > 2 && std::string(argv[2]) == "--debug");
 
-    // -------------- Video IO Setup ----------------- //
+    // -------------- OpenCV Video Setup ----------------- //
     cv::VideoCapture cap(input_pipeline, cv::CAP_GSTREAMER);
     if (!cap.isOpened()) {
-        syslog(LOG_ERR, "Failed to open input pipeline!");
+        syslog(LOG_ERR, "Failed to open video capture!");
         return -1;
     }
 
-    cv::VideoWriter writer(OUTPUT_PIPELINE, cv::CAP_GSTREAMER, 
-                           0, 30, cv::Size(viz::WIDTH, viz::HEIGHT), false); // grayscale output
-    if (!writer.isOpened()) {
-        syslog(LOG_ERR, "Failed to open output pipeline!");
-        return -1;
+    cv::VideoWriter writer;
+    if (!debug_mode) {
+        writer.open(OUTPUT_PIPELINE, cv::CAP_GSTREAMER, 0, 30, cv::Size(viz::WIDTH, viz::HEIGHT), true);
+        if (!writer.isOpened()) {
+            syslog(LOG_ERR, "Failed to open video writer!");
+            cap.release();
+            return -1;
+        }
     }
 
     // -------------- Runtime Parameters ----------------- //
     std::array<std::atomic<float>, viz::NUM_PARAMS> _params;
     ParameterMap param_map(CONFIG_PATH, viz::NODE_NAME);
-    param_map.register_parameter(viz::P_PROG_MODE, _params[viz::P_PROG_MODE], viz::val_prog_mode);
-    param_map.register_parameter(viz::P_LOOK_HRZ_HEIGHT, _params[viz::P_LOOK_HRZ_HEIGHT], viz::val_hrz_height);
-    param_map.register_parameter(viz::P_MAX_VEL, _params[viz::P_MAX_VEL], viz::val_max_vel);
+    param_map.register_parameter(viz::P_PROG_MODE, _params[viz::P_PROG_MODE], cmd::val_prog_mode);
+    param_map.register_parameter(viz::P_LOOK_HRZ_HEIGHT, _params[viz::P_LOOK_HRZ_HEIGHT], cmd::val_hrz_height);
+    param_map.register_parameter(viz::P_MAX_VEL, _params[viz::P_MAX_VEL], cmd::val_max_vel);
+    param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
+    param_map.set_value(viz::P_LOOK_HRZ_HEIGHT, 1);
+    param_map.set_value(viz::P_MAX_VEL, 0.1);
 
-    // initialize the parameters
-    param_map.set_value(viz::P_PROG_MODE, viz::M_CALIBRATE);
-    param_map.set_value(viz::P_LOOK_HRZ_HEIGHT, 330);
-
-    // ------------- Command Server Coms Thread ----------------- //
-    std::thread cmd_thread(viz::command_server, std::ref(param_map));
-    // ------------- Tracjectory Publisher Thread ----------------- //
+    // ------------- Command Server & Trajectory Threads ----------------- //
+    std::thread cmd_thread(cmd::command_server, std::ref(param_map));
     std::thread traj_thread(nav::trajGenServer);
 
     // -------------- Vision Pipeline Allocations ----------------- //
-    cv::Mat y_plane(viz::HEIGHT, viz::WIDTH, CV_8UC1); // Single channel for Y plane
-    cv::Mat homography_matrix = cv::findHomography(viz::_src_pts, viz::_dst_pts);
+    cv::Mat homography_matrix;
+    cv::Mat undistorted(viz::HEIGHT, viz::WIDTH, CV_8UC1);
+    cv::Mat outputFrame(viz::HEIGHT, viz::WIDTH, CV_8UC3);
+
+    // -------------- Camera Calibration ----------------- //
+    cv::Mat cameraMatrix, distCoeffs;
+    if (!calib::loadCalibration(cameraMatrix, distCoeffs)) {
+        syslog(LOG_ERR, "Failed to load camera calibration parameters!");
+        cap.release();
+        writer.release();
+        return -1;
+    }
+
+    cv::Mat map1, map2;
+    cv::initUndistortRectifyMap(cameraMatrix, distCoeffs, cv::Mat(),
+                               cameraMatrix, cv::Size(viz::WIDTH, viz::HEIGHT), CV_32FC1, map1, map2);
 
     // -------------- Vision Pipeline Loop ----------------- //
-    float progmode;
-
+    int loopRate_ms = -1;  
     while (!viz::_exit_trig) {
         // ------------ Read Frame ------------ //
-        if (!cap.read(y_plane)) {  // Read the full frame
-            if (cap.grab()) {
-                syslog(LOG_ERR, "End of stream reached, handling EOS...");
-                break; // Graceful EOS exit
-            } else {
-                syslog(LOG_ERR, "Failed to read frame!");
-                viz::_exit_trig.store(true); // force exit
+        cv::Mat y_plane;
+        if (!cap.read(y_plane)) {
+            syslog(LOG_ERR, "Failed to read frame from capture!");
+            break;
+        }
+        auto process_start = std::chrono::high_resolution_clock::now();
+        // ------------ Undistort ------------ //
+        cv::remap(y_plane, undistorted, map1, map2, cv::INTER_LINEAR);
+        // ------------ Processing ------------ //
+        viz::img_pipeline(undistorted, outputFrame, homography_matrix, param_map, loopRate_ms);
+        auto process_end = std::chrono::high_resolution_clock::now();
+        // ------------ Write Frame ------------ //
+        if (!outputFrame.empty()) {
+            try {
+                writer.write(outputFrame);
+            } catch (cv::Exception& e) {
+                syslog(LOG_ERR, "Failed to write frame to video writer!");
                 break;
             }
         }
-        if(y_plane.empty()) {
-            syslog(LOG_ERR, "Empty Frame!");
-            viz::_exit_trig.store(true); // force exit
-            break;
+        // ------------ Loop Performance ------------ //
+        auto process_duration = std::chrono::duration_cast<std::chrono::milliseconds>(process_end - process_start);
+        int loopTime_ms = static_cast<int>(process_duration.count());
+        if(loopRate_ms < 0 ){
+            if(process_duration.count() > 20) { // high watermark
+                syslog(LOG_WARNING, "High watermark %d ms", loopTime_ms);
+            }
+        }else {
+            int sleepTime = debug_mode ? 200 : loopRate_ms;
+            std::this_thread::sleep_until(process_start + std::chrono::milliseconds(sleepTime));
         }
-
-        // ------------ Frame Processing ------------ //
-        (void) param_map.get_value(viz::P_PROG_MODE, progmode);
-
-        switch ((int)progmode) {
-            case viz::M_CALIBRATE:
-                syslog(LOG_INFO, "Calibrating Camera");
-                homography_matrix = cv::findHomography(viz::_src_pts, viz::_dst_pts);
-                syslog(LOG_INFO, "Calibration Complete");
-                param_map.set_value(viz::P_PROG_MODE, viz::M_PATHFOLLOW);
-                break;
-            case viz::M_PATHFOLLOW:
-                {
-
-                struct viz::WallDetection walls = {0};
-                cv::Mat pathHistTrend;
-                int peakIdx, peakWidth, peakProminence;
-                
-                walls = viz::estimateWallHorizon(y_plane);
-                
-                //param_map.set_value(viz::P_LOOK_HRZ_HEIGHT, walls.floor_y);
-
-                cv::Mat wall_frame = y_plane(cv::Rect(0, 0, viz::WIDTH, walls.floor_y)); // SubFrame for visualization
-                cv::Rect floor_roi;
-                viz::findRoi(y_plane, floor_roi, param_map);
-                cv::Mat floor_frame = y_plane(floor_roi);
-                viz::findTrackEstimate(floor_frame, homography_matrix);
-                std::tie(peakIdx, peakWidth, peakProminence, pathHistTrend) = viz::topologicalPeakTrack(floor_frame);
-                nav::pathFollower(peakIdx, peakWidth, peakProminence);
-                cv::line(y_plane, cv::Point(0, walls.floor_y), cv::Point(viz::WIDTH, walls.floor_y), cv::Scalar(250), 20);
-                viz::drawTopology(wall_frame, pathHistTrend, peakIdx, peakWidth, peakProminence);
-                
-                }
-                break;
-            case viz::M_SEG_FLOOR:
-                {
-                struct viz::WallDetection walls = {0};
-                walls = viz::estimateWallHorizon(y_plane);
-                cv::line(y_plane, cv::Point(0, walls.floor_y), cv::Point(viz::WIDTH, walls.floor_y), cv::Scalar(64), 20);
-                }
-                break;
-            case viz::M_VIZ:
-                break;
-            default:
-                break;
-        }
-
-        // ------------ Serialize Output Frame ------------ //
-        try {
-            writer.write(y_plane); // Write the Y plane (grayscale) to output pipeline
-        } catch (cv::Exception& e) {
-            syslog(LOG_ERR, "Failed to write frame: %s", e.what());
-            break;
-        }
-
-        // ------------ Debug Mode ------------ //
-        if (debug_mode) {
-            // process prames at 5 Hz
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-           
-        }
+        
     }
-
     // -------------- Cleanup ----------------- //
     cap.release();
     writer.release();
-    cv::destroyAllWindows();  // Close the OpenCV windows
-
-    viz::_exit_trig.store(true); // force exit
-    cmd_thread.join(); 
+    viz::_exit_trig.store(true);
+    cmd_thread.join();
     traj_thread.join();
     closelog();
 

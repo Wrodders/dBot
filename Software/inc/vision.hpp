@@ -23,100 +23,14 @@
 
 #include "../common/coms.hpp"
 
+#include "../inc/calibration.hpp"
 
-float iir_filter(float input, float prev, float alpha) {
-    return alpha * input + (1 - alpha) * prev;
-}
 
-namespace nav {
-
-    struct Trajectory {
-        float w_rate;
-        float speed;
-    };
-
-    std::queue<Trajectory> _twist_queue;
-    std::mutex _twist_mutex;
-    std::condition_variable _twist_cv;
-
-    //@brief: Computes velocity references from prominence, confidence and drivability
-    void pathFollower(const int peakIdx, const int curveWidth, const int curveConfidance) {
-        // Normalize the cross-track error to -1 to 1
-        float crossTrackError = (peakIdx - 320) / 320.0f;
-        bool trackLost = (curveConfidance < 50 || curveWidth > 600);
-    
-        // Trajectory object to hold speed and w_rate
-        Trajectory twist;
-
-        if (trackLost) {
-            // If track is lost, stop movement and set no rotation
-            //twist.w_rate = 0.0f;
-            twist.speed = 0.0f;
-        } else {    
-            // Width-based speed adjustment 
-            float widthFactor = 1.0f - std::min(curveWidth / 640.0f, 1.0f); // Larger width = slower speed
-    
-            // Prominence-based speed adjustment
-            float prominenceFactor = 1.0f - std::min(curveConfidance / 255.0f, 1.0f); // Low prominence = slower speed
-    
-            // Combined speed factor: both width and prominence affect the speed
-            float speedFactor = 0.3f * (widthFactor - prominenceFactor*0.3);
-    
-            // Limit the maximum speed to 0.2 and ensure it never goes below 0
-            //twist.speed = 0;
-            // Adjust rotation rate based on cross-track error
-            // deadband to prevent small errors from causing rotation
-            //crossTrackError = std::abs(crossTrackError) < 0.05f ? 0.0f : crossTrackError;
-            
-            static float rateCruvature = 0.0f;
-            rateCruvature = iir_filter(crossTrackError, rateCruvature, 0.3f);
-            
-
-            twist.w_rate = std::clamp(crossTrackError*0.5f, -0.6f, 0.6f);
-        }
-
-        
-    
-        // Debugging output to check the values
-        //std::cout << "W Rate: " << twist.w_rate << " Speed: " << twist.speed << std::endl;
-    
-        // Push the trajectory twist to the queue for the robot control
-        {
-            std::unique_lock<std::mutex> lock(_twist_mutex);
-            _twist_queue.push(twist);
-            lock.unlock();
-            _twist_cv.notify_one();
-        }
-    }
-
-    //@brief: Trajectory Generation Server
-    //@description: Publishes twist trajectory commands 
-    void trajGenServer(){
-        zmq::context_t context(1);
-        zmq::socket_t traj_pubsock(context, zmq::socket_type::pub);
-        traj_pubsock.set(zmq::sockopt::linger, 0);
-        traj_pubsock.bind("ipc:///tmp/vizcmds");
-        while(true){
-            std::unique_lock<std::mutex> lock(_twist_mutex);
-            _twist_cv.wait(lock, []{return !_twist_queue.empty();});
-            Trajectory twist = _twist_queue.front();
-            _twist_queue.pop();
-            lock.unlock();
-            // Build command messages
-            std::string msg = "<BR" + std::to_string(twist.w_rate) + "\n";
-            traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
-            traj_pubsock.send(zmq::message_t(msg.c_str(), msg.size()), zmq::send_flags::none);
-            //std::string msg2 = "<BM" + std::to_string(twist.speed) + "\n";
-            //traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
-            //traj_pubsock.send(zmq::message_t(msg2.c_str(), msg2.size()), zmq::send_flags::none);
-        }   
-    }
-}
 namespace viz {
 
 const char* NODE_NAME = "VISION";
 
-enum { M_CALIBRATE = 0, M_PATHFOLLOW,M_PERSUIT, M_SEG_FLOOR, M_VIZ, NUM_MODES };
+enum { M_INIT = 0, M_CALIBRATE, M_PATHFOLLOW, M_SEG_FLOOR, M_BIRD, M_VIZ, NUM_MODES };
 
 // -------------- Parameter IDs -------------- //
 enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, NUM_PARAMS }; 
@@ -146,7 +60,8 @@ struct WallDetection {
     uint16_t floor_y;   // Integer for the floor position (y-coordinate)
 };
 
-// Estimate drivability, maintaining proper types for the calculations
+
+//@brief: Estimate the horizon height of the floor
 WallDetection estimateWallHorizon(const cv::Mat& y_plane) {
     cv::Mat integral_img;
     cv::integral(y_plane, integral_img, CV_32S);
@@ -166,7 +81,7 @@ WallDetection estimateWallHorizon(const cv::Mat& y_plane) {
         std::nth_element(midpoints.begin(), midpoints.begin() + midpoints.size() / 2, midpoints.end());
         float median_horizon = static_cast<float>(midpoints[midpoints.size() / 2]);
         static float current_horizon = median_horizon;
-        float horz_lpf = (1 - 0.2f) * current_horizon + 0.2f * median_horizon;
+        float horz_lpf = iir_filter(median_horizon, current_horizon, 0.2f);
         wall_detection = {
             static_cast<uint16_t>(horz_lpf)
         };
@@ -175,245 +90,247 @@ WallDetection estimateWallHorizon(const cv::Mat& y_plane) {
     return wall_detection;
 }
 
-//  ROI based on the horizon height
-void findRoi(const cv::Mat& y_plane, cv::Rect& roi, ParameterMap& param_map ) {
-    float horizon_px;
-    (void) param_map.get_value(P_LOOK_HRZ_HEIGHT, horizon_px);
-    int horizon = static_cast<int>(horizon_px);
-    // Define ROI in original frame
-    roi = cv::Rect(0, horizon, WIDTH, HEIGHT - horizon);
-}
+
 
 // Find track estimate using homography transformation
-void findTrackEstimate(cv::Mat& roiFrame, const cv::Mat& homography) {
+void detectTrackEdges(cv::Mat& roiFrame, const cv::Mat& homography) {
     cv::Mat warped = cv::Mat::zeros(roiFrame.size(), CV_8U);
     //cv::warpPerspective(roiFrame, warped, homography, warped.size(), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
 
     // ------- Edge Detection ------- //
     // Apply Gaussian Blur to reduce noise
     cv::GaussianBlur(roiFrame, roiFrame, cv::Size(21, 5), 0);
-
     // Apply Sobel operator to detect edges
     cv::Sobel(roiFrame, roiFrame, CV_8U, 1, 0, 3, 2, 0, cv::BORDER_DEFAULT);
-
-    // Apply morphological operations to remove small noise
-    cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 3)); // 
-    cv::morphologyEx(roiFrame, roiFrame, cv::MORPH_CLOSE, element);
-    cv::morphologyEx(roiFrame, roiFrame, cv::MORPH_OPEN, element);
-
-
+    cv::threshold(roiFrame, roiFrame, 80, 255, cv::THRESH_BINARY);
 
 }
 
-// Compute histogram with appropriate types
-void computeHistogram(const cv::Mat& edges, cv::Mat& hist) {
-    cv::Mat bottom_half = edges(cv::Rect(0, edges.rows / 2, edges.cols, edges.rows / 2));
-    cv::reduce(bottom_half, hist, 0, cv::REDUCE_SUM, CV_32F);
+// Computes the histogram from a ROI of the edge image,
+// normalizes it to 0-255 and applies Gaussian blur to reduce high-frequency noise.
+void computeLineTrend(const cv::Mat& edges, const cv::Rect& roi, const std::array<float, WIDTH>& hist) {
+    cv::Mat section = edges(roi);
+    // Sum vertically to collapse the ROI into a single row histogram.
+    cv::reduce(section, hist, 0, cv::REDUCE_SUM, CV_32F);
     cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);  // Normalize to 0-255 range
-    cv::GaussianBlur(hist, hist, cv::Size(21, 1), 0, 0);
+    cv::GaussianBlur(hist, hist, cv::Size(21, 1), 0, 0);   // Reduce positional high-frequency noise
 }
 
-std::vector<std::tuple<int, int, float>> identifyPeakCandidates(const cv::Mat& hist, float threshold) {
+// Identify candidate peaks in the histogram given a noise floor.
+// Each candidate is a tuple: (peak index, width, prominence)
+std::vector<std::tuple<int, int, float>> identifyPeakCandidates(const std::array<float, WIDTH>& hist, float noiseFloor) {
     std::vector<std::tuple<int, int, float>> candidates;
 
-    for (int i = 1; i < hist.cols - 1; ++i) {
-        float val = hist.at<float>(0, i);
-        
-        // Check if the current point is a peak (higher than neighbors)
-        if (val > hist.at<float>(0, i - 1) &&
-            val > hist.at<float>(0, i + 1) &&
-            val > threshold) {
+    for (size_t i = 1; i + 1 < hist.size(); ++i) {
+        float val = hist[i];
+        // Check if current point is a local peak and above the noise floor.
+        if (val > hist[i - 1] &&
+            val > hist[i + 1] &&
+            val > noiseFloor) {
 
-            int leftValley = i, rightValley = i;
-
-            // Find left valley
-            while (leftValley > 0 && hist.at<float>(0, leftValley) > threshold)
+            int leftValley = i;
+            int rightValley = i;
+            // Search to the left for the valley.
+            while (leftValley > 0 && hist[leftValley] > noiseFloor) {
                 leftValley--;
-
-            // Find right valley
-            while (rightValley < hist.cols - 1 && hist.at<float>(0, rightValley) > threshold)
+            }
+            int lengthHist = hist.size();
+            // Search to the right for the valley.
+            while (rightValley + 1 < lengthHist && hist[rightValley] > noiseFloor) {
                 rightValley++;
-
-            // If valleys reach the edges, consider them the maximum possible width
+            }
             int width = rightValley - leftValley;
 
-            // Calculate prominence
-            // If there are no clear valleys, we use the max histogram value for prominence
-            float leftValleyVal = (leftValley > 0) ? hist.at<float>(0, leftValley) : 0.0f;
-            float rightValleyVal = (rightValley < hist.cols - 1) ? hist.at<float>(0, rightValley) : 0.0f;
-
-            // Prominence is calculated as the difference between the peak and the maximum of the two valleys
+            // Determine valley values (handling edge cases).
+            float leftValleyVal = (leftValley > 0) ? hist[leftValley] : 0.0f;
+            float rightValleyVal = (rightValley < lengthHist - 1) ? hist[rightValley] : 0.0f;
             float prominence = val - std::max(leftValleyVal, rightValleyVal);
 
-            // For cases with a large peak stretching to the edges, prominence can be set to the difference from the peak to the max value in the histogram
-            if (leftValley == 0 || rightValley == hist.cols - 1) {
-                double minVal, maxVal;
-                cv::minMaxLoc(hist, &minVal, &maxVal);
+            // If a peak extends to an edge, use overall maximum as reference.
+            if (leftValley == 0 || rightValley == lengthHist - 1) {
+                float maxVal = *std::max_element(hist.begin(), hist.end());
                 prominence = val - maxVal;
             }
 
             candidates.emplace_back(i, width, prominence);
         }
     }
-
     return candidates;
 }
 
-// Compute dynamic prominence for peak identification
-std::tuple<float, float> computeDynamicProminence(const std::vector<std::tuple<int, int, float>>& candidates) {
-    if (candidates.empty()) return {0, 0};
+// Analyze candidate peaks to compute the mean prominence and dynamic range.
+std::tuple<float, float> analyzePeaks(const std::vector<std::tuple<int, int, float>>& candidates) {
+    if (candidates.empty())
+        return {0.0f, 0.0f};
 
     std::vector<float> prominences;
     for (const auto& candidate : candidates) {
-        prominences.push_back(std::get<2>(candidate));
+        prominences.push_back(std::get<2>(candidate)); // Extract prominence
     }
-
     float meanProminence = std::accumulate(prominences.begin(), prominences.end(), 0.0f) / prominences.size();
     float maxProminence = *std::max_element(prominences.begin(), prominences.end());
-    return {meanProminence, maxProminence - meanProminence};  // Dynamic Range
+    return {meanProminence, maxProminence - meanProminence};
 }
 
-// Find the dominant peak from the candidates
+// Find the dominant peak from candidates starting the search near the last known peak index.
+// If the candidate peak is significantly lower than the overall maximum in the histogram,
+// it indicates that the track has significantly changed, so the algorithm can fall back to a wider search.
 std::tuple<int, int, float> findDominantPeak(
-    std::vector<std::tuple<int, int, float>> candidates, float meanProminence, int lastPeakIndex) {
+    const std::array<float, WIDTH>& hist,
+    const std::vector<std::tuple<int, int, float>>& candidates,
+    float meanProminence, int lastPeakIndex)
+{
+    if (candidates.empty())
+        return {0, 0, 0.0f};
 
-    const float penaltyFactor = 0.8f;
-    int bestIndex = -1, bestWidth = 0;
-    float bestDynamicRange = -1.0f, bestScore = -std::numeric_limits<float>::max();
-    std::vector<int> widths;
-
-    // Loop over all candidates and compute the dynamic range.
+    // Group peaks that are near each other (within 10 indices).
+    std::vector<std::vector<std::tuple<int, int, float>>> peakGroups;
+    std::vector<std::tuple<int, int, float>> currentGroup;
     for (const auto& candidate : candidates) {
-        int index, width;
-        float prominence;
-        std::tie(index, width, prominence) = candidate;
+        int peakIndex = std::get<0>(candidate);
+        if (currentGroup.empty() || (peakIndex - std::get<0>(currentGroup.back()) < 10)) {
+            currentGroup.push_back(candidate);
+        } else {
+            peakGroups.push_back(currentGroup);
+            currentGroup.clear();
+            currentGroup.push_back(candidate);
+        }
+    }
+    if (!currentGroup.empty())
+        peakGroups.push_back(currentGroup);
 
-        // Calculate the dynamic range: difference between peak's prominence and the mean prominence of candidates.
-        float dynamicRange = prominence - meanProminence;
+    // Filter out candidates with prominence below the mean.
+    std::vector<std::tuple<int, int, float>> filteredCandidates;
+    for (const auto& group : peakGroups) {
+        for (const auto& candidate : group) {
+            if (std::get<2>(candidate) > meanProminence)
+                filteredCandidates.push_back(candidate);
+        }
+    }
+    // If none remain after filtering, use all candidates.
+    if (filteredCandidates.empty()) {
+        filteredCandidates = candidates;
+    }
 
-        // Compute score: Dynamic range is the primary factor, penalty for distance from last peak.
-        float score = dynamicRange - penaltyFactor * std::abs(index - lastPeakIndex);
-
-        // Track the best score and corresponding peak.
-        if (score > bestScore) {
-            bestScore = score;
-            bestIndex = index;
-            bestWidth = width;
-            bestDynamicRange = dynamicRange;
+    // Select the candidate closest to the last known peak index.
+    int bestIndex = std::get<0>(filteredCandidates[0]);
+    float bestDistance = std::abs(lastPeakIndex - bestIndex);
+    for (const auto& candidate : filteredCandidates) {
+        int peakIndex = std::get<0>(candidate);
+        float distance = std::abs(lastPeakIndex - peakIndex);
+        if (distance < bestDistance) {
+            bestIndex = peakIndex;
+            bestDistance = distance;
+        }
+    }
+    int bestWidth = 0;
+    float bestProminence = 0.0f;
+    // Retrieve width and prominence for the chosen candidate.
+    for (const auto& candidate : filteredCandidates) {
+        if (std::get<0>(candidate) == bestIndex) {
+            bestWidth = std::get<1>(candidate);
+            bestProminence = std::get<2>(candidate);
+            break;
         }
     }
 
-    // If we found a valid peak (bestIndex != -1), determine the width based on similar peaks.
-    if (bestIndex != -1) {
-        widths.push_back(bestWidth);  // Include the width of the dominant peak.
+    // If the selected peak's value is notably less than the maximum in the histogram,
+    // assume a significant track change and set bestProminence to 0 to trigger fallback.
+    double minVal, histMax;
+    cv::minMaxLoc(hist, &minVal, &histMax);
+    float candidateVal = hist[bestIndex];
+    if (candidateVal < histMax) {
+        // For example, if the candidate is less than 90% of the max, trigger fallback.
+        if (candidateVal < 0.6 * histMax) {
+            return {0, 0, 0.0f}; // Indicate that fallback should be used.
+        }
+    }
 
-        // Collect widths of peaks with a similar dynamic range to handle uncertainty.
-        for (const auto& candidate : candidates) {
-            int index, width;
-            float prominence;
-            std::tie(index, width, prominence) = candidate;
+    return {bestIndex, bestWidth, bestProminence};
+}
 
-            // Consider peaks with dynamic range close to the best peak's dynamic range.
-            if (std::abs(prominence - bestDynamicRange) / std::max(1.0f, bestDynamicRange) < 0.2f) {
-                widths.push_back(width);
-            }
+// Fallback: perform a full scan using a lower threshold if the primary search fails.
+std::tuple<int, int, float> fallbackFullScan(const std::array<float, WIDTH>& hist, float meanProminence, int lastPeakIndex) {
+    auto candidates = identifyPeakCandidates(hist, 0.5f * meanProminence);
+    return findDominantPeak(hist, candidates, meanProminence, lastPeakIndex);
+}
+// --- PeakTracker Class ---
+class PeakTracker {
+public:
+    // Initializes the tracker with the histogram width and starting position.
+    PeakTracker(int histCols)
+        : lastPeakIndex(histCols / 2),
+          prevFilteredRange(0.0f),
+          prevFilteredWidth(0.0f),
+          prevFilteredIndex(static_cast<float>(histCols / 2))
+    {}
+
+    // Performs topological peak tracking on a given ROI of the edge image.
+    // Returns a tuple: (peak index, peak width, filtered dynamic range, histogram).
+    std::tuple<uint16_t, uint16_t, uint8_t, std::array<float, WIDTH>>
+    topologicalPeakTrack(const cv::Mat& edges, const cv::Rect& roi) {
+        std::array<float, WIDTH> hist;
+        computeLineTrend(edges, roi, hist);
+
+        // Compute the noise floor as the median of the histogram values.
+        std::array<float, WIDTH> histSorted = hist;
+        std::sort(histSorted.begin(), histSorted.end());
+        float medianNoiseFloor = histSorted[histSorted.size() / 2];
+        // Identify candidate peaks.
+        auto candidates = identifyPeakCandidates(hist, medianNoiseFloor);
+        auto [meanProminence, peakDynamicRange] = analyzePeaks(candidates);
+
+        // First attempt: search near the last known peak.
+        auto [bestIndex, bestWidth, bestDynamicRange] = findDominantPeak(hist, candidates, meanProminence, lastPeakIndex);
+
+        // If no valid dominant peak was found (signaled by bestDynamicRange==0),
+        // or if the candidate's value is notably less than the histogram maximum,
+        // fall back to a full scan.
+        if (bestDynamicRange == 0) {
+            std::tie(bestIndex, bestWidth, bestDynamicRange) = fallbackFullScan(hist, meanProminence, lastPeakIndex);
         }
 
-        // Calculate the final width as the mean of the widths of similar peaks (to represent uncertainty).
-        bestWidth = std::accumulate(widths.begin(), widths.end(), 0) / std::max(1, (int)widths.size());
+        // Update the last known peak index.
+        lastPeakIndex = bestIndex;
+
+        // --- Smoothing using IIR filters ---
+        prevFilteredRange = iir_filter(bestDynamicRange, prevFilteredRange, 0.6f);
+        uint16_t filteredRange = static_cast<uint16_t>(prevFilteredRange);
+
+        prevFilteredWidth = iir_filter(static_cast<float>(bestWidth), prevFilteredWidth, 0.5f);
+        bestWidth = static_cast<int>(prevFilteredWidth);
+
+        prevFilteredIndex = iir_filter(static_cast<float>(bestIndex), prevFilteredIndex, 0.9f);
+        bestIndex = static_cast<int>(prevFilteredIndex);
+
+        return {static_cast<uint16_t>(bestIndex),
+                static_cast<uint16_t>(bestWidth),
+                static_cast<uint8_t>(filteredRange),
+                hist};
     }
 
-    // Normalize the dynamic range to a value between 0 and 255 to fit within standard range.
-    bestDynamicRange = std::min(bestDynamicRange, 255.0f);  // Ensure the dynamic range does not exceed 255.
-
-    return {bestIndex, bestWidth, bestDynamicRange};
-}
-
-// Full scan fallback if the best dynamic range is too small
-std::tuple<int, int, float> fallbackFullScan(const cv::Mat& hist, float meanProminence, int lastPeakIndex) {
-    std::vector<std::tuple<int, int, float>> candidates = identifyPeakCandidates(hist, 0.5f * meanProminence);
-    return findDominantPeak(candidates, meanProminence, lastPeakIndex);
-}
-
-// Topological peak tracking
-std::tuple<uint16_t, uint16_t, uint8_t, cv::Mat> topologicalPeakTrack(const cv::Mat& edges) {
-    cv::Mat hist;
-    computeHistogram(edges, hist);
-
-    // Identify candidates for peaks from the histogram
-    std::vector<std::tuple<int, int, float>> candidates = identifyPeakCandidates(hist, 0.5f * cv::mean(hist)[0]);
-    auto [meanProminence, dynamicProminence] = computeDynamicProminence(candidates);
-
-    static int lastPeakIndex = hist.cols / 2; // Initialize the last peak index to the center of the histogram
-    auto [bestIndex, bestWidth, bestDynamicRange] = findDominantPeak(candidates, meanProminence, lastPeakIndex);
-    // If the dynamic range of the best peak in window is less than a threshold, perform a full scan
-    if (bestDynamicRange < 0.8f * dynamicProminence) {
-        std::tie(bestIndex, bestWidth, bestDynamicRange) = fallbackFullScan(hist, meanProminence, lastPeakIndex);
-    }
-    lastPeakIndex = bestIndex;
-   
-    // ------- Smoothing ------- //
-    static float prevFilteredRange = bestDynamicRange;
-    prevFilteredRange = iir_filter(bestDynamicRange, prevFilteredRange, 0.3f);
-    uint16_t filteredRange = static_cast<uint16_t>(prevFilteredRange);
-
-    static float prevFilteredWidth = bestWidth;
-    prevFilteredWidth = iir_filter(bestWidth, prevFilteredWidth, 0.5f);
-    bestWidth = static_cast<int>(prevFilteredWidth);
-
-    static float prevFilteredIndex = bestIndex;
-    prevFilteredIndex = iir_filter(bestIndex, prevFilteredIndex, 0.5f);
-    bestIndex = static_cast<int>(prevFilteredIndex);
-
-    // Return the tuple with best index, width, dynamic range, and the histogram
-    return {static_cast<uint16_t>(bestIndex), static_cast<uint16_t>(bestWidth), static_cast<uint8_t>(filteredRange), hist};
-}
+private:
+    int lastPeakIndex;
+    float prevFilteredRange;
+    float prevFilteredWidth;
+    float prevFilteredIndex;
+};
 
 // Draw topology (visualization) on the frame
-void drawTopology(cv::Mat& subFrame, const cv::Mat& hist, int peakIdx, int peakWidth, int peakProminence) {
-
+void drawTopology(cv::Mat& subFrame, const std::array<float, WIDTH>& hist, int peakIdx, int peakWidth, float peakProminence, cv::Scalar histColor, cv::Scalar peakColor) {
     subFrame.setTo(0);
     // ------- Visualize Dominant Peak ------- //
+
+    // ------- Visualize Histogram ------- //
+    for (size_t i = 0; i < hist.size(); ++i) {
+        int scaledHeight = static_cast<int>(hist[i] * subFrame.rows / 255.0f);
+        cv::line(subFrame, cv::Point(i, subFrame.rows), cv::Point(i, subFrame.rows - scaledHeight), histColor);    }
+
     if (peakIdx >= 0) {
         int scaledProminence = static_cast<int>(peakProminence * subFrame.rows / 255.0f);
         cv::Rect peakRect(peakIdx - peakWidth / 2, subFrame.rows - scaledProminence, peakWidth, scaledProminence);
-        cv::rectangle(subFrame, peakRect, cv::Scalar(255), -1);  // Visualize as white peak
+        cv::rectangle(subFrame, peakRect, peakColor, -1);
     }
-    // ------- Visualize Histogram ------- //
-    for (size_t i = 0; i < hist.cols; i++) {
-        int scaledHeight = static_cast<int>(hist.at<float>(0, i) * subFrame.rows / 255.0f);
-        cv::line(subFrame, cv::Point(i, subFrame.rows), cv::Point(i, subFrame.rows - scaledHeight),
-                    cv::Scalar(128));  // Use grey for histogram lines
-    }
-
-
-}
-
-
-
-void tileVisualizer(cv::Mat& y_plane, ParameterMap& param_map, cv::Mat& top_left, cv::Mat& top_right, cv::Mat& bottom_left, cv::Mat& bottom_right) {
-    float horizon_px; // UGH NEED to get multiple types 
-    (void) param_map.get_value(P_LOOK_HRZ_HEIGHT, horizon_px);
-    int horizon = static_cast<int>(horizon_px);
-    // ------- Visualization Setup ------- //
-    cv::Mat topLeftDst= y_plane(cv::Rect(0, 0, WIDTH / 2, HEIGHT / 2)); // Grab the offsets for each quadrant
-    cv::Mat topRightDst = y_plane(cv::Rect(WIDTH / 2, 0, WIDTH / 2, HEIGHT / 2));
-    cv::Mat bottomLeftDst = y_plane(cv::Rect(0, HEIGHT / 2, WIDTH / 2, HEIGHT / 2));
-    cv::Mat bottomRightDst = y_plane(cv::Rect(WIDTH / 2, HEIGHT / 2, WIDTH / 2, HEIGHT / 2));
-
-    cv::resize(top_left, topLeftDst(cv::Rect(0, horizon / 2, top_left.cols, top_left.rows - (horizon / 2))),
-                cv::Size(top_left.cols, top_left.rows - (horizon / 2))); 
-
-    top_right.setTo(0);
-    cv::resize(top_right, topRightDst(cv::Rect(0, horizon / 2, top_right.cols, top_right.rows - (horizon / 2))), 
-                cv::Size(topRightDst.cols, topRightDst.rows - (horizon / 2)));
-
-    bottom_left.setTo(0);
-    cv::resize(bottom_left, bottomLeftDst, cv::Size(bottomLeftDst.cols, bottomLeftDst.rows));
-
-    bottom_right.setTo(0);
-    cv::resize(bottom_right, bottomRightDst, cv::Size(bottomRightDst.cols, bottomRightDst.rows));
-
 }
 
 void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float drivability) {
@@ -426,41 +343,125 @@ void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float 
 }
 
 
-//@brief: Command Server
-//@description: Listens for commands on the VISION topic over TCP and IPC; publishes command responses to the VISION topic over TCP
-void command_server(ParameterMap& param_map) {
-    syslog(LOG_INFO, "Starting Command Server");
-    Protocol _proto = { '<', '\n', ':', 'A' };
-    CommandMsg recv_cmd_msg;
-    zmq::context_t context(1);
+struct TrackSection {
+    int peakIdx;
+    int peakWidth;
+    float peakProminence;
+};
 
-    zmq::socket_t cmd_subsock(context, zmq::socket_type::sub);
-    cmd_subsock.set(zmq::sockopt::linger, 0);
-    cmd_subsock.set(zmq::sockopt::subscribe, "VISION");
-    cmd_subsock.connect("ipc:///tmp/botcmds");
-    syslog(LOG_INFO, "Subscribed Cmd Server to ipc:///tmp/botcmds");
+void path_follower(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map) {
+    // -- Floor Segmentation --
+    viz::WallDetection walls = {0};
+    walls = viz::estimateWallHorizon(undistorted);
+    int look_hrz_height = static_cast<int>(walls.floor_y);
+    cv::Rect floor_roi;  // Dynamically adjust the ROI based on the floor horizon 
+    cv::Mat floor_frame = undistorted(cv::Rect(0,look_hrz_height, WIDTH, HEIGHT - look_hrz_height));
+    viz::detectTrackEdges(floor_frame, homography_matrix);
+    // -- Peak Tracking --
+    viz::PeakTracker lowTracker(floor_frame.cols);
+    std::array<float, WIDTH> low_pathTrend;
+    struct TrackSection low_section;
+    const  cv::Rect lowRoi(0, floor_frame.rows * 3 / 4, viz::WIDTH, floor_frame.rows / 4);
+    std::tie(low_section.peakIdx, low_section.peakWidth, low_section.peakProminence, low_pathTrend) =
+        lowTracker.topologicalPeakTrack(floor_frame, lowRoi);
 
-    zmq::socket_t msg_pubsock(context, zmq::socket_type::pub);
-    msg_pubsock.set(zmq::sockopt::linger, 0);
-    msg_pubsock.bind("ipc:///tmp/botmsgs");
-    syslog(LOG_INFO, "Bound Msg Server to ipc:///tmp/botmsgs");
-
-    while (!_exit_trig) {
-        coms_receive_asciicmd(cmd_subsock, recv_cmd_msg);
-        coms_handle_cmd(recv_cmd_msg, msg_pubsock, param_map, _proto, "VISION");
-    }
-    syslog(LOG_INFO, "Exiting Command Server");
-    context.close();
-    _exit_trig.store(true);
+    viz::PeakTracker highTracker(floor_frame.cols);
+    struct TrackSection high_section;
+    std::array<float, WIDTH> high_pathTrend;
+    const cv::Rect highRoi(0, 0, viz::WIDTH, floor_frame.rows / 4);
+    std::tie(high_section.peakIdx, high_section.peakWidth, high_section.peakProminence, high_pathTrend) =
+        highTracker.topologicalPeakTrack(floor_frame, highRoi);
+    // -- Visualization --
+    cv::cvtColor(undistorted, outputFrame, cv::COLOR_GRAY2BGR);
+    cv::Mat topVizFrame = outputFrame(cv::Rect(0, 0, viz::WIDTH, walls.floor_y / 2));
+    cv::Mat lowVizFrame = outputFrame(cv::Rect(0, walls.floor_y / 2, viz::WIDTH, walls.floor_y / 2));
+    viz::drawTopology(topVizFrame, high_pathTrend, high_section.peakIdx, high_section.peakWidth, high_section.peakProminence, cv::Scalar(128, 128, 128), cv::Scalar(255, 255, 255));
+    viz::drawTopology(lowVizFrame, low_pathTrend, low_section.peakIdx, low_section.peakWidth, low_section.peakProminence, cv::Scalar(64, 64, 64), cv::Scalar(192, 192, 192));
+  
 }
 
-// -------------- Parameter Validation -------------- //
-static inline bool val_hrz_height(float val) { return (val > 0 && val < HEIGHT); }
-static inline bool val_trfm_pad(float val)   { return (val > 0 && val < WIDTH); }
-static inline bool val_prog_mode(float val)  { return (val >= 0 && val < NUM_MODES); }
-static inline bool val_max_vel(float val)    { return (val > 0 && val < 1); }
 
 
+void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, int& loopRate_ms) {
+    float progmode;
+    param_map.get_value(viz::P_PROG_MODE, progmode);
+    static std::vector<cv::Point2f> imagePts(4);
+    switch ((int)progmode) {
+        case viz::M_INIT:
+            syslog(LOG_INFO, "Initializing Vision Pipeline");
+            param_map.set_value(viz::P_PROG_MODE, viz::M_CALIBRATE);
+            break;
+        case viz::M_CALIBRATE:{
+           
+            int ret = calib::calibrateBirdseye(undistorted, outputFrame, homography_matrix, imagePts);
+            if(ret == 1) {
+                syslog(LOG_INFO, "Calibration Complete");
+                param_map.set_value(viz::P_PROG_MODE, viz::M_BIRD);
+                loopRate_ms = -1;
+                break;
+            } else if (ret == -2) {
+                syslog(LOG_ERR, "Calibration Failed");
+                param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
+                break;
+
+            } else if (ret == -1){
+                cv::putText(outputFrame, "Found", cv::Point(30, 30),
+                    cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 2);
+                loopRate_ms = 1000;}
+            
+            else{
+                cv::putText(outputFrame, "Chessboard not found", cv::Point(30, 30),
+                    cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 2);
+                loopRate_ms = 500;
+            }
+        }
+            break;
+        case viz::M_PATHFOLLOW:
+            path_follower(undistorted, outputFrame, homography_matrix, param_map);
+            break;
+        case viz::M_SEG_FLOOR:{
+            struct viz::WallDetection walls = {0};
+            walls = viz::estimateWallHorizon(undistorted);
+            // Convert to BGR for visualization
+            cv::cvtColor(undistorted, outputFrame, cv::COLOR_GRAY2BGR);
+            cv::line(outputFrame, cv::Point(0, walls.floor_y), cv::Point(viz::WIDTH, walls.floor_y), cv::Scalar(0, 0, 255), 30);
+        }
+            break;
+
+
+        case M_BIRD:{
+            // Apply birdge eye view perspective transformation
+            cv::Mat birdseye;
+            float horz_height;
+            param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
+            if(homography_matrix.empty()) {
+                syslog(LOG_ERR, "Homography matrix is empty");
+                param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
+                break;
+            }
+            homography_matrix.at<double>(2, 2) = horz_height;
+
+            cv::warpPerspective(undistorted, birdseye, homography_matrix, undistorted.size(), cv::INTER_LINEAR);
+            cv::cvtColor(birdseye, outputFrame, cv::COLOR_GRAY2BGR);
+            cv::circle(outputFrame, imagePts[0], 5, cv::Scalar(0, 0, 255), -1); // Top left
+            cv::circle(outputFrame, imagePts[1], 5, cv::Scalar(0, 255, 0), -1); // Top right
+            cv::circle(outputFrame, imagePts[2], 5, cv::Scalar(255, 0, 0), -1); // Bottom left
+            cv::circle(outputFrame, imagePts[3], 5, cv::Scalar(255, 255, 0), -1); // Bottom right
+
+
+
+            
+        }
+        break;
+        case viz::M_VIZ: // Pass through mode
+            cv::cvtColor(undistorted, outputFrame, cv::COLOR_GRAY2BGR);       
+            break;
+        default: 
+            syslog(LOG_ERR, "Invalid Program Mode");
+            param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
+            break;
+    }
+}
 
 } // namespace viz
 

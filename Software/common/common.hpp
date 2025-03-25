@@ -17,9 +17,6 @@
 #include <chrono>
 #include <zmq.hpp>
 
-
-
-
 #define DEBUG_MODE true
 
 #define CMD_SRC_SOCKET "tcp://Rodrigos-MacBook-Air.local:5556"
@@ -27,6 +24,13 @@
 
 #define PC_VIDEO_ADDRESS "192.168.0.32"
 #define SERCOMS_RX_BUFFER_SIZE 1024
+
+
+
+
+float iir_filter(float input, float prev, float alpha) {
+    return alpha * input + (1 - alpha) * prev;
+}
 
 //@Brief: Format timestamps in human-readable format
 std::string formatTimestamp(std::chrono::time_point<std::chrono::system_clock> timestamp) {

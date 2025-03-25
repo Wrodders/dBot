@@ -9,6 +9,7 @@ After=network.target
 Type=simple
 User=pi
 ExecStart=/home/pi/prog/software/build/vision
+WorkingDirectory=/home/pi/prog/software/
 KillMode=process
 TimeoutStopSec=10
 
@@ -22,6 +23,7 @@ Nice=-20
 
 #Filesystem Access
 ReadOnlyPaths=/home/pi/prog/software/
+
 
 
 [Install]
