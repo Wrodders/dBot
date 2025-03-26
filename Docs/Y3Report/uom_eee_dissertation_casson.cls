@@ -139,12 +139,11 @@
 \def\studentid#1{\gdef\@studentid{#1}}
 \def\submitdate#1{\gdef\@submitdate{#1}}
 
-\newcommand{\titletext}{A dissertation submitted to The University of Manchester for the degree of\ \linebreak \textbf{Bachelor of Science in \@course}\ \linebreak in the Faculty of Science and Engineering}
+\newcommand{\titletext}{Third Year Individual Project – Final Report} 
 
-\newcommand{\submissiontext}{\textbf{Year of submission}\ \linebreak \@submitdate}
+\newcommand{\submissiontext}{April 2025}
 
-%\newcommand{\authortext}{\textbf{\@author}\ \linebreak ID \@studentid}
-\newcommand{\authortext}{\textbf{Student ID}\ \linebreak \@studentid}
+\newcommand{\authortext}{\textbf{\@author}\ \linebreak \@studentid}
 
 
 \def\maketitle{
@@ -166,8 +165,11 @@
       \submissiontext
 	  \vskip 2cm
 	  \authortext
-	  \vskip 2cm
-	  School of Engineering
+	  \vskip 1cm
+	  Supervisor:
+    \vskip 0.5cm
+    Dr. Joaquin Carrasco
+    \vskip 2cm
       \vspace*{\fill}
     \end{center}
 

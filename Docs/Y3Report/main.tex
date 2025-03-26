@@ -9,15 +9,13 @@
 %%%%%%%%%%%%%%%%%% META DATA SETUP %%%%%%%%%%%%%%%%%%
 % This is where the document title and author are set. Other details for the title page are set later
 % Note that if/when you edit these you may need to 'Recompile from scratch' to get the changes to display in the PDF. (In Overleaf, select the down arrow to the right of the 'Recompile' button)
-\IfFileExists{\jobname.xmpdata}{}{
-  \begin{filecontents*}{\jobname.xmpdata}
-       \Title{Development of Two Wheel Self Balancing Line Following Robot} % title of your thesis
-       \Author{107067151} % should be student number rather than name to help with annoymous marking
-       \Language{en-GB}
-       \Copyrighted{True}
-       % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
-   \end{filecontents*}
-}
+
+    \begin{filecontents*}{\jobname.xmpdata}
+        \Language{en-GB}
+        \Copyrighted{True}
+        % More meta-data fielda can be added here if wanted, see https://ctan.org/pkg/pdfx?lang=en for fields
+    \end{filecontents*}
+
     %%%%%%%%%%%%%%%%%% DOCUMENT SETUP %%%%%%%%%%%%%%%%%%
     \documentclass[12pt]{uom_eee_dissertation_casson} 
     %%%%%%%%%%%%%%%%%% PACKAGES AND COMMANDS %%%%%%%%%%%%%%%%%%
@@ -66,23 +64,30 @@
     \addbibresource{references.bib }
     
     %%%%%%%%%%%%%%%%%% START DOCUMENT %%%%%%%%%%%%%%%%%%
-    % Don't edit these lines, title and author are automatically taken from the document meta-data defined above
+
     \begin{document}
     \makeatletter
-    \title{\xmp@Title}
-    \studentid{\xmp@Author}
-    \makeatother
-    
-    % Set the below yourself
-    \course{Mechatronics and Robotics Engineering}  % "Master of Science in" is added automatically
-                                                    % Our courses are: Advanced Control and Systems Engineering, Advanced Control and Systems Engineering with Extended Research, Communications and Signal Processing, Communications and Signal Processing with Extended Research, Electrical Power Systems Engineering, Advanced Electrical Power Systems Engineering, Renewable Energy and Clean Technology, Renewable Energy and Clean Technology with Extended Research
-    \submitdate{2025}                               % regulations ask only for the year, not month
+    \title{Development of Two Wheel Self Balancing Line Following Robot} % title of your thesis
+    \author{Winston Scott}
+    \studentid{107067151}
+    \makeatother                                               
     \wordcount{1000}		                    % use \wordcount{} to set the count, \thewordcount to print in the text
     \maketitle
 
     %%%%%%%%%%%%%%%%%% LISTS OF CONTENT %%%%%%%%%%%%%%%%%%
     \uomtoc
-    % other lists are not required, but can include \uomlof and \uomlot if really want to
+    \begin{uomterms}
+        \textbf{TWSB}:Two Wheel Self Balancing \\
+        \textbf{DDMR}:Differential Drive Mobile Robot \\
+        \textbf{LQR}:Linear Quadratic Regulator \\
+        \textbf{MEMS}:Micro-Electro-Mechanical Systems \\
+        \textbf{MPC}:Model Predictive Control \\
+        \textbf{MCU}:Microcontroler Unit \\
+        \textbf{RPC}:Remote Procedure Call \\
+        \textbf{IMU}:Inertial Measurement Unit \\
+        \textbf{ppr}:Pulses Per Revolution \\
+        \textbf{KF}:Kalman Filter \\
+    \end{uomterms}
 
     %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
     \begin{abstract} % put abstract here. Limit is 1 page.
@@ -98,14 +103,12 @@
     The performance of the the system is shown to be robust to different race tracks which
     surface texture variation, lighting conditions, high speed straights and tight curves. 
 
-    \begin{figure}[H]
-    \centering
-    \includegraphics[width=\textwidth]{CurveSequence.pdf}
-    \caption{Tracking a tight chicane at high speed}
-    \end{figure}
 
   \end{abstract}%
   \clearpage
+
+  \uomdeclarations
+
   %%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
     \section{Introduction}
     The Two Wheel Self Balancing (TWSB) system is a nonlinear, underactuated system that is dynamically stable.
@@ -318,7 +321,7 @@
     \section{System Design}
         \begin{figure}[H]
             \includegraphics[width=\textwidth]{DesingImgs/bBot Drawing v3.pdf}
-            \caption{CAD Drawing of the TWSB system}
+            \caption{CAD Drawing of the TWSB system dimensions in mm}
             \label{fig:CAD}
         \end{figure}
 
@@ -341,48 +344,44 @@
         A simple circuit adapted from \cite{chu2008designing} is used to safely load share between the battery pack and the charger.
 
         \subsection{Software Architecture}
-        The modern standard for robotics software is the Robot Operating System 2 (ROS2) \cite{Macenski2022RobotOS}
-        Whilst this is a powerful tool, it is deemed too complex for the requirements of this project
-        as the initial hardware prototype of the TWSB system utilized a Raspberry Pi Zero 2W, 
-        its 512MB of RAM is limiting. 
-        Nevertheless some core concepts are used such as its 
-        decentralized message pattern shown in fig(8). ZeroMQ middleware is used for 
-        timestamped data stream style communication between computational nodes.
+        The modern standard for robotics software is the Robot Operating System 2 (ROS2) \cite{Macenski2022RobotOS}. 
+        It is composed of several highly configurable applications that are designed to be manged in a distributed system.
+        Distributed systems are beneficial in robotics development as they functionally decouple the software components, 
+        enabling robust failure recovery and ease of integrating new features. This is useful for this project as 
+        the core control and vision systems are developed in parallel. The controls, logs and error recovery systems mandating 
+        high availability compared to user interfaces such as the remote control webapp. 
+        Whilst this is a powerful tool, it is deemed too complex to learn for meeting the project deadline.
+        Nevertheless some core concepts are used such as sharing state by message passing between components, 
+        and dynamic parameter configuration to improve testing and data collection. The ZeroMQ middleware is used for 
+        timestamped signal stream communication between the computational nodes shown in Fig.\ref{fig:DataPath}.
         \begin{figure} [H]
             \includegraphics[width=\textwidth]{Diagrams/CommunicationDataPath.pdf}  
-            \caption{Inter-process Communications Data Path}
+            \caption{Communications Data Path, borders show where state is shared}
+            \label{fig:DataPath}
         \end{figure}
 
-        The software, written in C++17, is managed by systemd as services[]. 
+        The software, written in C++, is managed by systemd as services. 
         Self-diagnosis routines are used for resource monitoring and auto recovery. 
-        Programs implement a Remote Procedure Call (RPC) ASCII interface using 
-        a GET/SET/RUN pattern operating on runtime parameters. 
-        This significantly reduces the compile/flash/debug iteration time. 
-        A GStreamer pipeline sets up an RSTP video server accessible over LAN.
-        OpenCV is used for optimized image processing.
-        \begin{figure} [H]
-            \includegraphics[width=\textwidth]{Diagrams/FirmwareArch.pdf}
-            \caption{Firmware Architecture}
-        \end{figure}
-
-        Key components of the firmware are shown in Fig(9).
-        It is implemented in c99 using CIMIS register definitions from the 
-        libopencm3 project[] as an exercise in low level programming. 
-        The resultant binary is 19KB with 892B of RAM used.
+        Programs operate on runtime parameters through Remote Procedure Call (RPC) 
+        interface using a GET-SET pattern. This reduces the 
+        compile flash debug iteration time. A GStreamer pipeline sets up a video 
+        server accessible over LAN. OpenCV is used for optimized image processing.
+      
+        The firmware is implemented in C using register definitions from the 
+        libopencm3 project \cite{BeginningSTM32} as an exercise in low level programming. 
         No dynamic memory allocation is used.
+        The resultant binary is 19KB with 892B of RAM used.
         A simplified sprintf function from [] is the only external dependency.
-        The MCU also presents the same RPC ASCII interface over serial.
-        which executes commands at 100Hz, and publishes telemetry at 50Hz.
+        The MCU also presents the same RPC interface over uart serial link.
+        This executes commands and publishes telemetry at 100Hz.
 
-        The data-aquististion system obtains a timestamped sample of the TWSB 
+        The data-acquisition system obtains a timestamped sample of the 
         telemetry values transmitted by the MCU through a serial link.
         This can result in non-uniformly sampled data as parsing the UART IO buffer 
-        is constrained by the OS scheduler, thus an event driven system is used to minimize CPU overhead.   
-        Worst case jitter is observed, under CPU stress tests[] to be 0.1ms. 
-        This is acceptable for telemetry data. 
+        is constrained by the OS scheduler, thus an event driven system is used to 
+        minimize CPU overhead. Worst case jitter is observed, under CPU stress 
+        tests to be 0.1ms. This is acceptable for telemetry data. 
         \pagebreak{}
-
-    
         \subsubsection{Parameters }
         The system parameters are given in table(1). 
         The mass of the sub-components obtained by weighing,
@@ -428,14 +427,15 @@
                 \end{tabular}
                 \caption{Manufacturer Provided Motor Parameters}
         \end{table}
-        A telemetry and analysis software system developed in python. It is used as test bench 
-        setup shown in Fig.\ref{fig:SysIDSetUp}, a series of reference ramp, step, sine and 
-        chirp inputs are applied to each motor, the resultant input outputs are shown 
+        A telemetry and analysis software system developed in python. It is used as 
+        test bench  setup shown in Fig.\ref{fig:SysIDSetUp}, a series of reference 
+        ramp, step, sine and chirp inputs are applied to each motor, 
+        the resultant input outputs are shown 
         in Fig.\ref{fig:openloop}.
        
         \begin{figure}[H]
             \centering
-            \includegraphics[height=0.45\textwidth]{SysIDMotorSetUp.png}
+            \includegraphics[height=0.\textwidth]{SysIDMotorSetUp.png}
             \caption{System Identification Testbench Setup}
             \label{fig:SysIDSetUp}
         \end{figure}
@@ -491,16 +491,50 @@
 
 
     \section{State Estimation}
-    Information about a system may be obtained from 2 types of sources; 
+    Information about the TWSB system may be obtained from 2 kinds of sources; 
     mathematical models models as in eq(1) which can describe the time evolution of the chosen system variables, 
-    and sensors that convert energy arising from a physical property into information[]. Both of which are approximation of the true state. 
-    The process of combining multiple sources of information is termed sensor fusion.
-
+    and sensors that convert energy arising from a physical property into information. Both of these sources 
+    are approximations of the true state. The process of combining multiple sources of information is termed sensor fusion.
+    This section evaluates the available methods employed using \textit{proprioceptive} sensors.
     \subsection{Sensors Overview}
-        For the TWSB system in eq(6) its state variables $\theta$ and $\dot x_b$ can be measured by the onboard IMU and the wheel encoders.
-        The motors incorporates a low cost 12 pulses per revolution (ppr) quadrature encoder. The hardware decoder peripheral on the MCU
-        is used to increment the pulse count and the rotational speed is updated at each step of a fixed rate loop[].
-        
+        For the TWSB system in eq(\ref{eq:2DOF}) its state variables $\theta$ and $\dot x_b$ can be measured through the onboard IMU 
+        and the wheel encoders respectively. 
+            
+        The motors incorporate a low-cost 12 pulses per revolution (PPR) incremental encoder on the rotor shaft. 
+        Further resolution is easily obtained by using the hardware quadrature decoder 
+        peripheral to increment, or decrement, a counter based on the direction of movement. 
+        Considering the gearbox ratio $n=20$ results in an effective resolution of 960 PPR. 
+        The rotational speed of the wheel is computed by sampling the change in the pulse counts
+        at a fixed rate as per 
+            \begin{equation}
+                \omega=2\pi \frac{\Delta \textit{count}}{PPR \cdot \Delta t}
+            \end{equation}
+    
+        Where $\Delta \textit{count}$ is the change in the pulse count. The sample period is inversely proportional to the
+        quantization error in the velocity estimate. 
+        However, it is observed that larger sources of error arise from the mechanical backlash in the gearbox.
+        The sample time is set to 2ms, and a low-pass filter is given by the recursive relation
+            \begin{equation}
+        y_k = \alpha x_k + (1-\alpha)y_{k-1}
+                \label{eq:lpf}
+            \end{equation}
+        Selecting $\alpha = 0.95$, attenuates exponentially sudden deviations in the velocity estimate.
+
+        Utilizing this velocity in the model of the DDMR in eq(\ref{eq:DDMR}) to obtain the
+        position of the robot in the cartesian plane as ($x_g,y_g$)is known as odometry.
+        There are various sources of errors in 
+        this process, arising from assembly imperfections and conditions in 
+        the environment which may break the constraints assumed in the kinematics of the DDMR.
+            
+        These conditions become significant in the case of the TWSB system as crashes, or bumps, result in large 
+        and unbounded error accumulation. In the case of crashes, the robot is subsequently stationary 
+        and its state is reset. However, in the case of bumps, where the robot can recover, corrective 
+        action is required to mitigate this. Assuming a sufficiently accurate wheel encoder, a simple method is 
+        implemented based on \cite{Gyrodometry}, only correcting 
+        the odometry when such events are detected.  
+        This leads to the decision that other forms of systematic odometry errors have to be 
+        either disregarded in the short term or corrected by landmark methods by $exteroceptive$ sensors. 
+
         The IMU is a 6 axis MEMS sensor[] which measures the local linear acceleration 
         and angular velocity.
         The 3D acceleration $\vec{a}$ is used to obtain an 
@@ -787,7 +821,6 @@
             \item The pitch angle must be regulated to $±1$ degree.
             \item The global $x$ position should be controlled by a linear velocity reference.
         \end{enumerate}
-        allowing for teleoperation where a operator is tasked with the navigation of the robot. 
 
         \subsection{Cascade PID}
         
@@ -995,7 +1028,7 @@
         \end{subfigure}
         \hfill
         \begin{subfigure}[c]{0.6\textwidth}
-            \includegraphics[width=1.2\textwidth]{Graphs/DeadReckoningTrackMap.png}
+            \includegraphics[width=\textwidth]{Graphs/DeadReckoningTrackMap.png}
 
             \caption{Map built offline using dead reckoning}
         \end{subfigure}
