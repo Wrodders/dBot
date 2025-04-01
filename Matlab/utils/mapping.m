@@ -3,12 +3,11 @@ function [x, y, theta, linvel, stats] = mapping(data, dt, config)
     linvel = -data(config.start:config.stop, 15);
     angvel = -data(config.start:config.stop, 18) * 2 * pi;  % Convert to rad/s
     stats.trgtVel = data(1, 16);
-    stats.mean = mean(linvel);
-    stats.median = median(linvel);
-    stats.mode = mode(linvel);
-    stats.dev = std(linvel);
-    stats.var = var(linvel);
-    stats.time = (config.stop - config.start) * dt;
+    stats.vel_dev = std(linvel);
+    stats.vel_var = var(linvel);
+
+    
+   
 
     n = length(linvel);
     x = zeros(n, 1);
@@ -24,4 +23,7 @@ function [x, y, theta, linvel, stats] = mapping(data, dt, config)
         x(i) = x(i-1) + linvel(i-1) * cos(theta(i-1)) * dt;
         y(i) = y(i-1) + linvel(i-1) * sin(theta(i-1)) * dt;
     end
+    stats.steer_dev = std(data(:,19)*2*pi);
+    stats.steer_var = var(data(:,19)*2*pi);
+    stats.time = round((config.stop - config.start) * dt, 2);
 end

@@ -4,6 +4,6 @@ function [timestamps, measurement, reference, controlaction] = extractMotorData(
     measurement = data(:, 9);
 
     reference = data(:, 10);
-    reference = [reference(2:end); reference(end)]; % Reference at time k is evaluated by MCU at time k+1
+    measurement = [measurement(2:end); measurement(end)]; % measurement at time k is evaluated by MCU at time k+1
     controlaction = data(:, 11);
 end

@@ -91,19 +91,17 @@
 
     %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
     \begin{abstract} % put abstract here. Limit is 1 page.
-    The highly dynamic Two Wheel Self Balancing Robot 
-    (TWSB) has a large exploration space for developing high level 
-    control strategies. 
-    This report presents the design decisions and algorithms developed for
-    an autonomous line racing TWSB robot utilizing a monocular vision system with low cost hardware. 
-    System identifications techniques are used to explore
-    cascaded PID and LQG control strategies.
-    A trajectory generation algorithm is proposed based on drivability, confidence 
-    and prominence of the detected line from a camera used as an intensity sensor. 
-    The performance of the the system is shown to be robust to different race tracks which
-    surface texture variation, lighting conditions, high speed straights and tight curves. 
-
-
+        The highly dynamic Two Wheel Self Balancing Robot 
+        (TWSB) has a large exploration space for developing high level 
+        control strategies. 
+        This report presents the design decisions and algorithms developed for
+        an autonomous line racing TWSB robot utilizing a monocular vision system with low cost hardware. 
+        System identifications techniques are used to explore
+        cascaded PID and LQG control strategies.
+        A trajectory generation algorithm is proposed based on drivability, confidence 
+        and prominence of the detected line from a camera used as an intensity sensor. 
+        The performance of the the system is shown to be robust to different race tracks which
+        surface texture variation, lighting conditions, high speed straights and tight curves. 
   \end{abstract}%
   \clearpage
 
@@ -183,93 +181,72 @@
 
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
     \section{Mathematical Modeling} % edit section heading as appropriate
-    \subsection{DC Motor Model}    
-    \begin{figure}[H]
-        \centering
-            \includegraphics[width=0.75\textwidth]{Diagrams/DcMotorModel.pdf}
-        \caption{Gearbox DC Motor Model Diagram}
-    \end{figure}
-    The system is driven by two independently voltage controlled DC motors through 
-    planetary gearboxes, as is shown in Fig(2). 
-    DC motors execute a torque $t_r$, proportional to the armature current $i_a$,
-    when a voltage $V_a$ is applied.
-    The ratio of motors inductance $L_a$ and resistance $R_a$ determine the
-    time constant $\tau_e$ of the motor. That is the time it takes 
-    for $i_a$ to reach 63.2\% of its final value. []
-    The gear ratio, $n=N_2/N_1$ transmits the torque to the wheel, 
-    where $N_1$ and $N_2$ are the number of teeth on the input and output gears respectively.
-    The equivalent viscous damping 
-    $B_G$ and the moment of inertia $J_G$ with respect to the motor are given by
-    \begin{equation}
-        J_{\text{eq}} = J_G + J_r \cdot n^2 
-    \end{equation}
-    With $J_r$ representing the moment of inertia of the the rotor.
-
-    The speed of the gearbox, $\dot\phi_w$ is related to the armature voltage 
-    by the well-known transfer function
-    \begin{equation}
-        \begin{aligned}
-            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s^2 \cdot L_a R_a +\;s\left(R_a \cdot J_{\mathrm{eq}} +B_{\mathrm{eq}} \cdot L_a \right)+K_t {\cdot K}_e +R_a \cdot B_q }\cdot\frac{1}{n}
-        \end{aligned}
-        \label{eq:DCMotor}
-    \end{equation}
-    Where $\Omega_w$ is the laplace transform of the output speed, 
-    The rotors viscous damping $B_r$ is assumed to be negligible, as is $B_G$. 
-    For small motors, $\tau_e$ is small and $L_a << R_a$, hence the motor can be 
-    approximated as a first order system as
-    \begin{equation}
-        \begin{aligned}
-            \frac{\Omega_w \left(s\right)}{V_a \left(s\right)}=\frac{K_t }{s\cdot R_a + J_{eq}+K_t K_e }\cdot\frac{1}{n}
-        \end{aligned}
-        \label{eq:DCMotorSimple}
-    \end{equation}
-
-    Where $K_t$ is the torque constant of the motor and $K_e$ is the back EMF constant.
-    The parameters of the motor are identified and discussed in section 3.1. 
-    \pagebreak{}
-
-    \subsection{2DOF System Model}
+    In this report, the TWSB decomposed into 2 commonly studied 2DOF subsystems, described by Fig.\ref{fig:2DOF} and their behavior is analyzed
+    separately.
+    Effective control and planning algorithms for such platforms require the designer to obtain a mathematical model describing the behavior
+    of the robot.  
     \begin{figure}[h]
         \centering
-        \begin{subfigure}[b]{0.4\textwidth}
-            \includegraphics[width=\textwidth]{Diagrams/WIP.pdf}
-            \caption{Wheeled Inverted Pendulum}
-            \label{fig:WIP}
-        \end{subfigure}
-        \hfill
         \begin{subfigure}[b]{0.4\textwidth}
             \includegraphics[width=\textwidth]{Diagrams/DDMR.pdf}
             \caption{Differential Drive Mobile Robot}
             \label{fig:DDMR}
         \end{subfigure}
-        \caption{Robot motion decoupled by levels of abstraction}
+        \hfill
+        \begin{subfigure}[b]{0.4\textwidth}
+            \includegraphics[width=\textwidth]{Diagrams/WIP.pdf}
+            \caption{Wheeled Inverted Pendulum}
+            \label{fig:WIP}
+        \end{subfigure}        
+        \caption{Robot subsystems}
         \label{fig:2DOF}
     \end{figure}
 
-    Wheeled mobile robots are typically restricted to navigation in the 2D Cartesian plane, their motion models are often simplified and 
-    abstract the non linear dynamics of friction and acceleration is assumed to be constant. 
-    Effective control and planning algorithms for such platforms require the designer to obtain a mathematical model, 
-    the differences in models arise form the nature of the goal of the planner, the available control signals and the sensors 
-    used to estimate the configuration of the robot \cite{ClassificationWheeled}. 
-    In this paper, the TWSB decomposed into 2 commonly studied 2DOF systems, as in Fig.\ref{fig:2DOF} and their behavior is analyzed
-    seperately.
-    
-    The DDMR modeled in Fig.\ref{fig:DDMR} navigates under the pure rolling assumption, that is, the wheels do not slip 
-    and the inerial forces arising from acceleration in the $x'$ direction are negligible \cite{KinematicWheeled}. 
-    The motion of the DDMR is bounded by its non-holonomic constraints[], that is no lateral motion is allowed along the $y'$ axis. 
 
-    The  DDMR's non linear kinematic model in the global frame is 
+    \subsubsection{Differential Drive Mobile Robot}
+    Wheeled mobile robots are typically restricted to navigation in the 2D Cartesian plane. For small robots 
+    this configuration, motion models are often simplified by discounting the non linear dynamics of friction and 
+    the inertial forces arising from acceleration in the $X'$ direction are negligible \cite{KinematicWheeled}. 
+
+    The DDMR's nonlinear kinematics are obtained from Fig.\ref{fig:DDMR} describe point $G=(x_g,y_g)$ as the position of 
+    the robot in the global frame.
     \begin{equation}
         \begin{bmatrix}
-            \dot{x}_b \\
-            \dot{y}_b \\
-            \dot{\theta}
+            \dot x_g \\
+            \dot y_g \\
+            \dot \psi
         \end{bmatrix}
         =
         \begin{bmatrix}
-            \frac{r}{2} \cos \theta & \frac{r}{2} \cos \theta \\
-            \frac{r}{2} \sin \theta & \frac{r}{2} \sin \theta \\
-            -\frac{r}{2L} & \frac{r}{2D}
+            \cos(\psi) & 0 \\
+            \sin(\psi) & 0 \\
+            0 & 1
+        \end{bmatrix}
+        \begin{bmatrix}
+            v_g \\
+            \omega_g
+        \end{bmatrix}
+        \label{eq:DDMRGlobal}
+    \end{equation}
+
+    Where the angular velocity $\omega_g$ and linear velocity $v_g$ are the control 
+    inputs to the system. 
+
+    The motion of the DDMR is bounded by its non-holonomic constraints, 
+    preventing lateral movement along the $Y'$ axis. 
+    Under the pure rolling assumption,the wheels do not slip, the robot's kinematics 
+    are governed by the wheel radius $r$ and wheelbase $d$. These parameters define 
+    the mapping between the left and right wheel velocities, $\omega_L$ and $\omega_R$, 
+    and the global velocities $v_g$ and $\omega_g$, by:
+    \begin{equation}
+        \begin{bmatrix}
+            v_g \\
+            \omega_g
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+            \frac{r}{2} & \frac{r}{2} \\
+            \frac{r}{d} & -\frac{r}{d}
         \end{bmatrix}
         \begin{bmatrix}
             \omega_L \\
@@ -277,46 +254,117 @@
         \end{bmatrix}
         \label{eq:DDMR}
     \end{equation}
-    Where $r$ is the radius of the wheel and $D$ is the distance between the wheels.
-    from \ref{eq:DDMR} it can be seen that a large wheel radius $r$ amplifies the resultant effect of difference in the wheel 
-    speeds, $\omega_L$ and $\omega_R$. This leads to very small disturbances to the wheel velocities being sufficient 
-    to adequately steer the TWSB. Conversely small wheels minimize the effects of backlash in the drive train, these effects are most notable 
-    when the TWSB is required to maintain static stability. \cite{kim2015dynamic} considers the dynamics of the coriolis force 
-    arising from the yaw rate of the body, $\omega_b$. The robot developed in this paper is of small stature and these effects 
-    are assumed to be negligible. This project is mainly concerned with the navigation the TWSB system and as such 
-    relatively large wheels are used. This allows for a simplified dynamics model of the Wheel Inverted Pendulum 
-    in Fig.\ref{fig:WIP} to simulate the balancing of the TWSB in 2DOF space.
 
-    The derivation of the linearized 2DOF model for the TWSB is well known[][]. Incorporating \ref{eq:DCMotorSimple}
-    with state space model obtained by \cite{Velazquez2016VelocityAM} the system in Fig.\ref{fig:WIP} is described by 
+    
+    \subsection{DC Motor Model}    
+    The robot is driven by two DC motors,through planetary gearboxes, as shown in Fig.~\ref{fig:DCMotor}.
+    When a voltage $V_a$ is applied, the DC motor generates a torque, $\tau$, 
+    proportional to the armature current, $i_a$.
+    According to Lenz's law, the back electromotive force (emf), $e_a(t)$, 
+    opposes the applied voltage. These relations are given by:
+    \begin{subequations}
+        \begin{align}
+            \tau &= K_t i_a \\
+            e_a &= K_e \dot{\phi}_r
+        \end{align}
+    \end{subequations}
+    where $\dot{\phi}_r$ represents the rotor's angular velocity. The torque 
+    and back emf constants are denoted as $K_t$ and $K_e$, respectively.
+    \begin{figure}[H]
+        \centering
+            \includegraphics[width=0.75\textwidth]{Diagrams/DcMotorModel.pdf}
+        \caption{Gearbox DC Motor Model Diagram}
+        \label{fig:DCMotor}
+    \end{figure}
+    The ratio between the inductance $L_a$ and armature resistance $R_a$ 
+    determines the time constant $\tau_e$ of the motor, that is, the time required 
+    for $i_a$ to reach 63.2\% of its final value. In small motors, $\tau_e$ is 
+    small, and since $L_a \ll R_a$, the electrical dynamics can be approximated as:
     \begin{equation}
-        \left\lbrack \begin{array}{c}
-        {\dot{x} }_b \\
-        {\ddot{x} }_b \\
-        \dot{\theta} \\
-        \ddot{\theta} 
-        \end{array}\right\rbrack =\left\lbrack \begin{array}{cccc}
-        0 & 1 & 0 & 0\\
-        0 & \frac{2n^2 K_e K_t }{r^2 R_a \cdot W_1 } & -\frac{M_b^2 L^2 g\;}{W_1 \left(J_b -M_c L^2 \right)} & 0\\
-        0 & 0 & 0 & 1\\
-        0 & \frac{2n^2 K_e K_t }{r^2 R_a \cdot W_1 \left(\frac{J_b }{M_b }+L\right)} & \frac{{-M}_b^2 L^2 g}{W_1 \left(\frac{J_b }{M_b }+L\right)\left(\left(J_b -M_c L^2 \right)+{\mathrm{gW}}_1 \right)} & 0
-        \end{array}\right\rbrack \cdot \left\lbrack \begin{array}{c}
-        x_b \\
-        {\dot{x} }_b \\
-        \theta \\
-        \dot{\theta} 
-        \end{array}\right\rbrack +\left\lbrack \begin{array}{c}
-        0\\
-        -\frac{2{n\;K}_t }{r\;R_a W_1 }\\
-        0\\
-        -\frac{2n\;K_t }{r\;R_a W_1 \left(\frac{J_b }{M_b }+L\right)}
-        \end{array}\right\rbrack \cdot V_a
+        i_a (t) = \frac{V_a (t) - K_e \dot{\phi}_r (t)}{R_a}
+    \end{equation}
+
+    The rotor torque, $\tau_r$, is transmitted through the gearbox, which 
+    reduces the angular velocity of the wheel, $\dot{\phi}_w$, by the gear ratio $n = \frac{N_2}{N_1}$. 
+    Assuming the gearbox is lossless the wheel torque, $\tau_w$, is given by:
+    \begin{equation}
+            \tau_w = n\tau_r
+    \end{equation}
+    where $N_1$ and $N_2$ are the number of teeth on the input and output gears, respectively.
+    The rotor's inertia $J_r$ and damping $B_r$ are considered negligible.
+    By summing the torques of the rotor and gearbox subsystems, the output torque is given as:
+    \begin{equation}
+        \tau_w = - J_g \ddot{\phi}_w - \dot{\phi}_w \left( \frac{K_t K_e}{R_a} n^2 + B_g \right) + \frac{n K_t V_a}{R_a}
+    \end{equation}
+    where $J_g$ represents the gearbox's inertia and $B_g$ its damping coefficient.
+
+    \subsection{Wheeled Inverted Pendulum}
+    The wheel inverted pendulum (WIP), is similar to the classic inverted pendulum on a cart. 
+    The WIP is composed of 2 rigid bodies, the body and the chassis connected by a revolute joint, 
+    at the center of mass of the wheel as shown in Fig.\ref{fig:WIP}. 
+    The center of mass of the body, $B=(x_b,z_b)$, 
+    is located at a distance $L$ from the wheel's axel, displaced at some pitch angle $\theta$ with 
+    the vertical axis $Z$. The body is assumed to be a point mass $M_b$ with a moment of inertia $J_b$ 
+    about the axis of rotation. 
+    
+    The system of equations governing the time evolution of the WIP are 
+    commonly found by Lagrangian mechanics \cite{AdvancedWIP}. This is an energy-based approach that
+    facilitates describing losses in the system in a general manner through a 
+    dissipative term \cite{frankovsky2017modeling} \cite{ModelingWIPLagrange}.
+    \begin{equation}
+        D = \frac{b_w}{r^2} \dot{x}^2
+    \end{equation}
+    Following this approach, the system is linearized about the vertical equilibrium position $\theta = 0$,
+    yielding the following coupled differential equations of motion:
+
+    \begin{subequations}
+        \begin{align}
+            \tau_R + \tau_L &= - M_b L \ddot{x}  
+            - (M_b L^2 + J_b) \ddot{\theta}  
+            + g M_b L \theta, \\
+            \frac{\tau_R + \tau_L}{r} &= \left( M_b + 2M_w + 2\frac{J_w}{r^2} \right) \ddot{x}  
+            + 2\frac{b_w}{r^2} \dot{x}  
+            + M_b L \ddot{\theta}.
+        \end{align}
+        \label{eq:2DOFWIP}
+    \end{subequations}
+
+    Where $\tau_R$ and $\tau_L$ are the torques applied to the right and left wheels. 
+    The wheel's inertia is denoted by $J_w$, its damping by $b_w$, and its mass by $M_w$. 
+
+    Incorporating the torque produced by each actuator $\tau_w$, 
+    and reiterating the no slip condition $\phi_w = \frac{x}{r}$,
+    eq(\ref{eq:2DOFWIP}) can be written in state space form as:
+
+    \begin{equation}
+        \begin{bmatrix}
+            \ddot{x} \\
+            \ddot{\theta}
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+            -\frac{b_w}{r^2} & 0 \\
+            \frac{1}{M_b L} & -\frac{M_b L + M_w r^2}{M_b L (M_b L^2 + J_b)}
+        \end{bmatrix}
+        \begin{bmatrix}
+            \dot{x} \\
+            \dot{\theta}
+        \end{bmatrix}
+        +
+        \begin{bmatrix}
+            \frac{1}{M_b L} \\
+            \frac{1}{M_b L (M_b L^2 + J_b)}
+        \end{bmatrix}
+        \tau_w
         \label{eq:2DOF}
-    \end{equation} 
+    \end{equation}
 
-    with $W_1 =2\left(-\frac{n^2 J_{\mathrm{eq}} +J_b }{r^2 }-M_w \right)-M_b +\;\frac{M_b^2 L^2 }{J_b +M_b L^2 }$ 
 
+   
+
+    
     \pagebreak{}
+
 
     \section{System Design}
         \begin{figure}[H]
@@ -353,12 +401,7 @@
         Whilst this is a powerful tool, it is deemed too complex to learn for meeting the project deadline.
         Nevertheless some core concepts are used such as sharing state by message passing between components, 
         and dynamic parameter configuration to improve testing and data collection. The ZeroMQ middleware is used for 
-        timestamped signal stream communication between the computational nodes shown in Fig.\ref{fig:DataPath}.
-        \begin{figure} [H]
-            \includegraphics[width=\textwidth]{Diagrams/CommunicationDataPath.pdf}  
-            \caption{Communications Data Path, borders show where state is shared}
-            \label{fig:DataPath}
-        \end{figure}
+        timestamped signal stream communication between the computational nodes. 
 
         The software, written in C++, is managed by systemd as services. 
         Self-diagnosis routines are used for resource monitoring and auto recovery. 
@@ -469,25 +512,25 @@
 
 
         From these experiments it is clear that the motor is has significant deadzones, 
-        and the input output relationship is non linear at low speeds. When the motor is operating at its rated currnet, 
-        seen by the experiments in Fig.\ref{fig:speedvolt}, its its linearity is improved. The maximum no load speed is  
+        and the input output relationship is non linear at low armature voltages. When the motor is operating at 
+        its rated current, seen by the experiments in Fig.\ref{fig:speedvolt}, its its linearity is improved. 
+        The maximum no load speed within the manufacturers operating range is found to be 8 rotations per second.
+        To increase control authority, the motors are powered by 12V, with the armature voltage is modulated by 
+        the duty cycle of the PWM signal. The DRV7783 Integrates current sensing and over current protection,
+        used to limit the current to the motors to 1.5A.
         \begin{figure}[H]
             \centering
             \includegraphics[width=0.5\textwidth]{Graphs/SpeedVoltageCurve.pdf}
             \caption{Speed Voltage Relationship}
             \label{fig:speedvolt}
         \end{figure}
-
-        This non-linearity is a result of the motors backlash, which is a common issue in low cost gearboxes.
-        \cite{grasser2002joe} utilizes a low pass filter to mitigate some of the more sever effects of 
-        this deadline; mechanical vibration increased thermal stress and noise. 
-        In the case of the TWSB system, when it is stationary, 
-        the actuators will not be static and are required to be operating mostly is a sinusoidal version, 
+        For stationary balancing of the TWSB robot
+        the actuators are required to be operate mostly in a sinusoidal fashion, 
         similar to Fig.\ref{fig:opensine} in order to regulate the pitch angle of the body.
         Considering this a closed loop controller is developed in section 4.1 to regulate the motors speed,
-         and maintain the device is it operating region. 
-    \pagebreak{}
+        and maintain the device is it operating region. 
 
+    \pagebreak{}
 
 
     \section{State Estimation}
@@ -501,18 +544,13 @@
         and the wheel encoders respectively. 
             
         The motors incorporate a low-cost 12 pulses per revolution (PPR) incremental encoder on the rotor shaft. 
-        Further resolution is easily obtained by using the hardware quadrature decoder 
-        peripheral to increment, or decrement, a counter based on the direction of movement. 
-        Considering the gearbox ratio $n=20$ results in an effective resolution of 960 PPR. 
+        Further resolution is easily obtained by using the MCU's quadrature 
+        peripheral to increment, or decrement, a counter based on the phase transitions.
+        Considering the gearbox ratio $n=20$, an effective resolution of 960 PPR is attained.
         The rotational speed of the wheel is computed by sampling the change in the pulse counts
-        at a fixed rate as per 
-            \begin{equation}
-                \omega=2\pi \frac{\Delta \textit{count}}{PPR \cdot \Delta t}
-            \end{equation}
-    
-        Where $\Delta \textit{count}$ is the change in the pulse count. The sample period is inversely proportional to the
-        quantization error in the velocity estimate. 
-        However, it is observed that larger sources of error arise from the mechanical backlash in the gearbox.
+        over a sample period $\Delta t$. Thus the error in the velocity estimate, 
+        is inversely proportional sample period, resulting in large errors at low speeds.
+        Yet, it is observed that more significant sources of error arise from the mechanical backlash in the gearbox.
         The sample time is set to 2ms, and a low-pass filter is given by the recursive relation
             \begin{equation}
         y_k = \alpha x_k + (1-\alpha)y_{k-1}
@@ -751,7 +789,7 @@
     
         For example, the input-output data of the selected actuators obtained in Fig.\ref{fig:openloop}, 
         it can be seen that a large integral action is needed to overcome the steady-state error.
-        This is a common issue in low-cost DC motors, where the backlash and static friction of the gearbox presents 
+        This is a common issue in low-cost DC motors, where the static friction of the gearbox presents 
         a nonlinearity which is most notable at low voltages. 
     
         Model-based control allows the designer to validate the performance of the system in simulation. 
@@ -900,76 +938,89 @@
 
         \pagebreak{}
         \section{Navigation System}
-        The TWSB robot is tasked with navigating an line track.
-        The line is assumed to be of significant contrast to to its surrounding environment,
-        and the track is taken to be a closed loop, containing chicanes, curves and straight sections, 
-        an example of such a track is shown in Fig.\ref{fig:TrajTrack}.
+        The TWSB robot is tasked with navigating around a line track, assumed to be of significant contrast to to its surrounding environment.
+        This contains straights, curves and a chicane, each of these are related to the speed, maneuverability and accuracy
+        performance metrics of the TWSB robot.
 
         Map building is a popular approach for mobile navigation in a closed loop as it allows for a large 
-        context of the environment to be considered and guarantees can be made such as obstacle avoidance 
-        and optimal path selection in \cite{Macenski_2020}. Maps can be built iteratively, by exploration 
-        and subsequent loop closure, or based on $\textit{a priori}$ knowledge.
-
+        context of the environment to be considered.  Closed maps can be built iteratively, by exploration 
+        and subsequent loop closure, or based on $\textit{a priori}$ knowledge, in this case guarantees can also be made, 
+        such as obstacle avoidance and path selection by optimization functions \cite{Macenski_2020}. This is referred to as global navigation.
         In this report however, no map is initially available and the robot must navigate the track using only
-        the information obtained from the camera sensor. This is commonly referred to as local navigation. 
-    
+        the information obtained from the camera sensor. This is commonly known as local navigation.
+
+        Path following is a form of local navigation, which aims to reduce the error between a point on the track 
+        and the robots pose. This differs from trajectory following where a velocity profile is followed together with the path. 
+              
+        The latter requires some form of planning, where a local 2D map is used to generate a dynamic path based on estimating 
+        the robots pose relative to the track and from this determining a velocity profile. The former is a reactive control
+        method, where, as implemented by \cite{visionlinetwsb}, a camera is used to classify a small 
+        section of the track into discreet states and a rule based system is used to determine the next action. This is demonstrated to be 
+        effective and simple to impellent, however discards a large portion of the information available in the image. 
+        Similar perforce is achieved by \cite{ghani2011two} with optical sensors. 
+
         \subsection{Camera Sensor}
         Geometric information about the track can be observed from a camera sensor mounted on the TWSB robot.
         This obtains a discreet 2D projection of the environment in the form of a matrix of pixels, each of which encodes 
         its identity value as an 8 bit unsigned integer. Considering such an image, it is non trivial to
-        obtain this geometry, as it is highly encoded in a large measurement space. Perceptual sensors of this form differ from 
-        the physical sensors found elsewhere on the TWSB robot as the quantity measured; light intensity, are not directly 
-        usable in all but the most fundamentally complex autonomous behavior, photo-taxis \cite{hasslacher1995living}. 
+        obtain a map of the track with reference to the robot, as the data is highly encoded in a large measurement space. 
+        Perceptual sensors of this form differ from the physical sensors found elsewhere on the TWSB robot as the quantity measured; 
+        light intensity, is not directly usable in all but simple autonomous behavior, photo-taxis \cite{hasslacher1995living}. 
+        
         The question of what quantifies useful information in an image is a long standing problem,  \cite{siegwart2011introduction} classifies 
         perception as the process of condensing the detailed information contained within each image, or sequence of images, 
         into features that are useful to track for the task at hand.
-        In the case of ocular mobile navigation the notion models of features is a key concept in active perception \cite{Activeperception},
-        these models are used to infer a $\textit{percept}$, then used to make decisions in controlling the robots pose within its environment 
+        In the case of monocular mobile navigation the notion models of features is a key concept in active perception \cite{Activeperception},
+        these models are used to infer $\textit{percepts}$. These are used to make decisions in controlling the robots pose within its environment 
         \cite{hutchinson1996tutorial}. 
 
+        The field of computer vision is concerned with the extraction of these percepts from the image data. 
+        Recent advances in parallel computing have proliferated the use of neural networks in computer vision, which apply a 
+        series of latent filters to the image data. These are trained on large datasets of images 
+        or online \cite{tai2017virtual} \cite{lee2013line} \cite{kober2013reinforcement}. 
+
         Classical computer vision algorithms are used to extract spacial information about the sensed environment over the visible 
-        horizon.
+        horizon. Common features are reasoned by geometry, 
+        \cite{lee2009geometric} such as edges, corners, lines and blobs of texture. These are typically processed using a series of 2D convolutional filters,
+        for large images this is computationally expensive and often requires the use of a GPU to parallelize the operations. For performance the image is restricted 
+        to 640x480 pixels and processed in grayscale as the color information is not required.
 
-
-        
-
-        
-
-        \begin{figure}[H]
-            \centering
-            \includegraphics[width=0.8\textwidth]{Diagrams/VizNavSystem.pdf}
-        \end{figure}
-
-        
-
-        The Raspberry Pi Camera Module V3 Wide angle is used as the physical sensor for the vision system.
-        The small sature of the TWSB robot mandates a wide angle lense to be used in order to maimize 
-        the horizon vizibile in the image, 
         \subsubsection{Calibration}
+        The Raspberry Pi Camera Module V3 Wide angle is used as the physical sensor for the vision system.
+        The small stature of the TWSB robot mandates a wide angle lense to be used in order to maximize 
+        the horizon visible in the image. 
         The camera matrix and distortion coefficients are obtained by taking calibration sequence of images of a 
-        chessboard pattern. The commonly used Zhang's Method is used to obtain the camera matrix and distortion coefficients as 
+        chessboard pattern. The commonly used Zhang's Method is used to obtain the camera matrix and distortion coefficients. 
+        The chessbaord patters is also used to recalculate the homography matrix between the camera and the floor plane, which when
+        applied to the image frame, produces a birds eye view of the environment. 
+        Homography assumes that the camera is orthogonal to the floor plane, the pitch angle of the TWSB is applied 
+        through a rotation matrix to the image frame given by:
         \begin{equation}
             \begin{aligned}
-                \begin{bmatrix}
-                    u \\
-                    v
-                \end{bmatrix}
-                &= 
-                \begin{bmatrix}
-                    f_x & 0 & c_x \\
-                    0 & f_y & c_y
+                H = \begin{bmatrix}
+                    1 & 0 & -\frac{w}{2} \\
+                    0 & 1 & -\frac{h}{2} \\
+                    0 & 0 & 1
                 \end{bmatrix}
                 \begin{bmatrix}
-                    X \\
-                    Y \\
-                    Z
-                \end{bmatrix}
+                    cos(\theta) & -sin(\theta) & 0 \\
+                    sin(\theta) & cos(\theta) & 0 \\
+                    0 & 0 & 1
+                \end{bmatrix}.
             \end{aligned}
-            \label{eq:CameraModel}
+            \label{eq:Homography Matrix}
         \end{equation}
-
-
+        The camera is mounted on the TWSB robot at a height of 0.1m and at an angle of 45 degrees to the floor plane.
+        This acts to correct the geometric distortion of the image from non-orthogonal projection of the camera. 
+        \pagebreak{}
         \subsection{Robust Line Detection Algorithms}
+
+        In non ideal environments, significant noise is present in the image data, 
+        and simple edge thresholding methods are not adequate. This noise can lead large errors
+        in the estimated position of the track. Once the birds eye view map of the track is obtained, 
+        from Fig.\ref{fig:LineDetection} by weighted summing the pixel in the x direction, it can be seen that the 
+        curvature of line can be parametrized by the width of the identified peak. The ideal straight line can be through of as
+        a single peak in the middle of the image.  
 
         \begin{figure}[H]
             \centering
@@ -982,10 +1033,15 @@
             \begin{subfigure}[b]{0.45\textwidth}
                 \includegraphics[width=\textwidth]{vizBigCurve.png}
                 \caption{Sharp Curvature}
-                \label{fig:LineSegmentation}
+                \label{fig:Sharp Curvature}
             \end{subfigure}
             \caption{Line Detection and Segmentation}   
         \end{figure}
+
+        Some challenging cases, where simpler methods may fail, are shown in Fig.\ref{fig:ChallengingEnvironments}.
+        Here it can be seen these cases have a higher noise floor, that is the the peak is not as prominent. 
+        This prominence can be used as as an indicator of the quality of the line detection algorithm, where good algorithms 
+        maximize the peak to noise ratio.
 
         \begin{figure}[H]
             \centering
@@ -1001,7 +1057,40 @@
                 \label{fig:ReflectOcclusion}
             \end{subfigure}
             \caption{Challenging Environments}
+            \label{fig:ChallengingEnvironments}
         \end{figure}
+
+        False positive are the most common issue with line detection algorithms as they often cause the robot to loose track of the original path. 
+        These are difficult to remove as outliers in the image data as they form peaks of similar shapes to other features. This non unique mapping 
+        of image data to classified set of features is a common issue in robotic navigation. 
+        Assuming that the robot is initial on the track, then the search space for the peak can be expanded around the last known position of the track. 
+        A topological peak tracker grouping peaks of similar shape, width prominence and position, further reducing outliers. 
+        This results an a set of best candidate peaks, which are sorted by their distance from last known position and prominence. 
+
+        This procedure is shown in Fig.\ref{fig:LineSegmentation} where the image is split into 3 sections, thus obtaining points at different lookahead distances 
+        on the track. 
+    
+
+
+
+
+        \begin{figure}[H]
+            \centering
+            \begin{subfigure}[b]{0.6\textwidth}
+                \includegraphics[width=\textwidth]{Diagrams/VIzNav.pdf}
+                \caption{VizNavigation System}
+                \label{fig:Vision}
+            \end{subfigure}
+            \hfill
+            \begin{subfigure}[b]{0.35\textwidth}
+                \includegraphics[width=0.8\textwidth]{Diagrams/PurePersuit.pdf}
+                \caption{Local Path Following}
+                \label{fig:PurePersuit}
+            \end{subfigure}
+            \caption{Navigation System}
+            \label{fig:NavigationSystem}
+        \end{figure}
+
 
         \subsection{Navigation requirements}
 
@@ -1028,13 +1117,31 @@
         \end{subfigure}
         \hfill
         \begin{subfigure}[c]{0.6\textwidth}
-            \includegraphics[width=\textwidth]{Graphs/DeadReckoningTrackMap.png}
-
+            \includegraphics[width=\textwidth]{Graphs/Path Following.pdf}
             \caption{Map built offline using dead reckoning}
         \end{subfigure}
         \caption{Trajectory Tracking and Map Visualization}
         \label{fig:TrajTrack}
     \end{figure}
+
+    \begin{table}[h]
+        \centering
+        \begin{tabular}{cccc}
+            \toprule
+            \textbf{Time (s)} & $\nu_{trgt}$ \textit{(m/s)} & $\nu_g$ \textit{var}& $\Delta\psi$ \textit{var} \\  
+            \midrule
+            40.59 & 0.1900 & 0.0112 & 1.0207 \\  
+            32.00 & 0.2400 & 0.0122 & 1.4781 \\  
+            27.00 & 0.2800 & 0.0093 & 1.4958 \\  
+            27.20 & 0.3000 & 0.0105 & 1.6750 \\  
+            22.80 & 0.3500 & 0.0140 & 1.6480 \\  
+            \bottomrule
+        \end{tabular}
+        \caption{Lap Statistics}
+        \label{tab:lap_stats}
+    \end{table}
+
+
     \subsection{More detail}
     \subsection{Summary}
   %%%%%%%%%%%%%%%%%% SECTION 5 %%%%%%%%%%%%%%%%%%

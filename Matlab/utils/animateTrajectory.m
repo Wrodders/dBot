@@ -21,12 +21,12 @@ function animateTrajectory(x, y, theta, linvel, dt, config, varargin)
     % Create figure for animation
     figAnim = figure('Visible', p.Results.FigureVisible, 'Color', 'w');
     axAnim = axes(figAnim);
-    hold(axAnim, 'on');
+   
     
     % Plot static trajectory elements on the animation figure
     plotDDMRTrajectory(axAnim, x, y, theta, linvel, config);
     plotStartEndMarkers(axAnim, x, y);
-    
+    hold(axAnim, 'on');
     % Set fixed axis limits with a 10% margin to prevent dynamic resizing
     x_range = max(x) - min(x);
     y_range = max(y) - min(y);
@@ -45,7 +45,7 @@ function animateTrajectory(x, y, theta, linvel, dt, config, varargin)
                     'MaxHeadSize', 0.5, 'DisplayName', 'Current Heading');
     
     % Configure axes appearance and title
-    title(axAnim, p.Results.Title, 'FontSize', 20); grid minor;
+    title(axAnim, p.Results.Title, 'FontSize', 20); 
     set(axAnim, 'FontSize', 14, 'XGrid', 'on', 'YGrid', 'on', 'GridAlpha', 0.3, 'LineWidth', 1.2);
     
     % Animation loop: update the robot's position and heading arrow
