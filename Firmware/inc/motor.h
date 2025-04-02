@@ -173,7 +173,7 @@ static void motorEstSpeed(struct Motor* motor) {
     if (dCount > (UINT16_MAX / 2)) { dCount -= (UINT16_MAX + 1);}  // Convert to signed range [-32768, 32767]
     motor->enc->lastCount = mCount; 
     float measuredRPS = (float)dCount * TICKS_TO_RPS * -motor->flipDir * motor->enc->flipDir; // convert to rotations per second at gearbox output
-    motor->wheelRPS = iirLPF(motor->alpha, measuredRPS, motor->wheelRPS); 
+    motor->wheelRPS = lagFilter(motor->alpha, measuredRPS, motor->wheelRPS); 
 }
 
 

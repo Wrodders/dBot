@@ -35,10 +35,10 @@ static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, 
 static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PID *balanceAngleCtrl, 
                             struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
     // Twist Velocity Control Loop
-    float linvelFilt = ddmr->linearVel; 
-    float angvelFilt = ddmr->angularVel;
-    velCtrl->out = pidRun(velCtrl, ddmr->linearVel); // Reference - odometry velocity 
-    steerCtrl->out = pidRun(steerCtrl,ddmr->angularVel); // Reference - odometry angular velocity
+    float linvelFilt = ddmr->v_b; 
+    float angvelFilt = ddmr->w_b;
+    velCtrl->out = pidRun(velCtrl, ddmr->v_b); // Reference - odometry velocity 
+    steerCtrl->out = pidRun(steerCtrl,ddmr->w_b); // Reference - odometry angular velocity
     pidSetRef(balanceAngleCtrl, -velCtrl->out); // Sets Balance Reference point to reach desired velocity
 }
 // ********** LQR FUNCTIONS ***************************************//
@@ -94,7 +94,7 @@ int main(void){
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
     // LQR Controller
     struct LQR lqr ={.K[0] = LQR_K1, .K[1] = LQR_K2, .K[2] = LQR_K3, .K[3] = LQR_K4, 
-        .state.x = {&ddmr.posX, &ddmr.linearVel, &imu.kal.pitch, &imu.kal.pitchRate}};
+        .state.x = {&ddmr.posX, &ddmr.v_b, &imu.kal.pitch, &imu.kal.pitchRate}};
 
     // ***************************** COMMUNICATIONS ******************************************************** // 
     struct Coms coms = comsInit();
@@ -306,8 +306,8 @@ int main(void){
                 imu.lpf.gyro.x,     imu.lpf.gyro.y,         imu.lpf.gyro.z,
                 motorL.wheelRPS,    motorL.speedCtrl.ref,   motorL.speedCtrl.out,
                 motorR.wheelRPS,    motorR.speedCtrl.ref,   motorR.speedCtrl.out,
-                ddmr.linearVel,     velCtrl.ref,            balanceAngleCtrl.ref, 
-                ddmr.angularVel,    steerCtrl.ref,          steerCtrl.out,
+                ddmr.v_b,     velCtrl.ref,            balanceAngleCtrl.ref, 
+                ddmr.w_b,    steerCtrl.ref,          steerCtrl.out,
                 ddmr.posX, lqr.u);
 
             

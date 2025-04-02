@@ -3,46 +3,96 @@
 
 #include "motor.h"
 
-// 
-  // ******* Differential Drive Mobile Robot ********* // 
-
+// ******* Differential Drive Mobile Robot ********* // 
 struct DiffDriveModel{
     const float wheelR;     // R [m]
     const float wheelBase;  // L [m]
-    float linearVelAlpha;   // LPF coeff estimate
-    float angularVelAlpha;  // LPF coeff estimate
+    float linearVelAlpha;   // LPF coeff 
+    float angularVelAlpha;  // LPF coeff 
+    float dt;              // sample time [s]
 
-    float linVelFiltAlpha;  // LPF coeff reference
-    float angVelFiltAlpha;  // LPF coeff reference
+    float gyroOdoThreshold; // threshold for gyro odometry
+
     // kinematic state
-    float linearVel;    // m/s    
-    float angularVel;   // angular vel [rad/s]
-    float posX;         // x position [m]
+    float v_b;   // linear velocity m/s    
+    float posX;  // x position [m] in robot frame
+    float w_b;   // angular vel [rad/s]
+   
+    float x_g;   // x position [m] in global frame
+    float y_g;   // y position [m] in global frame
+    float theta; // orientation [rad] in global frame
 }DiffDriveModel; // Deferential Drive Mobile Robot
 
-
-
+static inline void ddmrReset(struct DiffDriveModel *const ddmr){
+    ddmr->v_b = 0.0f;
+    ddmr->w_b = 0.0f;
+    ddmr->posX = 0.0f;
+    ddmr->x_g = 0.0f;
+    ddmr->y_g = 0.0f;
+    ddmr->theta = 0.0f;
+}
 
 static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheelBase, 
-                                      const float linearVel_alpha, const float angularVel_alpha){
+                            const float linearVel_alpha, const float angularVel_alpha, 
+                            const float dt){
+
     struct DiffDriveModel ddmr =  {
         .wheelR = wheelRadius,
         .wheelBase = wheelBase,
         .linearVelAlpha = linearVel_alpha,
         .angularVelAlpha = angularVel_alpha,
-        .linearVel = 0.0f,
-        .angularVel = 0.0f
+        .dt = dt
     };
     return ddmr;
 } 
 
 //@Brief: Compute Inverse Kinematic State of Mobile Robot using Wheel Odometry
 static void ddmrEstimateOdom(struct DiffDriveModel *const ddmr, const struct Motor *const motorLeft, const struct Motor *const motorRight){
-    float speed =  RPS_TO_MPS * (motorLeft->wheelRPS + motorRight->wheelRPS) * 0.5f;                            // convert to mps 
-    ddmr->linearVel = iirLPF(ddmr->linearVelAlpha, speed, ddmr->linearVel);                                      // lpf filter
+    float speed =  RPS_TO_MPS * (motorLeft->wheelRPS + motorRight->wheelRPS) * 0.5f;                  // convert to mps 
+    ddmr->v_b = lagFilter(ddmr->linearVelAlpha, speed, ddmr->v_b);                                      // lpf filter
     float angVel = (motorLeft->wheelRPS - motorRight->wheelRPS) * ddmr->wheelR/ddmr->wheelBase ;                // ang vel in rad/s
-    ddmr->angularVel = iirLPF(ddmr->angularVelAlpha, angVel, ddmr->angularVel);                                  // lpf filter
-    ddmr->posX += ddmr->linearVel * (LQR_CNTRL_PERIOD * MS_TO_S); // update position
+    ddmr->w_b = lagFilter(ddmr->angularVelAlpha, angVel, ddmr->w_b);                                  // lpf filter
+    ddmr->posX += ddmr->v_b * (LQR_CNTRL_PERIOD * MS_TO_S); // update position
+}
+
+
+static void ddmrGyroOdometry(struct DiffDriveModel *const ddmr,
+                            const struct Motor *const motorLeft,
+                            const struct Motor *const motorRight,
+                            float gyroZ){
+
+    // --- Odometry Update ---
+    float wheelSpeed = RPS_TO_MPS * (motorLeft->wheelRPS + motorRight->wheelRPS) * 0.5f;
+    ddmr->v_b = lagFilter(ddmr->linearVelAlpha, wheelSpeed, ddmr->v_b);
+    float wheelAngVel = (motorLeft->wheelRPS - motorRight->wheelRPS) * (2*M_PI*ddmr->wheelR) / ddmr->wheelBase;
+    float deltaThetaOdo = wheelAngVel * ddmr->dt;
+    // bind to [-pi, pi]
+
+
+    // Compute incremental rotation from gyro measurement
+    float deltaThetaGyro = gyroZ * ddmr->dt;
+
+    // Compute the absolute difference between gyro and odometry increments
+    float deltaDiff = fabs(deltaThetaGyro - deltaThetaOdo);
+
+    // Decide which measurement to trust based on the threshold:
+    // If the difference exceeds the threshold, use the gyro value.
+    if (deltaDiff > ddmr->gyroOdoThreshold) {
+    // Catastrophic odometry error detected: use gyro measurement.
+    ddmr->theta += deltaThetaGyro;
+    ddmr->w_b = gyroZ;
+    } else {
+    // Normal condition: use odometry measurement.
+    ddmr->theta += deltaThetaOdo;
+    ddmr->w_b = wheelAngVel;
+    }
+
+    // Optionally, apply a low-pass filter to the angular velocity for smoother output.
+    ddmr->w_b = lagFilter(ddmr->angularVelAlpha, ddmr->w_b, ddmr->w_b);
+
+    // Update the robot's (x, y) position using the current orientation.
+    ddmr->x_g += ddmr->v_b * ddmr->dt * cos(ddmr->theta);
+    ddmr->y_g += ddmr->v_b * ddmr->dt * sin(ddmr->theta);
 }
 
 #endif // DDMR_H
