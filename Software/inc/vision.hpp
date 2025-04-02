@@ -30,10 +30,10 @@ namespace viz {
 
 const char* NODE_NAME = "VISION";
 
-enum { M_INIT = 0, M_CALIBRATE, M_PATHFOLLOW, M_SEG_FLOOR, M_BIRD, M_VIZ, NUM_MODES };
+enum { M_INIT = 0, M_CALIB_BEV, M_CALIB_LENS, M_PATHFOLLOW, M_SEG_FLOOR, M_BIRD, M_VIZ, NUM_MODES };
 
 // -------------- Parameter IDs -------------- //
-enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, NUM_PARAMS }; 
+enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, P_NAV_EN, NUM_PARAMS }; 
 
 // -------------- Global Variables -------------- //
 std::atomic<bool> _exit_trig(false);
@@ -372,12 +372,13 @@ void path_follower(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& ho
     std::tie(high_section.peakIdx, high_section.peakWidth, high_section.peakProminence, high_pathTrend) =
         highTracker.topologicalPeakTrack(floor_frame, highRoi);
     // -- Visualization --
-    cv::cvtColor(undistorted, outputFrame, cv::COLOR_GRAY2BGR);
+
+    cv::Mat trackVizFrame = outputFrame(floor_roi);
     cv::Mat topVizFrame = outputFrame(cv::Rect(0, 0, viz::WIDTH, walls.floor_y / 2));
     cv::Mat lowVizFrame = outputFrame(cv::Rect(0, walls.floor_y / 2, viz::WIDTH, walls.floor_y / 2));
-    viz::drawTopology(topVizFrame, high_pathTrend, high_section.peakIdx, high_section.peakWidth, high_section.peakProminence, cv::Scalar(128, 128, 128), cv::Scalar(255, 255, 255));
-    viz::drawTopology(lowVizFrame, low_pathTrend, low_section.peakIdx, low_section.peakWidth, low_section.peakProminence, cv::Scalar(64, 64, 64), cv::Scalar(192, 192, 192));
-  
+    viz::drawTopology(topVizFrame, high_pathTrend, high_section.peakIdx, high_section.peakWidth, high_section.peakProminence, cv::Scalar(128), cv::Scalar(255));
+    viz::drawTopology(lowVizFrame, low_pathTrend, low_section.peakIdx, low_section.peakWidth, low_section.peakProminence, cv::Scalar(64), cv::Scalar(192));
+    floor_frame.copyTo(trackVizFrame);
 }
 
 
@@ -389,72 +390,84 @@ void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& hom
     switch ((int)progmode) {
         case viz::M_INIT:
             syslog(LOG_INFO, "Initializing Vision Pipeline");
-            param_map.set_value(viz::P_PROG_MODE, viz::M_CALIBRATE);
+            param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
             break;
-        case viz::M_CALIBRATE:{
-           
-            int ret = calib::calibrateBirdseye(undistorted, outputFrame, homography_matrix, imagePts);
-            if(ret == 1) {
+        case viz::M_CALIB_BEV: {
+            static auto start_time = std::chrono::steady_clock::now();
+            static bool timeout_active = false; // inital 
+            // If re-entering calibration mode, reset the timer
+            if (!timeout_active) {
+                start_time = std::chrono::steady_clock::now();
+                timeout_active = true;
+            }
+            int ret = calib::calibrateBirdseye(undistorted, homography_matrix, imagePts);
+            undistorted.copyTo(outputFrame); // Show the chessboard for debugging        
+            if (ret == 1) {
                 syslog(LOG_INFO, "Calibration Complete");
                 param_map.set_value(viz::P_PROG_MODE, viz::M_BIRD);
                 loopRate_ms = -1;
-                break;
-            } else if (ret == -2) {
+                timeout_active = false;  // Reset timeout for next calibration
+            } else if (ret == -1) {
                 syslog(LOG_ERR, "Calibration Failed");
                 param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
-                break;
-
-            } else if (ret == -1){
-                cv::putText(outputFrame, "Found", cv::Point(30, 30),
-                    cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 2);
-                loopRate_ms = 1000;}
-            
-            else{
-                cv::putText(outputFrame, "Chessboard not found", cv::Point(30, 30),
-                    cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 0, 255), 2);
-                loopRate_ms = 500;
+                loopRate_ms = -1;
+                timeout_active = false;  // Reset timeout for next calibration
+            } else {
+                // Check if timeout has occurred
+                if (std::chrono::steady_clock::now() - start_time > std::chrono::seconds(60)) {
+                    syslog(LOG_ERR, "Calibration Timeout");
+                    param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
+                    loopRate_ms = -1;
+                    timeout_active = false;  // Reset timeout for next calibration
+                } else {
+                    cv::putText(outputFrame, "Chessboard not found", cv::Point(30, 30),
+                                cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(64), 2);
+                    loopRate_ms = 500;
+                }
+            }
+            }
+            break;
+        case viz::M_CALIB_LENS: {
+            static auto start_time = std::chrono::steady_clock::now();
+            static bool timeout_active = false; // inital 
+            // If re-entering calibration mode, reset the timer
+            if (!timeout_active) {
+                start_time = std::chrono::steady_clock::now();
+                timeout_active = true;
             }
         }
             break;
+        
         case viz::M_PATHFOLLOW:
             path_follower(undistorted, outputFrame, homography_matrix, param_map);
             break;
         case viz::M_SEG_FLOOR:{
             struct viz::WallDetection walls = {0};
             walls = viz::estimateWallHorizon(undistorted);
-            // Convert to BGR for visualization
-            cv::cvtColor(undistorted, outputFrame, cv::COLOR_GRAY2BGR);
-            cv::line(outputFrame, cv::Point(0, walls.floor_y), cv::Point(viz::WIDTH, walls.floor_y), cv::Scalar(0, 0, 255), 30);
+            undistorted.copyTo(outputFrame);
+            cv::line(outputFrame, cv::Point(0, walls.floor_y), cv::Point(viz::WIDTH, walls.floor_y), cv::Scalar(128), 30);
         }
             break;
-
-
         case M_BIRD:{
-            // Apply birdge eye view perspective transformation
-            cv::Mat birdseye;
+            // Apply birds eye view perspective transformation
             float horz_height;
             param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
             if(homography_matrix.empty()) {
-                syslog(LOG_ERR, "Homography matrix is empty");
-                param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
+                //syslog(LOG_ERR, "Homography matrix is empty");
+                param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ); // Fall back to pass through mode
                 break;
             }
             homography_matrix.at<double>(2, 2) = horz_height;
-
-            cv::warpPerspective(undistorted, birdseye, homography_matrix, undistorted.size(), cv::INTER_LINEAR);
-            cv::cvtColor(birdseye, outputFrame, cv::COLOR_GRAY2BGR);
-            cv::circle(outputFrame, imagePts[0], 5, cv::Scalar(0, 0, 255), -1); // Top left
-            cv::circle(outputFrame, imagePts[1], 5, cv::Scalar(0, 255, 0), -1); // Top right
-            cv::circle(outputFrame, imagePts[2], 5, cv::Scalar(255, 0, 0), -1); // Bottom left
-            cv::circle(outputFrame, imagePts[3], 5, cv::Scalar(255, 255, 0), -1); // Bottom right
-
-
-
-            
+            cv::warpPerspective(undistorted, outputFrame, homography_matrix, undistorted.size(), cv::INTER_AREA);
+            undistorted.copyTo(outputFrame);
+            cv::circle(outputFrame, imagePts[0], 5, cv::Scalar(64), -1); 
+            cv::circle(outputFrame, imagePts[1], 5, cv::Scalar(128), -1); 
+            cv::circle(outputFrame, imagePts[2], 5, cv::Scalar(192), -1); 
+            cv::circle(outputFrame, imagePts[3], 5, cv::Scalar(255), -1);       
         }
         break;
         case viz::M_VIZ: // Pass through mode
-            cv::cvtColor(undistorted, outputFrame, cv::COLOR_GRAY2BGR);       
+            undistorted.copyTo(outputFrame);
             break;
         default: 
             syslog(LOG_ERR, "Invalid Program Mode");

@@ -36,7 +36,7 @@
     #define CONFIG_PATH "configs/robotConfig.json"
 
 #else   
-    #define DEFAULT_INPUT_PIPELINE "libcamerasrc ! video/x-raw,format=I420,width=640,height=480,framerate=30/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink drop=true sync=false max-buffers=1"
+    #define DEFAULT_INPUT_PIPELINE "libcamerasrc ! video/x-raw,format=I420,width=640,height=480,framerate=25/1 ! videoconvert ! video/x-raw,format=GRAY8 ! appsink drop=true sync=false max-buffers=1"
     #define OUTPUT_PIPELINE "appsrc ! videorate ! videoconvert ! queue ! x264enc tune=zerolatency speed-preset=ultrafast quantizer=25 key-int-max=15 ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=192.168.0.32 port=5002 sync=false"
     #define CONFIG_PATH "/home/pi/prog/software/configs/robotConfig.json"
 #endif
@@ -48,6 +48,24 @@
 #include "../inc/navigation.hpp"
 #include "../inc/cmdserver.hpp"
 
+
+struct PerfMetrics {
+    long loop_count = 0;
+    int hwm_count =0;
+    double total_process = 0;
+    double total_write = 0;
+    double peak_process = 0;
+    std::chrono::time_point<std::chrono::steady_clock> last_report;
+    
+    void reset() {
+        loop_count = 0;
+        hwm_count = 0;
+        total_process = 0;
+        peak_process = 0;
+        total_write = 0;
+        last_report = std::chrono::steady_clock::now();
+    }
+};
 
 int run(int argc, char* argv[]) {
     std::cout << "Starting Vision Pipeline (OpenCV GStreamer)" << std::endl;
@@ -66,7 +84,7 @@ int run(int argc, char* argv[]) {
 
     cv::VideoWriter writer;
     if (!debug_mode) {
-        writer.open(OUTPUT_PIPELINE, cv::CAP_GSTREAMER, 0, 30, cv::Size(viz::WIDTH, viz::HEIGHT), true);
+        writer.open(OUTPUT_PIPELINE, cv::CAP_GSTREAMER, 0, 25, cv::Size(viz::WIDTH, viz::HEIGHT), false);
         if (!writer.isOpened()) {
             syslog(LOG_ERR, "Failed to open video writer!");
             cap.release();
@@ -80,19 +98,19 @@ int run(int argc, char* argv[]) {
     param_map.register_parameter(viz::P_PROG_MODE, _params[viz::P_PROG_MODE], cmd::val_prog_mode);
     param_map.register_parameter(viz::P_LOOK_HRZ_HEIGHT, _params[viz::P_LOOK_HRZ_HEIGHT], cmd::val_hrz_height);
     param_map.register_parameter(viz::P_MAX_VEL, _params[viz::P_MAX_VEL], cmd::val_max_vel);
+    param_map.register_parameter(viz::P_NAV_EN, _params[viz::P_NAV_EN], cmd::val_nav_en);
     param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
-    param_map.set_value(viz::P_LOOK_HRZ_HEIGHT, 1);
+    param_map.set_value(viz::P_LOOK_HRZ_HEIGHT,360);
     param_map.set_value(viz::P_MAX_VEL, 0.1);
-
+    param_map.set_value(viz::P_NAV_EN, 1);
     // ------------- Command Server & Trajectory Threads ----------------- //
     std::thread cmd_thread(cmd::command_server, std::ref(param_map));
     std::thread traj_thread(nav::trajGenServer);
-
     // -------------- Vision Pipeline Allocations ----------------- //
     cv::Mat homography_matrix;
+    cv::Mat y_plane(viz::HEIGHT, viz::WIDTH, CV_8UC1);
     cv::Mat undistorted(viz::HEIGHT, viz::WIDTH, CV_8UC1);
-    cv::Mat outputFrame(viz::HEIGHT, viz::WIDTH, CV_8UC3);
-
+    cv::Mat outputFrame(viz::HEIGHT, viz::WIDTH, CV_8UC1);
     // -------------- Camera Calibration ----------------- //
     cv::Mat cameraMatrix, distCoeffs;
     if (!calib::loadCalibration(cameraMatrix, distCoeffs)) {
@@ -101,26 +119,29 @@ int run(int argc, char* argv[]) {
         writer.release();
         return -1;
     }
-
     cv::Mat map1, map2;
     cv::initUndistortRectifyMap(cameraMatrix, distCoeffs, cv::Mat(),
-                               cameraMatrix, cv::Size(viz::WIDTH, viz::HEIGHT), CV_32FC1, map1, map2);
+                               cameraMatrix, cv::Size(viz::WIDTH, viz::HEIGHT), CV_16SC2, map1, map2);
+
+    // -------------- Performance Metrics ----------------- //
+        // In main loop
+    PerfMetrics metrics;
+    constexpr int REPORT_INTERVAL_MS = 30000;
 
     // -------------- Vision Pipeline Loop ----------------- //
     int loopRate_ms = -1;  
     while (!viz::_exit_trig) {
         // ------------ Read Frame ------------ //
-        cv::Mat y_plane;
         if (!cap.read(y_plane)) {
             syslog(LOG_ERR, "Failed to read frame from capture!");
             break;
         }
-        auto process_start = std::chrono::high_resolution_clock::now();
+        auto process_start = std::chrono::steady_clock::now();
         // ------------ Undistort ------------ //
         cv::remap(y_plane, undistorted, map1, map2, cv::INTER_LINEAR);
         // ------------ Processing ------------ //
         viz::img_pipeline(undistorted, outputFrame, homography_matrix, param_map, loopRate_ms);
-        auto process_end = std::chrono::high_resolution_clock::now();
+        auto process_end = std::chrono::steady_clock::now();
         // ------------ Write Frame ------------ //
         if (!outputFrame.empty()) {
             try {
@@ -130,14 +151,31 @@ int run(int argc, char* argv[]) {
                 break;
             }
         }
+        auto write_end = std::chrono::steady_clock::now();
         // ------------ Loop Performance ------------ //
-        auto process_duration = std::chrono::duration_cast<std::chrono::milliseconds>(process_end - process_start);
-        int loopTime_ms = static_cast<int>(process_duration.count());
-        if(loopRate_ms < 0 ){
-            if(process_duration.count() > 20) { // high watermark
-                syslog(LOG_WARNING, "High watermark %d ms", loopTime_ms);
+        if (loopRate_ms < 0) { // Normal operation no rate limiting
+            metrics.loop_count++;
+            // Update performance metrics
+            double currentLoopTime = std::chrono::duration_cast<std::chrono::milliseconds>(process_end - process_start).count();
+            metrics.total_process += currentLoopTime;
+            metrics.total_write += std::chrono::duration_cast<std::chrono::milliseconds>(write_end - process_end).count();
+            metrics.peak_process = std::max(metrics.peak_process, currentLoopTime);
+            if (currentLoopTime > 30) {
+            metrics.hwm_count++;
             }
-        }else {
+            // Periodic Performance Report 
+            auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(now - metrics.last_report).count() > REPORT_INTERVAL_MS) {
+            if (metrics.hwm_count > 0) { // Only log if high water mark was reached
+                syslog(LOG_WARNING, "Loop Count: %ld, HWM Count: %d, Avg Process Time: %.4f ms, Peak Process Time: %.4f ms, Avg Write Time: %.4f ms",
+                metrics.loop_count, metrics.hwm_count,
+                (metrics.total_process / metrics.loop_count),
+                (metrics.peak_process),
+                (metrics.total_write / metrics.loop_count));
+            }
+            metrics.reset();
+            }
+        } else {
             int sleepTime = debug_mode ? 200 : loopRate_ms;
             std::this_thread::sleep_until(process_start + std::chrono::milliseconds(sleepTime));
         }

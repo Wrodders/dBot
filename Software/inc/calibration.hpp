@@ -67,42 +67,23 @@ const int board_w = board_sz.width;
 const int board_h = board_sz.height;
 const int square_size = 40;
 
-
-int calibrateBirdseye(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, std::vector<cv::Point2f>& srcPts) {
+//@brief: Calibrate the camera and compute the homography matrix
+//@return: 1 if successful, 0 if chessboard not found,
+int calibrateBirdseye(const cv::Mat& undistorted,cv::Mat& homography_matrix, std::vector<cv::Point2f>& srcPts) {
     std::vector<cv::Point2f> corners;
     bool found = cv::findChessboardCorners(undistorted, board_sz, corners, cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_FILTER_QUADS);
-
-    cv::cvtColor(undistorted, outputFrame, cv::COLOR_GRAY2BGR); // Convert to BGR for visualization
-
-    if (!found) {
-        syslog(LOG_ERR, "Calibration: Chessboard not found.");
-        return 0;
-    }
+    if (!found) {return 0;}
     // Refine corner locations
     cv::cornerSubPix(undistorted, corners, cv::Size(11, 11), cv::Size(-1, -1),
         cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.1));
     
-    // Draw detected corners
-    cv::drawChessboardCorners(outputFrame, board_sz, corners, found);
-
     // Get the four outer corners (order matters!)
     // Assuming standard chessboard detection order (left-right, top-bottom)
-    srcPts.resize(4);
-    srcPts[0] = corners[0];                          // top right 
-    srcPts[1] = corners[board_w - 1];                // top left
-    srcPts[2] = corners[(board_h - 1) * board_w];     // bottom right
-    srcPts[3] = corners[(board_h * board_w) - 1];     // bottom left
-    
-
-
+    srcPts = corners;
 
     // Define real-world coordinates (in mm or any unit matching square_size)
     float board_width = (board_w - 1) * square_size;  // Number of internal edges
     float board_height = (board_h - 1) * square_size;
-
-
-
-    
     std::vector<cv::Point2f> dstPts(4);
     // Conpue perspecive presinvivig the with of the top of the frame and saling the bottom 
     dstPts[0] = cv::Point2f(320 - board_width/2, undistorted.rows); // Bottom Left
@@ -110,13 +91,12 @@ int calibrateBirdseye(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat&
     dstPts[2] = cv::Point2f(320+board_width/2, undistorted.rows); // Bottom Right
     dstPts[3] = cv::Point2f(undistorted.cols,  undistorted.rows-board_height); // Top Right  
 
-
-    
-
-
     // Compute homography matrix
     homography_matrix = cv::getPerspectiveTransform( srcPts, dstPts );
-
+    // Save the homography matrix to a file
+    cv::FileStorage fs("calibration/homography_matrix.yml", cv::FileStorage::WRITE);
+    fs << "homography_matrix" << homography_matrix;
+    fs.release();
     return 1; // Success
 }
 
