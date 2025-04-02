@@ -105,7 +105,7 @@ int run(int argc, char* argv[]) {
     param_map.set_value(viz::P_LOOK_HRZ_HEIGHT,360);
     param_map.set_value(viz::P_MAX_VEL, 0.1);
     param_map.set_value(viz::P_NAV_EN, 1);
-    param_map.set_value(viz::P_KP, 15);
+    param_map.set_value(viz::P_KP, 1);
     
     // ------------- Command Server & Trajectory Threads ----------------- //
     std::thread cmd_thread(cmd::command_server, std::ref(param_map));
@@ -164,9 +164,7 @@ int run(int argc, char* argv[]) {
             metrics.total_process += currentLoopTime;
             metrics.total_write += std::chrono::duration_cast<std::chrono::milliseconds>(write_end - process_end).count();
             metrics.peak_process = std::max(metrics.peak_process, currentLoopTime);
-            if (currentLoopTime > 30) {
-            metrics.hwm_count++;
-            }
+            if (currentLoopTime > 38) {metrics.hwm_count++;}
             // Periodic Performance Report 
             auto now = std::chrono::steady_clock::now();
             if (std::chrono::duration_cast<std::chrono::milliseconds>(now - metrics.last_report).count() > REPORT_INTERVAL_MS) {

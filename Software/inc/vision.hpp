@@ -463,12 +463,23 @@ void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& hom
                 param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ); // Fall back to pass through mode
                 break;
             }
+            // find max x and y poin inimge poitns as the size of the wrapeed iamg e
+            cv::Point2f max_x = *std::max_element(imagePts.begin(), imagePts.end(), [](const cv::Point2f& a, const cv::Point2f& b) { return a.x < b.x; });
+            cv::Point2f max_y = *std::max_element(imagePts.begin(), imagePts.end(), [](const cv::Point2f& a, const cv::Point2f& b) { return a.y < b.y; });
+            cv::Size size = cv::Size(max_x.x, max_y.y);
+
             //homography_matrix.at<double>(2, 2) = z;
-            cv::warpPerspective(undistorted, outputFrame, homography_matrix, undistorted.size(),cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS);
-            cv::circle(outputFrame, imagePts[0], 5, cv::Scalar(64), -1); 
-            cv::circle(outputFrame, imagePts[1], 5, cv::Scalar(128), -1); 
-            cv::circle(outputFrame, imagePts[2], 5, cv::Scalar(192), -1); 
-            cv::circle(outputFrame, imagePts[3], 5, cv::Scalar(255), -1);       
+            cv::Mat bev;
+            cv::warpPerspective(undistorted, bev, homography_matrix, size,cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS);
+            cv::circle(bev, imagePts[0], 5, cv::Scalar(64), -1); 
+            cv::circle(bev, imagePts[1], 5, cv::Scalar(128), -1); 
+            cv::circle(bev, imagePts[2], 5, cv::Scalar(192), -1); 
+            cv::circle(bev, imagePts[3], 5, cv::Scalar(255), -1); 
+
+
+            cv::resize(bev, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
+            
+          
         }
         break;
         case viz::M_VIZ: // Pass through mode
