@@ -40,6 +40,7 @@ static inline bool val_trfm_pad(float val)   { return (val > 0 && val < viz::WID
 static inline bool val_prog_mode(float val)  { return (val >= 0 && val < viz::NUM_MODES); }
 static inline bool val_max_vel(float val)    { return (val >= 0 && val < 1); }
 static inline bool val_nav_en(float val)     { return (static_cast<int>(val) % 2 == 0 || static_cast<int>(val) % 2 == 1); } // test if 0 or 1
+static inline bool val_kp(float val)        { return (val >= 0 && val < 100); } // test if 0 or 1
 
 } // namespace cmd
 

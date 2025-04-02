@@ -5,54 +5,56 @@ import numpy as np
 video_path = "IMG_9851.mov"  # Update with actual path
 cap = cv2.VideoCapture(video_path)
 
-# Get video properties
-fps = int(cap.get(cv2.CAP_PROP_FPS))
-frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+# Parameters for Lucas-Kanade Optical Flow
+lk_params = dict(winSize=(15, 15), maxLevel=2,
+                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
-# Create a blank canvas for overlaying frames
-timelapse = np.zeros((frame_height, frame_width, 3), dtype=np.float32)
+# Shi-Tomasi corner detection parameters
+feature_params = dict(maxCorners=1, qualityLevel=0.3, minDistance=7, blockSize=7)
 
-# Frame counter
-frame_count = 0
+# Read the first frame
+ret, old_frame = cap.read()
+if not ret:
+    print("Error: Could not read video")
+    cap.release()
+    exit()
 
-# Accumulator for blending
-overlay_accumulator = np.zeros((frame_height, frame_width, 3), dtype=np.float32)
-blend_factor = 0.3  # Transparency factor per frame
+gray_old = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+p0 = cv2.goodFeaturesToTrack(gray_old, mask=None, **feature_params)
+
+# Create a mask for drawing trajectory
+mask = np.zeros_like(old_frame)
 
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
         break
     
-    # Select one frame per 3 seconds
-    if frame_count % (10 * fps) == 0:
-        # Convert frame to float
-        frame_float = frame.astype(np.float32)
-        
-        # Compute luminance normalization factor
-        luminance = np.sum(frame_float)
-        if luminance > 0:
-            frame_normalized = frame_float / luminance
-        else:
-            frame_normalized = frame_float
-        
-        # Add normalized frame to accumulator
-        overlay_accumulator = overlay_accumulator * (1 - blend_factor) + frame_normalized * blend_factor * luminance
-        
-        # Normalize accumulated image to maintain brightness consistency
-        timelapse = np.clip(overlay_accumulator, 0, 255).astype(np.uint8)
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    frame_count += 1
+    # Calculate optical flow
+    if p0 is not None:
+        p1, st, err = cv2.calcOpticalFlowPyrLK(gray_old, gray_frame, p0, None, **lk_params)
+        
+        # Select good points
+        if p1 is not None and st[0][0] == 1:
+            a, b = p1.ravel()
+            c, d = p0.ravel()
+            
+            # Draw trajectory
+            mask = cv2.line(mask, (int(c), int(d)), (int(a), int(b)), (0, 255, 0), 2)
+            frame = cv2.add(frame, mask)
+            
+            # Update for next iteration
+            p0 = p1.reshape(-1, 1, 2)
     
-    # Display timelapse
-    cv2.imshow("Motion Timelapse", timelapse)
+    gray_old = gray_frame.copy()
+    
+    # Display the tracking
+    cv2.imshow("Optical Flow Tracking", frame)
     
     if cv2.waitKey(30) & 0xFF == 27:  # Press 'ESC' to exit
         break
 
 cap.release()
 cv2.destroyAllWindows()
-
-# Save final timelapse frame
-cv2.imwrite("motion_timelapse.png", timelapse)

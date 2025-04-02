@@ -33,7 +33,7 @@ const char* NODE_NAME = "VISION";
 enum { M_INIT = 0, M_CALIB_BEV, M_CALIB_LENS, M_PATHFOLLOW, M_SEG_FLOOR, M_BIRD, M_VIZ, NUM_MODES };
 
 // -------------- Parameter IDs -------------- //
-enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, P_NAV_EN, NUM_PARAMS }; 
+enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, P_NAV_EN, P_KP, P_KI, P_KD, NUM_PARAMS }; 
 
 // -------------- Global Variables -------------- //
 std::atomic<bool> _exit_trig(false);
@@ -357,7 +357,7 @@ void path_follower(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& ho
     cv::Rect floor_roi;  // Dynamically adjust the ROI based on the floor horizon 
     cv::Mat floor_frame = undistorted(cv::Rect(0,look_hrz_height, WIDTH, HEIGHT - look_hrz_height));
     viz::detectTrackEdges(floor_frame, homography_matrix);
-    // -- Peak Tracking --
+    // Way point detection
     viz::PeakTracker lowTracker(floor_frame.cols);
     std::array<float, WIDTH> low_pathTrend;
     struct TrackSection low_section;
@@ -371,8 +371,10 @@ void path_follower(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& ho
     const cv::Rect highRoi(0, 0, viz::WIDTH, floor_frame.rows / 4);
     std::tie(high_section.peakIdx, high_section.peakWidth, high_section.peakProminence, high_pathTrend) =
         highTracker.topologicalPeakTrack(floor_frame, highRoi);
-    // -- Visualization --
+    // -- Circle Fitting --- 
 
+      
+    // -- Visualization --
     cv::Mat trackVizFrame = outputFrame(floor_roi);
     cv::Mat topVizFrame = outputFrame(cv::Rect(0, 0, viz::WIDTH, walls.floor_y / 2));
     cv::Mat lowVizFrame = outputFrame(cv::Rect(0, walls.floor_y / 2, viz::WIDTH, walls.floor_y / 2));
@@ -386,7 +388,10 @@ void path_follower(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& ho
 void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, int& loopRate_ms) {
     float progmode;
     param_map.get_value(viz::P_PROG_MODE, progmode);
-    static std::vector<cv::Point2f> imagePts(4);
+    static std::array<cv::Point2f, 4> imagePts = {
+        cv::Point2f(0, HEIGHT), cv::Point2f(WIDTH, HEIGHT),
+        cv::Point2f(0, 0), cv::Point2f(WIDTH, 0)
+    };
     switch ((int)progmode) {
         case viz::M_INIT:
             syslog(LOG_INFO, "Initializing Vision Pipeline");
@@ -400,7 +405,9 @@ void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& hom
                 start_time = std::chrono::steady_clock::now();
                 timeout_active = true;
             }
-            int ret = calib::calibrateBirdseye(undistorted, homography_matrix, imagePts);
+            float horz_height;
+            param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
+            int ret = calib::calibrateInversePerspectiveMap(undistorted, homography_matrix, imagePts, horz_height);
             undistorted.copyTo(outputFrame); // Show the chessboard for debugging        
             if (ret == 1) {
                 syslog(LOG_INFO, "Calibration Complete");
@@ -437,7 +444,6 @@ void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& hom
             }
         }
             break;
-        
         case viz::M_PATHFOLLOW:
             path_follower(undistorted, outputFrame, homography_matrix, param_map);
             break;
@@ -450,16 +456,15 @@ void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& hom
             break;
         case M_BIRD:{
             // Apply birds eye view perspective transformation
-            float horz_height;
-            param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
+            float z;
+            param_map.get_value(viz::P_KP, z);
             if(homography_matrix.empty()) {
-                //syslog(LOG_ERR, "Homography matrix is empty");
+                syslog(LOG_ERR, "Homography matrix is empty");
                 param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ); // Fall back to pass through mode
                 break;
             }
-            homography_matrix.at<double>(2, 2) = horz_height;
-            cv::warpPerspective(undistorted, outputFrame, homography_matrix, undistorted.size(), cv::INTER_AREA);
-            undistorted.copyTo(outputFrame);
+            //homography_matrix.at<double>(2, 2) = z;
+            cv::warpPerspective(undistorted, outputFrame, homography_matrix, undistorted.size(),cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS);
             cv::circle(outputFrame, imagePts[0], 5, cv::Scalar(64), -1); 
             cv::circle(outputFrame, imagePts[1], 5, cv::Scalar(128), -1); 
             cv::circle(outputFrame, imagePts[2], 5, cv::Scalar(192), -1); 

@@ -99,10 +99,14 @@ int run(int argc, char* argv[]) {
     param_map.register_parameter(viz::P_LOOK_HRZ_HEIGHT, _params[viz::P_LOOK_HRZ_HEIGHT], cmd::val_hrz_height);
     param_map.register_parameter(viz::P_MAX_VEL, _params[viz::P_MAX_VEL], cmd::val_max_vel);
     param_map.register_parameter(viz::P_NAV_EN, _params[viz::P_NAV_EN], cmd::val_nav_en);
+    param_map.register_parameter(viz::P_KP, _params[viz::P_KP], cmd::val_kp);
+    
     param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
     param_map.set_value(viz::P_LOOK_HRZ_HEIGHT,360);
     param_map.set_value(viz::P_MAX_VEL, 0.1);
     param_map.set_value(viz::P_NAV_EN, 1);
+    param_map.set_value(viz::P_KP, 15);
+    
     // ------------- Command Server & Trajectory Threads ----------------- //
     std::thread cmd_thread(cmd::command_server, std::ref(param_map));
     std::thread traj_thread(nav::trajGenServer);

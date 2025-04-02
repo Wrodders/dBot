@@ -3,8 +3,11 @@
         "parameters": [
             {"name": "PROG_MODE",         "id":0, "access": "W",  "format": "%d", "description": "Program Mode"},
             {"name": "HORIZON_HEIGHT_PX", "id": 1, "access": "W", "format": "%d", "description": "ROI Horizon height [px]"},
-            {"name": "TRANSFORM_PAD_PX",  "id": 2, "access": "W", "format": "%d", "description": "Center Bottom Padding [px]"},
-            {"name": "EDGE_FILT",         "id": 3, "access": "W", "format": "%d", "description": "Edge Filter Algorithm"}
+            {"name": "MAX_VEL",  "id": 2, "access": "W", "format": "%d", "description": "Center Bottom Padding [px]"},
+            {"name": "NAV_EN", "id": 3, "access": "W", "format": "%d", "description": "Edge Filter Algorithm"},
+            {"name": "KP", "id":4, "access":"W", "format":"%f", "description":"Steering Kp"},
+            {"name": "KI", "id":5, "access":"W", "format":"%f", "description":"Steering Ki"},
+            {"name": "KD", "id":6, "access":"W", "format":"%f", "description":"Steering Kd"}
             ],
         "publishers": [
             {"name": "CMD_RET",         "id": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
