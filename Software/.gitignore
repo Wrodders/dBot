@@ -1,12 +1,40 @@
-*build/*
-CMakeLists.txt.user
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-_deps
+**.mp4
+/scripts/generated_signals/
+# Ignore build directories
+/build/
+/bin/
+/CMakeFiles/
+/cmake-build-debug/
+/cmake-build-release/
+/Makefile
+/CMakeCache.txt
+
+# Ignore compiled object files and executables
+*.o
+*.a
+*.so
+*.out
+*.exe
+
+# Ignore IDE and editor specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# Ignore system-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore OpenCV specific libraries and files (if not needed)
+*.h5
+
+# Ignore any logs or temporary files
+*.log
+*.tmp
+*.bak
+
+*.gz
+*.zip

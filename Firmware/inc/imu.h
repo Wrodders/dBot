@@ -1,109 +1,123 @@
+/**************************************************
+ * @brief: IMU Sensor Fusion Library
+ * @details: Estimates Pitch and Roll from Accelerometer and Gyroscope Data
+ *           Applies 1st order IIR Low Pass Filter to Accelerometer and Gyroscope Data
+ *           Provides Kalman and Complementary Filter to Estimate Pitch and Roll
+ * @date: 2020/05/31
+ * @version: 1.0.0
+ * @file: imu.h
+ **************************************************/
+
+
 #ifndef IMU_H
 #define IMU_H
-
-#include "../drivers/MPU6050.h"
-
 #define RAD_TO_DEG 57.295779513082320876798154814105
+#define DEG_TO_RAD 0.01745329251994329576923690768489
+/* Inertial Measurement State Estimator
+Accelerometer and Gyroscope Data Low Pass Filtered. 
+Complementary Filter Applied to Fuse Measurements into Angle Estimate
+Kalman Filter Applied in 2 Stages: Predict and Update. 
+Predict - Apply Kalman Observer Algorithm to latest angle data. 
+Roll == X 
+Pitch == Y
+*/
 
-
-typedef struct Kalman{
-    float Q_angle;
-    float Q_bias;
-    float R_measure;
-    float angle;
-    float bias;
-    float P[2][2];
+struct Kalman{
+    float Q_angle; // Process Noise
+    float Q_bias; // Gyro Bias
+    float R_measure; // Measurement Noise
+    float angle; // Angle Estimate
+    float bias; // Gyro Bias Estimate
+    float P[2][2]; // Error Covariance Matrix
 }Kalman;
 
-typedef struct IMU{
-    MPU6050 sensor;
+struct IMU{
+    struct MPU6050 * sensor;  // IMU Sensor
+    const float dt;         // Sample Period [s]
     // Low Pass IIR Filter 
     struct{
-        float aAccel;
-        float aGyro;
-        vector_t accel; 
-        vector_t gyro;
+        float alpha_accel;          // LFP Alpha 
+        float alpha_gyro;           //    
+        struct vector_t accel;      // LPF output 
+        struct vector_t gyro;      //
     }lpf;
-
-    struct{// Complementary Filter
-        const float a;
-        float roll, pitch;
+    struct{
+        float pitch, roll;  // degreess
+    }raw;
+    // Complementary Filter
+    struct{
+        const float a; // Complementary Filter Alpha
+        float pitch, roll;
     }comp;
-    
-    Kalman kalX;
-    Kalman kalY;
-    float kalPitch, kalRoll;
+    struct {
+        struct Kalman rollK;
+        struct Kalman pitchK;
+        float pitch, roll;
+        float pitchRate, rollRate;
+    }kal;
 
-    const float dt;
-    // Estimated Euler Angles raw
-    float roll;
-    float pitch;
-    float yaw;
+    float pitchMountOffset; //degrees
+    float rollMountOffset;
 }IMU; 
 
-
-
-
-static IMU imuInit(float aAccel, float aGyro, float compAlpha, float dt){
-    IMU imu = {
-        .sensor = mpu6050Init(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA),
-        .lpf = {.aAccel = aAccel, .aGyro = aGyro},
-        .comp = {.a = compAlpha},      
-        .kalX = {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f},
-        .kalY = {.Q_angle = 0.001f, .Q_bias = 0.003f, .R_measure = 0.03f},
-        .dt = dt
-
+static struct IMU imuInit(const float alphaAccel, const float alphaGyro, const float alphaComp, const float dt){
+    struct IMU imu = {
+        .dt = dt,
+        .lpf = {.alpha_accel = alphaAccel, .alpha_gyro = alphaGyro},
+        .comp = {.a = alphaComp},
+        .kal = {
+            .rollK =  {.Q_angle = IMU_KAL_Q, .Q_bias = IMU_Q_BIAS, .R_measure = IMU_KAL_R},
+            .pitchK =  {.Q_angle = IMU_KAL_Q, .Q_bias = IMU_Q_BIAS, .R_measure = IMU_KAL_R}
+        }
     };
     return imu;
 }
 
-static void imuLPF(IMU *imu, vector_t *accel, vector_t *gyro){
-    // first order IIR filter
-    imu->lpf.accel.x = (imu->lpf.aAccel * imu->lpf.accel.x) + (1.0f - imu->lpf.aAccel) * accel->x;
-    imu->lpf.accel.y = (imu->lpf.aAccel * imu->lpf.accel.y) + (1.0f - imu->lpf.aAccel) * accel->y;
-    imu->lpf.accel.z = (imu->lpf.aAccel * imu->lpf.accel.z) + (1.0f - imu->lpf.aAccel) * accel->z;
-
-    imu->lpf.gyro.x = (imu->lpf.aGyro * imu->lpf.gyro.x) + (1.0f - imu->lpf.aGyro) * gyro->x;
-    imu->lpf.gyro.y = (imu->lpf.aGyro * imu->lpf.gyro.y) + (1.0f - imu->lpf.aGyro) * gyro->y;
-    imu->lpf.gyro.z = (imu->lpf.aGyro * imu->lpf.gyro.z) + (1.0f - imu->lpf.aGyro) * gyro->z;
+static void imuLinkSensor(struct IMU* imu, struct MPU6050* sensor){
+    imu->sensor = sensor;
 }
 
-static void imuRawEuler(IMU *imu){
-    //@Brief: Computes Euler from raw accelerometer data
+static void imuLPF(struct IMU* imu, const struct vector_t* accel, const struct vector_t* gyro){
+    // first order IIR filter
+    // y[n] = a * y[n-1] + (1-a) * x[n]
+    imu->lpf.accel.x = (imu->lpf.alpha_accel * imu->lpf.accel.x) + (1.0f - imu->lpf.alpha_accel) * accel->x;
+    imu->lpf.accel.y = (imu->lpf.alpha_accel * imu->lpf.accel.y) + (1.0f - imu->lpf.alpha_accel) * accel->y;
+    imu->lpf.accel.z = (imu->lpf.alpha_accel * imu->lpf.accel.z) + (1.0f - imu->lpf.alpha_accel) * accel->z;
 
-    // roll (x-axis rotation)
+    imu->lpf.gyro.x = (imu->lpf.alpha_gyro * imu->lpf.gyro.x) + (1.0f - imu->lpf.alpha_gyro) * gyro->x;
+    imu->lpf.gyro.y = (imu->lpf.alpha_gyro * imu->lpf.gyro.y) + (1.0f - imu->lpf.alpha_gyro) * gyro->y;
+    imu->lpf.gyro.z = (imu->lpf.alpha_gyro * imu->lpf.gyro.z) + (1.0f - imu->lpf.alpha_gyro) * gyro->z;
+}
+
+static void imuCalcRawAngle(struct IMU* imu){
+    //@Brief: Computes Euler from raw accelerometer data
     float ax2 = imu->lpf.accel.x * imu->lpf.accel.x;
     float ay2 = imu->lpf.accel.y * imu->lpf.accel.y;
     float az2 = imu->lpf.accel.z * imu->lpf.accel.z;
-    imu->pitch = atan2f(-imu->lpf.accel.x, imu->lpf.accel.z) * RAD_TO_DEG;
-    imu->roll = atan(imu->lpf.accel.y * invSqrt(ax2 + az2)) * RAD_TO_DEG;
+    imu->raw.pitch = atan2f(-imu->lpf.accel.x, imu->lpf.accel.z) * RAD_TO_DEG;
+    imu->raw.roll = atan(imu->lpf.accel.y * invSqrt(ax2 + az2)) * RAD_TO_DEG;
 }
 
-static void imuCompFilt(IMU *imu){
+static void imuCompFilt(struct IMU* imu){
     //@Brief: Complementary Filter Converts imu data into Euler Angles
-    vector_t *accel = &imu->lpf.accel;
-    vector_t *gyro = &imu->lpf.accel;
-
-    double pitchAcc = atan2(accel->y, sqrt((accel->x * accel->x) + (accel->z * accel->z))); //  angle between horizontal plane and accel vector
-    double rollAcc = atan2(-accel->x, accel->z);
-    // apply integrator
-    imu->comp.pitch += gyro->x * imu->dt;
-    imu->comp.roll += gyro->y * imu->dt;
- 
-    // apply bias
-    imu->comp.pitch = imu->comp.a * imu->comp.pitch + (1 -imu->comp.a) * imu->pitch;
-    imu->comp.roll = imu->comp.a * imu->comp.roll + (1 -imu->comp.a) * imu->roll;
+    imuCalcRawAngle(imu);
+    // Pitch
+    imu->comp.pitch = imu->comp.a * (imu->comp.pitch - imu->lpf.gyro.z * imu->dt) 
+                    + (1-imu->comp.a) * imu->raw.pitch;
+    // Roll
+    imu->comp.roll = imu->comp.a * (imu->comp.roll - imu->lpf.gyro.x * imu->dt) 
+                    + (1-imu->comp.a) * imu->raw.roll;
 }
 
-static float Kalman_getAngle(Kalman *kal, float newAngle, float newRate, float dt) {
-
+static float imuKalPredict(struct Kalman* kal, const float newAngle, const float newRate, float const dt) {
+    // Predicts an angle via kalman filter algorithm from angle[n] and dy/dt angle[n]
     float rate = newRate - kal->bias;
     kal->angle += dt * rate;
 
     kal->P[0][0] += dt * (dt * kal->P[1][1] - kal->P[0][1] - kal->P[1][0] + kal->Q_angle);
     kal->P[0][1] -= dt * kal->P[1][1];
     kal->P[1][0] -= dt * kal->P[1][1];
-    kal->P[1][1] += kal->Q_bias * dt;
+    kal->P[1][1] += kal->Q_bias * dt; // 
 
     float S = kal->P[0][0] + kal->R_measure;
     float K[2];
@@ -125,44 +139,44 @@ static float Kalman_getAngle(Kalman *kal, float newAngle, float newRate, float d
     return kal->angle;
 }
 
-static void imuKalFilt(IMU *imu){
-
+static void imuKalUpdate(struct IMU* imu){
+    // Working Variables
+    float rollRate = imu->lpf.gyro.x;
+    float pitchRate = imu->lpf.gyro.y;
     float ax = imu->lpf.accel.x;
     float ay = imu->lpf.accel.y;
     float az = imu->lpf.accel.z;
-    float ax2 = ax * ax;
+    float ax2 = ax * ax; // utility variables
     float az2 = az * az;
 
-
-    // Kalman angle solv
-    float roll;
+    float roll_estimate; // Compute Roll estimate from lpf accelerometer
     float rollsqrt = sqrt(ax2 + az2);
+    if(rollsqrt != 0.0f){roll_estimate = atan(ay / rollsqrt) * RAD_TO_DEG;} // Fix -180=180
+    else{roll_estimate = 0.0f;} 
+    if (fabs(imu->kal.pitch) > 90){rollRate *= -1;} // Invert Rate if Pitch is > 90   
+    imu->kal.roll= imuKalPredict(&imu->kal.rollK, roll_estimate, rollRate, imu->dt);
 
-    if(rollsqrt != 0.0f){roll = atan(ay / rollsqrt) * RAD_TO_DEG;}
-    else{roll = 0.0f;}
-    float pitch = atan2(-ax, az ) * RAD_TO_DEG;
-    if ((pitch < -90 && imu->kalPitch > 90) || (pitch > 90 && imu->kalPitch < -90)){
-        imu->kalY.angle = pitch;
-        imu->kalPitch = pitch;
+    // Estimate Pitch From Accelerometer
+    float pitch_estimate = atan2(-ax, az ) * RAD_TO_DEG; // Compute Pitch estimate from lpf accelerometer
+    if ((pitch_estimate < -90 && imu->kal.pitch > 90) || (pitch_estimate > 90 && imu->kal.pitch < -90)){
+        imu->kal.pitchK.angle = pitch_estimate; // Reset the Angle when the IMU has moved 180 degrees
+        imu->kal.pitch = pitch_estimate; 
     }
     else{
-        imu->kalPitch = Kalman_getAngle(&imu->kalY, pitch, imu->lpf.gyro.y, imu->dt);
+        imu->kal.pitch = imuKalPredict(&imu->kal.pitchK, pitch_estimate, pitchRate, imu->dt);
     }
-    float xRate = imu->sensor.gyro.x;
-    if (fabs(imu->kalPitch) > 90){
-        imu->sensor.gyro.x *= -1;
-    }   
-    imu->kalRoll= Kalman_getAngle(&imu->kalX, roll, imu->lpf.gyro.y, imu->dt);
-
+    imu->kal.rollRate = rollRate - imu->kal.rollK.bias; // Update angle rate
+    imu->kal.pitchRate = pitchRate - imu->kal.pitchK.bias; 
 }
 
-static void imuRunFusion(IMU *imu){
-    //@Brief: Run Sensor Fusion Algorithms 6-Axis IMU
-    mpu6050Read(&imu->sensor);
-    imuLPF(imu, &imu->sensor.accel, &imu->sensor.gyro);
-    imuRawEuler(imu); // Compute Raw angles
-    imuCompFilt(imu); // Compute Angle With Complematery Filter
 
+static void imuUpdate(struct IMU* imu){
+    mpu6050Read(imu->sensor); // Read Sensor need to move this to Interrupt Based
+    
+    imuLPF(imu, &imu->sensor->accel, &imu->sensor->gyro); // Apply Low pass filter
+    imuKalUpdate(imu); // Estimate Angle with Kalman Observer
 }
+
+
 
 #endif // IMU_H

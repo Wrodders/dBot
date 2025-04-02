@@ -3,8 +3,7 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/**",
-                "/libopencm3/*"
+                "${workspaceFolder}/**"
             ],
             "defines": [
                 "STM32F4",

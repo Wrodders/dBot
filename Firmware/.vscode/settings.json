@@ -2,6 +2,8 @@
     "C_Cpp.intelliSenseEngineFallback": "enabled",
     "C_Cpp.default.compilerPath": "/opt/homebrew/bin/arm-none-eabi-gcc",
     "files.associations": {
+        "*.h": "c",
+        "*.hpp": "cpp",
         "gpio.h": "c",
         "vector.h": "c",
         "systick.h": "c",
@@ -20,7 +22,14 @@
         "encoder.h": "c",
         "utils.h": "c",
         "pwm.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "typeinfo": "c",
+        "bit": "c",
+        "compare": "c",
+        "limits": "c",
+        "new": "c",
+        "type_traits": "c",
+        "cmath": "c"
     },
     "cSpell.words": [
         "acklogalged",
@@ -35,7 +44,8 @@
         "pupd",
         "Quaducore",
         "SPEEDCTRL",
-        "VBAT"
+        "VBAT",
+        "VREF"
     ],
     "editor.detectIndentation": false
 }

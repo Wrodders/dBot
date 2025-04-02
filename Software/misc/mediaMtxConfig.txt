@@ -1,0 +1,17 @@
+cam1:
+    runOnInit: bash -c 'rpicam-vid -t 0 --camera 0 --nopreview --codec yuv420 --width 1280 --height 720 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p 
+-s:v 1280x720 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+    runOnInitRestart: yes
+
+
+
+ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 640x480  -i ///tmp/video_out -c:v h264_v4l2m2m -bufsize 600k -bitrate 300k -maxrate 300k -preset ultrafast -tune zerolatency  -fflags nobuffer -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+
+ffmpeg -f rawvideo -pix_fmt yuv420p -video_size 640x360 \
+-avioflags direct -flags low_delay -fflags nobuffer+flush_packets \
+-i ///tmp/video_out \
+-c:v h264_v4l2m2m -b:v 300k -maxrate 300k -bufsize 300k \
+-profile:v baseline -level 3.1 -g 30 -keyint_min 30 \
+-flags +global_header -vsync passthrough \
+-f rtsp -rtsp_transport tcp -muxdelay 0.1 \
+rtsp://localhost:$RTSP_PORT/$MTX_PATH

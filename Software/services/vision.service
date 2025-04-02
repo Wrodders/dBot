@@ -1,0 +1,29 @@
+#-----------------------------------------------------------------
+# Vision Processing Service
+#-----------------------------------------------------------------
+[Unit]
+Description=Vision Processing
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/home/pi/prog/software/build/vision
+WorkingDirectory=/home/pi/prog/software/
+KillMode=process
+TimeoutStopSec=10
+
+# Resource Limits
+CPUQuota=60%
+MemoryMax=256M
+MemorySwapMax=64M
+IOWeight=150 
+Nice=-20 
+
+
+#Filesystem Access
+ReadWritePaths=/home/pi/prog/software/
+
+
+[Install]
+WantedBy=multi-user.target

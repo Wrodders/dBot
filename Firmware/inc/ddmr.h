@@ -1,105 +1,98 @@
 #ifndef DDMR_H
 #define DDMR_H
 
-
 #include "motor.h"
-#include "pid.h"
 
 // ******* Differential Drive Mobile Robot ********* // 
-//@Brief: Controls Robot State in 2D plane
-//@Description: Implements Differential Drive Kinematic Model
-//              LinVel AngVel Control
+struct DiffDriveModel{
+    const float wheelR;     // R [m]
+    const float wheelBase;  // L [m]
+    float linearVelAlpha;   // LPF coeff 
+    float angularVelAlpha;  // LPF coeff 
+    float dt;              // sample time [s]
 
-/*
-    Models and Controls the kinematics of the TWSB Robot in the 2D Plane 
-    Provides a DDMR Controllable Robot via cascaded PID 
-    Forward Kinematics:
-    Va = R * (wR + wL) / 2
-    Wa = 2R * (wR - wL) / L
-    Inverse Kinematics: 
-    wR = (Va - Wa) * L
-    wL = (Va + Wa) * L
-*/
+    float gyroOdoThreshold; // threshold for gyro odometry
 
-
-typedef struct DDMR{
-    Motor motorL, motorR;
-    Encoder encL, encR;
-    const float wheelR; // R
-    const float wheelBase; // L
-    
     // kinematic state
-    float linVel;
-    const float aLinVel;  // lpf alpha
-  
-}DDMR; // Deferential Drive Mobile Robot
+    float v_b;   // linear velocity m/s    
+    float posX;  // x position [m] in robot frame
+    float w_b;   // angular vel [rad/s]
+   
+    float x_g;   // x position [m] in global frame
+    float y_g;   // y position [m] in global frame
+    float theta; // orientation [rad] in global frame
+}DiffDriveModel; // Deferential Drive Mobile Robot
 
-static DDMR ddmrInit(void){
-    //@Brief: Initializes Peripherals Sensors and Controllers for Low Level Robot Robot
-    //@Description: Sets Up Low Level Differential Drive Robot Model with constant speed motors  
-    //Constant speed required by kinematics model implemented with PI Controller though Fixed Time Task
-    
-    DDMR ddmr = {
-        .wheelBase = WHEEL_BASE, 
-        .wheelR = WHEEL_RADIUS,        
+static inline void ddmrReset(struct DiffDriveModel *const ddmr){
+    ddmr->v_b = 0.0f;
+    ddmr->w_b = 0.0f;
+    ddmr->posX = 0.0f;
+    ddmr->x_g = 0.0f;
+    ddmr->y_g = 0.0f;
+    ddmr->theta = 0.0f;
+}
 
-        .encL = encoderInit(ENC_L_TIM, UINT16_MAX, ENC_L_A, ENC_L_PORT, ENC_L_B, ENC_L_PORT, ENC_L_AF),
-        .motorL = motorInit(M_L_TIM, M_L_PORT, TIM_OC1, M_L_PWMA, TIM_OC2, M_L_PWMB, DRV_EN_PIN, DRV_EN_PORT),
-            
-        .encR = encoderInit(ENC_R_TIM, UINT16_MAX, ENC_R_A, ENC_R_PORT, ENC_R_B, ENC_R_PORT, ENC_R_AF),
-        .motorR = motorInit(M_R_TIM, M_R_PORT, TIM_OC3, M_R_PWMA,TIM_OC4, M_R_PWMB, DRV_EN_PIN, DRV_EN_PORT),
-        .aLinVel = VEL_ALPHA,
-        };
+static struct DiffDriveModel ddmrInit(const float wheelRadius, const float wheelBase, 
+                            const float linearVel_alpha, const float angularVel_alpha, 
+                            const float dt){
 
-    motorConfig(&ddmr.motorL, &ddmr.encL, VBAT_MAX, 1.3f, true, SPEED_BETA, RPS_MAX);
-    motorConfig(&ddmr.motorR, &ddmr.encR, VBAT_MAX, 1.3f, false,  SPEED_BETA, RPS_MAX);
-
-    motorSetVel(&ddmr.motorL, 0.0f);
-    motorSetVel(&ddmr.motorR, 0.0f);
-
-    motorDisable(&ddmr.motorL); // enable DRV8833
-    motorDisable(&ddmr.motorR); // enable DRV8833
+    struct DiffDriveModel ddmr =  {
+        .wheelR = wheelRadius,
+        .wheelBase = wheelBase,
+        .linearVelAlpha = linearVel_alpha,
+        .angularVelAlpha = angularVel_alpha,
+        .dt = dt
+    };
     return ddmr;
-}
-static void ddmrOdometry(DDMR *ddmr){
-    //@Brief: Compute Kinematic State of Mobile Robot using Odometry
-    float mVel = (ddmr->motorL.angularVel * RPS_TO_MPS + ddmr->motorR.angularVel * RPS_TO_MPS ) * 0.5f; // convert to mps 
-    ddmr->linVel = (ddmr->aLinVel * mVel) + (1.0f - ddmr->aLinVel) * ddmr->linVel;  // lpf filter 
-}
+} 
 
-static void ddmrDiffDrive(DDMR* ddmr, float linVel, float angVel){
-        //@Brief: Computes Inverse DDMR Kinematics sets Motor Target velocities  
-            
-        float wLTarget = (linVel*MPS_TO_RPS) + (angVel * 2 * ddmr->wheelBase); //  // RPS
-        float wRTarget = (linVel*MPS_TO_RPS) - (angVel * 2 * ddmr->wheelBase); // // RPS
-        motorSetVel(&ddmr->motorL,wLTarget); // set target reference speed in rps
-        motorSetVel(&ddmr->motorR,wRTarget);
-}
-
-static void ddmrTankDrive(DDMR* ddmr, const float pwrL, const float pwrR){
-    //@Brief: Drive Mobile Robot in Tank Drive Configuration
-    //@Description: Wheel Power Sets Motor Voltage Independently 
-
-    float vL = _clamp(pwrL, -1, 1) * VBAT_MAX; // convert % to voltage
-    float vR = _clamp(pwrR, -1, 1) * VBAT_MAX;
-    motorSetVel(&ddmr->motorL, vL);
-    motorSetVel(&ddmr->motorR, vR);
-}
-
-static void ddmrStop(DDMR *ddmr){
-    //@Brief: Stops Motors
-    motorSetVel(&ddmr->motorL, 0.0f);
-    motorSetVel(&ddmr->motorR, 0.0f);
-}
-
-static void ddmrEStop(DDMR *ddmr){
-    //@Brief: Imitalsy stopsn moters then sets targets to 0.
-    motorStop(&ddmr->motorL);
-    motorStop(&ddmr->motorR);
-    motorSetVel(&ddmr->motorL, 0.0f);
-    motorSetVel(&ddmr->motorR, 0.0f);
+//@Brief: Compute Inverse Kinematic State of Mobile Robot using Wheel Odometry
+static void ddmrEstimateOdom(struct DiffDriveModel *const ddmr, const struct Motor *const motorLeft, const struct Motor *const motorRight){
+    float speed =  RPS_TO_MPS * (motorLeft->wheelRPS + motorRight->wheelRPS) * 0.5f;                  // convert to mps 
+    ddmr->v_b = lagFilter(ddmr->linearVelAlpha, speed, ddmr->v_b);                                      // lpf filter
+    float angVel = (motorLeft->wheelRPS - motorRight->wheelRPS) * ddmr->wheelR/ddmr->wheelBase ;                // ang vel in rad/s
+    ddmr->w_b = lagFilter(ddmr->angularVelAlpha, angVel, ddmr->w_b);                                  // lpf filter
+    ddmr->posX += ddmr->v_b * (LQR_CNTRL_PERIOD * MS_TO_S); // update position
 }
 
 
+static void ddmrGyroOdometry(struct DiffDriveModel *const ddmr,
+                            const struct Motor *const motorLeft,
+                            const struct Motor *const motorRight,
+                            float gyroZ){
+
+    // --- Odometry Update ---
+    float wheelSpeed = RPS_TO_MPS * (motorLeft->wheelRPS + motorRight->wheelRPS) * 0.5f;
+    ddmr->v_b = lagFilter(ddmr->linearVelAlpha, wheelSpeed, ddmr->v_b);
+    float wheelAngVel = (motorLeft->wheelRPS - motorRight->wheelRPS) * (2*M_PI*ddmr->wheelR) / ddmr->wheelBase;
+    float deltaThetaOdo = wheelAngVel * ddmr->dt;
+    // bind to [-pi, pi]
+
+
+    // Compute incremental rotation from gyro measurement
+    float deltaThetaGyro = gyroZ * ddmr->dt;
+
+    // Compute the absolute difference between gyro and odometry increments
+    float deltaDiff = fabs(deltaThetaGyro - deltaThetaOdo);
+
+    // Decide which measurement to trust based on the threshold:
+    // If the difference exceeds the threshold, use the gyro value.
+    if (deltaDiff > ddmr->gyroOdoThreshold) {
+    // Catastrophic odometry error detected: use gyro measurement.
+    ddmr->theta += deltaThetaGyro;
+    ddmr->w_b = gyroZ;
+    } else {
+    // Normal condition: use odometry measurement.
+    ddmr->theta += deltaThetaOdo;
+    ddmr->w_b = wheelAngVel;
+    }
+
+    // Optionally, apply a low-pass filter to the angular velocity for smoother output.
+    ddmr->w_b = lagFilter(ddmr->angularVelAlpha, ddmr->w_b, ddmr->w_b);
+
+    // Update the robot's (x, y) position using the current orientation.
+    ddmr->x_g += ddmr->v_b * ddmr->dt * cos(ddmr->theta);
+    ddmr->y_g += ddmr->v_b * ddmr->dt * sin(ddmr->theta);
+}
 
 #endif // DDMR_H

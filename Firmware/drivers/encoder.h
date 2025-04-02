@@ -1,29 +1,28 @@
 #ifndef ENCODER_H
 #define ENCODEr_H
-
-
 #include "../common/common.h"
 #include <libopencm3/stm32/timer.h>
 #include "gpio.h"
 
 #define TIM_MODE_ENC 0x3
 
-typedef struct Encoder {
-    GPIO chA;
-    GPIO chB;
+struct Encoder {
+    struct GPIO chA;
+    struct GPIO chB;
     uint32_t timPerif;
     uint16_t period; // counts per revolution
+    int flipDir; // 1 or -1
     
-    uint16_t lastCount; // encoder count
+    uint32_t lastCount; // encoder count
 }Encoder;
 
- static Encoder encoderInit(uint32_t timPerif, uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction) {
-    Encoder e;
+//@Breif: Initialize the encoder in Hardware Quadrature mode
+static struct Encoder encoderInit(uint32_t timPerif,  uint32_t period, uint32_t pinA, uint32_t portA, uint32_t pinB, uint32_t portB, uint32_t alternateFunction, bool flipDir) {
+    struct Encoder e;
     // Store the timer peripheral in the encoder structure
     e.timPerif = timPerif;
     e.lastCount = 0;
-
-
+    e.flipDir = flipDir  ? -1 : 1;
     // Configure pins for alternate function mode
     gpio_mode_setup(portA, GPIO_MODE_AF, GPIO_PUPD_NONE, pinA);
     gpio_set_af(portA, alternateFunction, pinA);
@@ -37,23 +36,17 @@ typedef struct Encoder {
     timer_continuous_mode(e.timPerif);
     timer_set_period(e.timPerif, period - 1);
     timer_slave_set_mode(e.timPerif, TIM_SMCR_SMS_EM3); // Encoder mode 3
-    timer_ic_set_input(e.timPerif, TIM_IC1, TIM_IC_IN_TI1);
-    timer_ic_set_input(e.timPerif, TIM_IC2, TIM_IC_IN_TI2);
+    timer_ic_set_input(e.timPerif, TIM_IC1, TIM_IC_IN_TI1); // Phase A
+    timer_ic_set_input(e.timPerif, TIM_IC2, TIM_IC_IN_TI2); // Phase B
     timer_enable_counter(e.timPerif);
     TIM_CNT(e.timPerif) = 0x0000; // reset counter
-
-   
-
 
     return e;
 }
 
 
-static inline uint32_t encoderRead(Encoder *enc){
+static inline uint32_t encoderRead(struct Encoder *enc){
     return timer_get_counter(enc->timPerif);
 }
-
-
-
 
 #endif // ENCODER_H
