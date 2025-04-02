@@ -57,6 +57,18 @@ namespace calib {
     }
 
 
+    bool loadHomography(cv::Mat& homography_matrix) {
+        cv::FileStorage fs(HOMOGRAPHY_FILE, cv::FileStorage::READ);
+        if (!fs.isOpened()) {
+            syslog(LOG_ERR, "Error: Unable to load homography matrix.");
+            return false;
+        }
+        fs["homography_matrix"] >> homography_matrix;
+        fs.release();
+        return true;
+    }
+
+
 //@brief: Calibrate the camera and compute the homography matrix
 //@return: 1 if successful, 0 if chessboard not found,
 int calibrateInversePerspectiveMap(const cv::Mat& undistorted, cv::Mat& homography_matrix, std::array<cv::Point2f, 4>& objPts, float horizon) {

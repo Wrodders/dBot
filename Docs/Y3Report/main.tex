@@ -453,10 +453,6 @@
             \caption{System Parameters}
         \end{table}
 
-
-
-        \pagebreak{}
-
         \subsection{System Identification}
         A set of experiments are conducted to obtain an estimate transfer function of the motors.
         \begin{table}[H]
@@ -529,9 +525,6 @@
         similar to Fig.\ref{fig:opensine} in order to regulate the pitch angle of the body.
         Considering this a closed loop controller is developed in section 4.1 to regulate the motors speed,
         and maintain the device is it operating region. 
-
-    \pagebreak{}
-
 
     \section{State Estimation}
     Information about the TWSB system may be obtained from 2 kinds of sources; 
@@ -987,14 +980,16 @@
 
         \subsubsection{Calibration}
         The Raspberry Pi Camera Module V3 Wide angle is used as the physical sensor for the vision system.
-        The small stature of the TWSB robot mandates a wide angle lense to be used in order to maximize 
-        the horizon visible in the image. 
+        The camera has a non symmetric field of view, being wider in the horizontal direction than the vertical.
+        This proves useful in identifying large, shallow curvatures in the track 
+        but requires calibration to remove barrel distortion. 
+
+        The camera is mounted on the TWSB robot at a height of 18cm with an angle of 15 degrees to the floor plane.
+        
+       
         The camera matrix and distortion coefficients are obtained by taking calibration sequence of images of a 
         chessboard pattern. The commonly used Zhang's Method is used to obtain the camera matrix and distortion coefficients. 
-        The chessbaord patters is also used to recalculate the homography matrix between the camera and the floor plane, which when
-        applied to the image frame, produces a birds eye view of the environment. 
-        Homography assumes that the camera is orthogonal to the floor plane, the pitch angle of the TWSB is applied 
-        through a rotation matrix to the image frame given by:
+       
         \begin{equation}
             \begin{aligned}
                 H = \begin{bmatrix}
@@ -1010,8 +1005,33 @@
             \end{aligned}
             \label{eq:Homography Matrix}
         \end{equation}
-        The camera is mounted on the TWSB robot at a height of 0.1m and at an angle of 45 degrees to the floor plane.
+        The chessboard patters is also used to recalculate the homography matrix between the camera and the floor plane, which when
+        applied to the image frame, produces a birds eye view of the environment. 
+        Homography assumes that the camera is orthogonal to the floor plane, the pitch angle of the TWSB is applied 
+        through a rotation matrix to the image frame given by:
+        
         This acts to correct the geometric distortion of the image from non-orthogonal projection of the camera. 
+
+        \subsection{Indoor Drivability Segmentation}
+        A simple floor segmentation method is used to estimate the horizon, where the floor meets the wall, 
+        by finding the largest horizontal line in the image. 
+
+        \begin{figure}[H]
+            \centering
+            \begin{subfigure}[b]{0.45\textwidth}
+                \includegraphics[width=0.8\textwidth]{ApprachWallCurve.png}
+                \caption{Floor Segmentation}
+                \label{fig:FloorSegmentation}
+            \end{subfigure}
+            \hfill
+            \begin{subfigure}[b]{0.45\textwidth}
+                \includegraphics[width=0.8\textwidth]{Obstacles.png}
+                \caption{Obstacle Detection}
+                \label{fig:ObstacleDetection}
+            \end{subfigure}
+            \caption{Floor Segmentation}
+        \end{figure}
+
         \pagebreak{}
         \subsection{Robust Line Detection Algorithms}
 
@@ -1060,16 +1080,19 @@
             \label{fig:ChallengingEnvironments}
         \end{figure}
 
-        False positive are the most common issue with line detection algorithms as they often cause the robot to loose track of the original path. 
+        False positive are a serious issue with line detection algorithms as they often cause the robot to loose track of the original path. 
         These are difficult to remove as outliers in the image data as they form peaks of similar shapes to other features. This non unique mapping 
         of image data to classified set of features is a common issue in robotic navigation. 
-        Assuming that the robot is initial on the track, then the search space for the peak can be expanded around the last known position of the track. 
+        Assuming that the robot is initially on the track, then the search space for the peak can be expanded around the last known position of the track. 
         A topological peak tracker grouping peaks of similar shape, width prominence and position, further reducing outliers. 
         This results an a set of best candidate peaks, which are sorted by their distance from last known position and prominence. 
 
-        This procedure is shown in Fig.\ref{fig:LineSegmentation} where the image is split into 3 sections, thus obtaining points at different lookahead distances 
+        The procedure is shown in Fig.\ref{fig:VizNavigation} where the image is split into 3 sections, thus obtaining points at different lookahead distances 
         on the track. 
-    
+
+        A baseline algorithm reactively changes the steering angel based on the peak obtained closet to the robot, at the bottom of the image frame.  
+        A more advanced algorithm makes use of the other peaks to determine the curvature of the track, from which a pure pursuit controller is used to
+        determine the steering angle, as shown in Fig.\ref{fig:PurePersuit}.
 
 
 
@@ -1094,7 +1117,7 @@
 
         \subsection{Navigation requirements}
 
-        \subsection{Indoor Drivability Segmentation}
+
 
         \subsection{Racing Algorithms}
 
@@ -1106,9 +1129,7 @@
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
   \section{Results and discussion} % edit section heading as appropriate
     \subsection{Balance Performance}
-
-    \subsection{Operational Robustness}
-    \subsection{Line Trajectory Tracking}
+    \subsection{Line Following}
     \begin{figure}[H]
         \centering
         \begin{subfigure}[c]{0.35\textwidth}
