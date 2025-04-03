@@ -16,9 +16,6 @@
 #include <zmq.hpp>
 #include <syslog.h>
 
-
-#include <opencv2/core/eigen.hpp>
-
 #include "../common/coms.hpp"
 
 #include "../inc/calibration.hpp"
@@ -121,8 +118,9 @@ void extractFloorPlane(const cv::Mat& y_plane, cv::Mat& floor_frame) {
 // Find track estimate using homography transformation
 void detectTrackEdges(const cv::Mat& roiFrame, cv::Mat& edges, const cv::Mat& homography) {
     // ------- Edge Detection ------- //
-    cv::GaussianBlur(roiFrame, edges, cv::Size(5, 21), 0);
-    cv::Sobel(edges, edges, CV_8U, 1, 0, 3, 2, 0, cv::BORDER_DEFAULT);
+    //cv::GaussianBlur(roiFrame, edges, cv::Size(5, 21), 0);
+    cv::Sobel(roiFrame, edges, CV_8U, 1, 0, 3, 2, 0, cv::BORDER_DEFAULT);
+    cv::medianBlur(edges, edges, 5);
     //  mask warped img boundaries edges fromm sobel
     std::vector<cv::Point> contour = {
         cv::Point(10, 0),

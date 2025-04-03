@@ -41,9 +41,9 @@ std::condition_variable _twist_cv;
 //              Sets angular velocity opposing the error. 
 //@Note        Sets linear velocity to max speed parameter
 void bangbang(const int peakIdx, ParameterMap& param_map) {
-    float crossTrackError = 320- peakIdx;
+    float crossTrackError = 320 - peakIdx;
     crossTrackError /= 320 / 2;
-    std::clamp(crossTrackError, -0.2f, 0.2f);
+    crossTrackError = std::clamp(crossTrackError, -0.6f, 0.6f);
     float maxSpeed;
     (void) param_map.get_value(viz::P_MAX_VEL, maxSpeed);
     struct Trajectory twist = {.w_rate = -crossTrackError, .speed = maxSpeed};

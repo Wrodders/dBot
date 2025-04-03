@@ -5,7 +5,6 @@
 #include "../common/coms.hpp"
 #include <algorithm> 
 #include <numeric>
-#include <Eigen/Dense>
 
 namespace pkt{
 
@@ -59,7 +58,7 @@ std::vector<Peak> identifyPeakCandidates(const std::array<float, 640>& hist, flo
             float rightValleyVal = (rightValleyIdx < lengthHist - 1) ? hist[rightValleyIdx] : 0.0f;
             float prominence = val - std::max(leftValleyVal, rightValleyVal); // Topographic prominence
 
-            Peak peak = {i, val, width, leftValleyIdx, rightValleyIdx, prominence};
+            Peak peak = {static_cast<int>(i), val, width, leftValleyIdx, rightValleyIdx, prominence};
             candidates.push_back(peak);
         }
     }
@@ -151,7 +150,14 @@ struct Peak findDominantPeak(
             return Peak{};
         }
     }
-    Peak bestPeak = {bestIndex, candidateVal, bestWidth, 0, 0, bestProminence};
+    Peak bestPeak = {
+        static_cast<int>(bestIndex),
+        candidateVal,
+        bestWidth,
+        filteredCandidates[0].leftValleyIdx,
+        filteredCandidates[0].rightValleyIdx,
+        bestProminence
+    };
     return bestPeak;
 }
 

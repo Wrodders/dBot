@@ -48,24 +48,21 @@
 #include "../inc/navigation.hpp"
 #include "../inc/cmdserver.hpp"
 
-
-void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, int& loopRate_ms);
-
-cv::Mat hmat_bangbang;
-
 std::array<cv::Point2f, 4> _dst_pts = { // homography transform destination points
-    cv::Point2f((viz::WIDTH / 2 - 90), viz::HEIGHT),
-    cv::Point2f((viz::WIDTH / 2 + 90), viz::HEIGHT),
+    cv::Point2f((viz::WIDTH / 2 - 90), viz::HEIGHT - 360),
+    cv::Point2f((viz::WIDTH / 2 + 90), viz::HEIGHT - 360),
     cv::Point2f(0, 0), 
     cv::Point2f(viz::WIDTH, 0)
 };
 
-const std::vector<cv::Point2f> _src_pts = {
-    cv::Point2f(0, viz::HEIGHT), cv::Point2f(viz::WIDTH, viz::HEIGHT),
-    cv::Point2f(0, 0), cv::Point2f(viz::WIDTH, 0)
-};    
 
-
+void handleInitMode(ParameterMap& param_map);
+void handleCalibBEVMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, int& loopRate_ms);
+void handlePathFollowMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, viz::PathEstimator& pathEstimator);
+void handleSegFloorMode(const cv::Mat& undistorted, cv::Mat& outputFrame);
+void handleBirdMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map);
+void handleBangBangMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map);
+void handleCalibLensMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map);
 
 struct PerfMetrics {
     long loop_count = 0;
@@ -133,6 +130,8 @@ int run(int argc, char* argv[]) {
     cv::Mat y_plane(viz::HEIGHT, viz::WIDTH, CV_8UC1);
     cv::Mat undistorted(viz::HEIGHT, viz::WIDTH, CV_8UC1);
     cv::Mat outputFrame(viz::HEIGHT, viz::WIDTH, CV_8UC1);
+    // --------------- Navigation Pipeline ----------------- //
+    viz::PathEstimator pathEstimator;
     // -------------- Camera Calibration ----------------- //
     cv::Mat cameraMatrix, distCoeffs;
     if (!calib::loadCalibration(cameraMatrix, distCoeffs)) {
@@ -151,16 +150,18 @@ int run(int argc, char* argv[]) {
         param_map.set_value(viz::P_PROG_MODE, viz::M_CALIB_BEV);
     }else {
        syslog(LOG_INFO, "Using loaded homography matrix");
-       param_map.set_value(viz::P_PROG_MODE, viz::M_PATHFOLLOW);
+       param_map.set_value(viz::P_PROG_MODE, viz::M_BANG_BANG);
     }
 
-    hmat_bangbang = cv::findHomography(_src_pts, _dst_pts);
+    const std::vector<cv::Point2f> _src_pts = {
+        cv::Point2f(0, viz::HEIGHT), cv::Point2f(viz::WIDTH, viz::HEIGHT),
+        cv::Point2f(0, 0), cv::Point2f(viz::WIDTH, 0)
+    };   
+    cv::Mat H_BB = cv::findHomography(_src_pts, _dst_pts);
 
     // -------------- Performance Metrics ----------------- //
-        // In main loop
     PerfMetrics metrics;
     constexpr int REPORT_INTERVAL_MS = 30000;
-
     // -------------- Vision Pipeline Loop ----------------- //
     int loopRate_ms = -1;  
     while (!viz::_exit_trig) {
@@ -173,7 +174,35 @@ int run(int argc, char* argv[]) {
         // ------------ Undistort ------------ //
         cv::remap(y_plane, undistorted, map1, map2, cv::INTER_LINEAR);
         // ------------ Processing ------------ //
-        img_pipeline(y_plane, outputFrame, homography_matrix, param_map, loopRate_ms);
+        float progmode;
+        param_map.get_value(viz::P_PROG_MODE, progmode);
+        switch ((int)progmode) {
+            case viz::M_INIT:
+                handleInitMode(param_map);
+                break;
+            case viz::M_CALIB_BEV:
+                handleCalibBEVMode(undistorted, outputFrame, homography_matrix, param_map, loopRate_ms);
+                break;
+            case viz::M_BANG_BANG:
+                handleBangBangMode(y_plane, outputFrame, H_BB, param_map);
+                break;
+            case viz::M_PATHFOLLOW:
+                handlePathFollowMode(y_plane, outputFrame, homography_matrix, param_map, pathEstimator);
+                break;
+            case viz::M_SEG_FLOOR:
+                handleSegFloorMode(undistorted, outputFrame);
+                break;
+            case viz::M_BIRD:
+                handleBirdMode(undistorted, outputFrame, homography_matrix, param_map);
+                break;
+            case viz::M_VIZ:
+                undistorted.copyTo(outputFrame);
+                break;
+            default:
+                syslog(LOG_ERR, "Invalid Program Mode");
+                param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
+                break;
+        }
         auto process_end = std::chrono::steady_clock::now();
         // ------------ Write Frame ------------ //
         if (!outputFrame.empty()) {
@@ -223,6 +252,8 @@ int run(int argc, char* argv[]) {
     return 0;
 }
 
+
+// ------------------ Main  ----------------- //
 int main(int argc, char* argv[]) {
     #ifdef __APPLE__
     gst_macos_main((GstMainFunc) run, argc, argv, NULL); // Workaround for Gstreamer on MacOS
@@ -233,7 +264,7 @@ int main(int argc, char* argv[]) {
 }
 
 
-// ******************************* Vision Pipeline ******************************* //
+// ------------------ PROGRAM MODES ----------------- //
 void handleInitMode(ParameterMap& param_map) {
     syslog(LOG_INFO, "Initializing Vision Pipeline");
     param_map.set_value(viz::P_PROG_MODE, viz::M_PATHFOLLOW);
@@ -278,42 +309,6 @@ void handleCalibBEVMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Ma
     }
 }
 
-
-void handlePathFollowMode(const cv::Mat& undistorted, cv::Mat& outputFrame,cv::Mat& homography_matrix, ParameterMap& param_map) {
-    // -- Floor Segmentation --
-    cv::Mat floor_frame;
-    viz::extractFloorPlane(undistorted, floor_frame);
-    cv::Mat bev;
-    cv::warpPerspective(floor_frame, bev, homography_matrix, floor_frame.size(),
-    cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS,
-    cv::BORDER_CONSTANT, cv::Scalar(0));
-    // -- Track Detection --
-    cv::Mat trackFrame;
-    viz::detectTrackEdges(bev, trackFrame, homography_matrix);
-
-
-
-    // -- Define the robot's visual position --
-    // The frame is 480 pixels tall (30 cm), so scaling yields ~16 px/cm.
-    // Given that the robot's position is 25 cm below the bottom, the offset is ~25*16=400 pixels.
-    // However, per specification we use (320, 480+300) = (320, 780).
-    cv::Point2f robotPos(480 + 300, 320);
-
-    // -- Visualization --
-    // Resize the visualizations into the output frame.
-    cv::resize(trackFrame, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
-    cv::Mat topVizFrame = outputFrame(cv::Rect(0, 0, outputFrame.cols, outputFrame.rows / 5));
-    cv::Mat midVizFrame = outputFrame(cv::Rect(0, outputFrame.rows * 2/5, outputFrame.cols, outputFrame.rows / 5));
-    cv::Mat lowVizFrame = outputFrame(cv::Rect(0, outputFrame.rows * 4/5, outputFrame.cols, outputFrame.rows / 5));
-
-    viz::drawTopology(topVizFrame, high_pathTrend, high_section.peakIdx,
-    high_section.peakWidth, high_section.peakProminence, cv::Scalar(128), cv::Scalar(255));
-    viz::drawTopology(midVizFrame, mid_pathTrend, mid_section.peakIdx,
-    mid_section.peakWidth, mid_section.peakProminence, cv::Scalar(128), cv::Scalar(255));
-    viz::drawTopology(lowVizFrame, low_pathTrend, low_section.peakIdx,
-    low_section.peakWidth, low_section.peakProminence, cv::Scalar(64), cv::Scalar(192));
-}
-
 void handleSegFloorMode(const cv::Mat& undistorted, cv::Mat& outputFrame) {
     viz::WallDetection walls = viz::estimateWallHorizon(undistorted);
     undistorted.copyTo(outputFrame);
@@ -336,49 +331,47 @@ void handleBirdMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& h
 }
 
 
-void handleBangBangMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map) {
+//@brief: Path Following by cross track error bang bang control
+void handleBangBangMode(const cv::Mat& inputFrame, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map) {
     // Extract ROI from horizon refencend the top of the image
-    cv::Mat roi = undistorted(cv::Rect(0, 340, undistorted.cols, undistorted.rows - 340));
-    cv::Mat edges(roi.size(), CV_8U);
-    // remove noise
-    cv::GaussianBlur(roi, roi, cv::Size(5, 21), 0);
-    // erode and dilate to remove noise
-    // Apply Sobel operator to detect edges
+    float horz_height;
+    param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
+    cv::Mat roi = inputFrame(cv::Rect(0, horz_height, viz::WIDTH, viz::HEIGHT - horz_height));
+    // -- Warp Perspective --
+    _dst_pts[0].y = _dst_pts[1].y = viz::HEIGHT - horz_height;
+    cv::Mat warped_frame;
+    cv::warpPerspective(roi,warped_frame,
+        homography_matrix, warped_frame.size(), cv::INTER_LINEAR,cv::BORDER_REPLICATE);
+
+    warped_frame(cv::Rect(0, warped_frame.rows / 2, warped_frame.cols, warped_frame.rows / 2)).setTo(0);
+    
     // ------- Edge Detection ------- //
-    cv::Sobel(roi, edges, CV_8U, 1, 0, 3, 1, 0);
-    cv::threshold(edges, edges, 60, 255, cv::THRESH_BINARY );
+    cv::Mat edges(roi.size(), CV_8U);
+    cv::Sobel(warped_frame, edges, CV_8U, 1, 0, 3, 1, 0);
+
+    cv::threshold(edges, edges, 40, 255, cv::THRESH_TRUNC);
     // ------- HISTOGRAM ------- //
     cv::Mat hist;
-    cv::reduce(edges, hist, 0, cv::REDUCE_SUM, CV_32S);     
+    cv::reduce(edges(cv::Rect(0, edges.rows / 2, edges.cols, edges.rows / 2)), hist, 0, cv::REDUCE_SUM, CV_32F);
     cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);
-    hist.convertTo(hist, CV_32F);
-    
-    // Apply Gaussian blur to remove high-frequency noise
-    cv::GaussianBlur(hist, hist, cv::Size(21, 1), 0);
-    
-    // Convert to vector for efficient processing
+    cv::GaussianBlur(hist, hist, cv::Size(21, 1), 0);    
     std::vector<float> histVec(hist.cols);
     for (int i = 0; i < hist.cols; ++i) {
         histVec[i] = hist.at<float>(0, i);
     }
-    
-    // Find the median using nth_element (O(n) instead of O(n log n))
     std::vector<float> sortedHist = histVec;
     size_t medianIdx = sortedHist.size() / 2;
     std::nth_element(sortedHist.begin(), sortedHist.begin() + medianIdx, sortedHist.end());
     float median = sortedHist[medianIdx];
-    
-    // Thresholding in-place
     float threshold = median * 1.5f;
     for (auto& val : histVec) {
         if (val < threshold) val = 0;
     }
-    // Find the peak index using OpenCV's built-in function (more efficient)
     cv::Mat histFiltered(1, hist.cols, CV_32F, histVec.data());
     double minVal, maxVal;
-    int peak_idx;
-    cv::minMaxIdx(histFiltered, &minVal, &maxVal, nullptr, &peak_idx);
-    //nav::bangbang(peak_idx, param_map); 
+    cv::Point lineStartEst;
+    cv::minMaxLoc(hist, nullptr, nullptr, nullptr, &lineStartEst);
+    nav::bangbang(lineStartEst.x, param_map); 
     // ------- Visualize Histogram ------- //
     cv::resize(edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
     cv::Mat top_half = outputFrame(cv::Rect(0, 0, edges.cols, edges.rows / 2));
@@ -386,37 +379,37 @@ void handleBangBangMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Ma
         int histValue = static_cast<int>(hist.at<float>(0, i)); // Ensure proper type casting and indexing
         cv::line(top_half, cv::Point(i, top_half.rows), cv::Point(i, top_half.rows - histValue), cv::Scalar(255));
     }
+
+    // ------- Visualize Dominant Peak ------- //
+    cv::Rect peakRect(lineStartEst.x - 10, top_half.rows - 20, 20, 20);
+    cv::rectangle(top_half, peakRect, cv::Scalar(128), -1);
 }
 
-void img_pipeline(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, int& loopRate_ms) {
-    float progmode;
-    param_map.get_value(viz::P_PROG_MODE, progmode);
+void handlePathFollowMode(const cv::Mat& inputFrame, cv::Mat& outputFrame,cv::Mat& homography_matrix, ParameterMap& param_map, viz::PathEstimator& pathEstimator) {
+    // -- Floor Segmentation --
+    cv::Mat floor_frame;
+    viz::extractFloorPlane(inputFrame, floor_frame);
+    cv::Mat bev;
+    cv::warpPerspective(floor_frame, bev, homography_matrix, floor_frame.size(),
+    cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS,
+    cv::BORDER_CONSTANT, cv::Scalar(0));
+    // -- Track Detection --
+    cv::Mat trackFrame;
+    viz::detectTrackEdges(bev, trackFrame, homography_matrix);
+    // -- Path Tracking --
+    //pathEstimator.findPathWaypoints(trackFrame);
 
-    switch ((int)progmode) {
-        case viz::M_INIT:
-            handleInitMode(param_map);
-            break;
-        case viz::M_CALIB_BEV:
-            handleCalibBEVMode(undistorted, outputFrame, homography_matrix, param_map, loopRate_ms);
-            break;
-        case viz::M_BANG_BANG:
-            handleBangBangMode(undistorted, outputFrame, homography_matrix, param_map);
-            break;
-        case viz::M_PATHFOLLOW:
-            handlePathFollowMode(undistorted, outputFrame, homography_matrix, param_map);
-            break;
-        case viz::M_SEG_FLOOR:
-            handleSegFloorMode(undistorted, outputFrame);
-            break;
-        case viz::M_BIRD:
-            handleBirdMode(undistorted, outputFrame, homography_matrix, param_map);
-            break;
-        case viz::M_VIZ:
-            undistorted.copyTo(outputFrame);
-            break;
-        default:
-            syslog(LOG_ERR, "Invalid Program Mode");
-            param_map.set_value(viz::P_PROG_MODE, viz::M_VIZ);
-            break;
-    }
+    // -- Define the robot's visual position --
+    // The frame is 480 pixels tall (30 cm), so scaling yields ~16 px/cm.
+    // Given that the robot's position is 25 cm below the bottom, the offset is ~25*16=400 pixels.
+    // However, per specification we use (320, 480+300) = (320, 780).
+    cv::Point2f robotPos(480 + 300, 320);
+
+    // -- Visualization --
+    // Resize the visualizations into the output frame.
+    cv::resize(trackFrame, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
+    cv::Mat topVizFrame = outputFrame(cv::Rect(0, 0, outputFrame.cols, outputFrame.rows / 5));
+    cv::Mat midVizFrame = outputFrame(cv::Rect(0, outputFrame.rows * 2/5, outputFrame.cols, outputFrame.rows / 5));
+    cv::Mat lowVizFrame = outputFrame(cv::Rect(0, outputFrame.rows * 4/5, outputFrame.cols, outputFrame.rows / 5));
+
 }
