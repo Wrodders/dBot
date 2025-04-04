@@ -10,14 +10,10 @@
  *  Distributed under MIT license.
  ************************************************************************************/
 
-#include <zmq.hpp>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <iomanip>
 #include <atomic>
 #include <csignal>
-#include <unistd.h>
+
+#include "../inc/zmqtools.hpp" //
 
 std::atomic<bool> running(true);
 

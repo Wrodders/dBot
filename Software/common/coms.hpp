@@ -16,19 +16,20 @@ Pub-RPC Specification Protocol Frame Structure
 Note that Command and Telemetry messages are framed differently
 */
 
-#include "common.hpp"
-
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
 #include <fstream>
 #include <atomic> 
-#include <exception>
+
+#include <zmq.hpp>
 #include <nlohmann/json.hpp>
 
-
-
 using json = nlohmann::json;
+
+std::string timestamp() {
+    return std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+}
 
 struct TopicInfo{
     uint8_t ID;
@@ -104,8 +105,6 @@ class PubMap {
         const std::string get_topic_name(uint8_t id) const {
             return (id < topics_by_id.size()) ? topics_by_id[id].name : "";
         }   
-
-
     };
     
 

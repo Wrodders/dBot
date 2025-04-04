@@ -36,7 +36,7 @@ std::vector<Peak> identifyPeakCandidates(const std::array<float, 640>& hist, flo
     std::vector<Peak> candidates;
     int lengthHist = hist.size();
 
-    for (size_t i = 1; i + 1 < lengthHist; ++i) {
+    for (int i = 1; i + 1 < lengthHist; ++i) {
         float val = hist[i];
         // Check if current point is a local peak and above the noise floor.
         if (val > hist[i - 1] && val > hist[i + 1] && val > noiseFloor) {
@@ -58,7 +58,7 @@ std::vector<Peak> identifyPeakCandidates(const std::array<float, 640>& hist, flo
             float rightValleyVal = (rightValleyIdx < lengthHist - 1) ? hist[rightValleyIdx] : 0.0f;
             float prominence = val - std::max(leftValleyVal, rightValleyVal); // Topographic prominence
 
-            Peak peak = {static_cast<int>(i), val, width, leftValleyIdx, rightValleyIdx, prominence};
+            Peak peak = {i, val, width, leftValleyIdx, rightValleyIdx, prominence};
             candidates.push_back(peak);
         }
     }
@@ -189,11 +189,11 @@ public:
         }
         // --- Smoothing
         // Apply a low-pass filter to the peak index, width, and prominence.
-        peak.index = iir_filter(peak.index, lastPeak.index, 0.8f);
-        peak.width = iir_filter(peak.width, lastPeak.width, 0.8f);
-        peak.prominence = iir_filter(peak.prominence, lastPeak.prominence, 0.8f);
-        peak.leftValleyIdx = iir_filter(peak.leftValleyIdx, lastPeak.leftValleyIdx, 0.8f);
-        peak.rightValleyIdx = iir_filter(peak.rightValleyIdx, lastPeak.rightValleyIdx, 0.8f);
+        peak.index = iir_lpf(peak.index, lastPeak.index, 0.8f);
+        peak.width = iir_lpf(peak.width, lastPeak.width, 0.8f);
+        peak.prominence = iir_lpf(peak.prominence, lastPeak.prominence, 0.8f);
+        peak.leftValleyIdx = iir_lpf(peak.leftValleyIdx, lastPeak.leftValleyIdx, 0.8f);
+        peak.rightValleyIdx = iir_lpf(peak.rightValleyIdx, lastPeak.rightValleyIdx, 0.8f);
         // Update the last known peak.
         lastPeak = peak;
         return peak;

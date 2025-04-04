@@ -16,10 +16,9 @@
 #include <zmq.hpp>
 #include <syslog.h>
 
+#include "../common/common.hpp"
 #include "../common/coms.hpp"
-
 #include "../inc/calibration.hpp"
-
 #include "../inc/peakTracker.hpp"
 
 
@@ -72,7 +71,7 @@ WallDetection estimateWallHorizon(const cv::Mat& y_plane) {
         median_horizon = std::clamp(median_horizon, 0.0f, static_cast<float>(y_plane.rows) / 5); // Clamp to valid range
         static float prev_horizon = median_horizon;
         
-        float horz_lpf = iir_filter(median_horizon, prev_horizon, 0.2f);
+        float horz_lpf = iir_lpf(median_horizon, prev_horizon, 0.2f);
         prev_horizon = horz_lpf; // Update the previous horizon value for the next iteration
 
         // Estimate wall angle using linear regression
@@ -91,7 +90,7 @@ WallDetection estimateWallHorizon(const cv::Mat& y_plane) {
             float angle = 0.0f;
             angle = std::atan2(line[1], line[0]) * 180.0f / M_PI; // Calculate angle in radians
             angle = std::clamp(angle, -5.0f, 5.0f); // Limit angle 
-            float angle_lpf = iir_filter(angle, current_angle, 0.1f);  // Low-pass filter the angle
+            float angle_lpf = iir_lpf(angle, current_angle, 0.1f);  // Low-pass filter the angle
             current_angle = angle_lpf; // Update the static variable
         }
 
@@ -115,18 +114,17 @@ void extractFloorPlane(const cv::Mat& y_plane, cv::Mat& floor_frame) {
                    cv::INTER_AREA, cv::BORDER_CONSTANT, cv::Scalar(0));
 }
 
-// Find track estimate using homography transformation
-void detectTrackEdges(const cv::Mat& roiFrame, cv::Mat& edges, const cv::Mat& homography) {
+void detectTrackEdges(const cv::Mat& frame, cv::Mat& edges) {
     // ------- Edge Detection ------- //
-    //cv::GaussianBlur(roiFrame, edges, cv::Size(5, 21), 0);
-    cv::Sobel(roiFrame, edges, CV_8U, 1, 0, 3, 2, 0, cv::BORDER_DEFAULT);
+    //cv::GaussianBlur(frame, edges, cv::Size(5, 21), 0);
+    cv::Sobel(frame, edges, CV_8U, 1, 0, 3, 2, 0, cv::BORDER_DEFAULT);
     cv::medianBlur(edges, edges, 5);
     //  mask warped img boundaries edges fromm sobel
     std::vector<cv::Point> contour = {
         cv::Point(10, 0),
-        cv::Point(roiFrame.cols-10, 0),
-        cv::Point(roiFrame.cols/2 +200, roiFrame.rows),
-        cv::Point(roiFrame.cols/2 -200, roiFrame.rows)
+        cv::Point(frame.cols-10, 0),
+        cv::Point(frame.cols/2 +200, frame.rows),
+        cv::Point(frame.cols/2 -200, frame.rows)
     };
 
     cv::line(edges, contour[0], contour[3], cv::Scalar(0), 30);
@@ -197,5 +195,160 @@ void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float 
 }
 
 } // namespace viz
+
+
+namespace nav {
+
+struct Trajectory {
+    float w_rate;
+    float speed;
+};
+
+std::queue<Trajectory> _twist_queue;
+std::mutex _twist_mutex;
+std::condition_variable _twist_cv;
+
+//@Brief: Simple Point Tracking Algorithm - Bang Bang
+//@Description: Computes the cross-track error based on the histogram of the image
+//              Sets angular velocity opposing the error. 
+//@Note        Sets linear velocity to max speed parameter
+void bangbang(const int peakIdx, const float maxSpeed, ParameterMap& param_map) {
+    float crossTrackError = 320 - peakIdx;
+    crossTrackError /= 320 / 2; // Normalize error
+
+    // PID state variables
+    static float lastError = 0.0f;
+    static float integral = 0.0f;
+    static auto lastTime = std::chrono::steady_clock::now();
+    // Get time delta
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<float> elapsedTime = now - lastTime;
+    float dt = elapsedTime.count();
+    lastTime = now;
+    float Kp, Ki, Kd;
+    (void) param_map.get_value(viz::P_KP, Kp);
+    (void) param_map.get_value(viz::P_KI, Ki);
+    (void) param_map.get_value(viz::P_KD, Kd);
+    // PID parameters
+
+    // PID calculations
+    integral += crossTrackError * dt;               // Accumulate integral
+    integral = std::clamp(integral, -0.5f, 0.5f); // Limit integral
+    float derivative = (crossTrackError - lastError) / dt; // Calculate derivative
+    lastError = crossTrackError;
+
+    float controlSignal = (Kp * crossTrackError) + (Ki * integral) + (Kd * derivative);
+    controlSignal = std::clamp(controlSignal, -0.6f, 0.6f); // Limit output
+
+    // Construct trajectory command
+    struct Trajectory twist = {.w_rate = -controlSignal, .speed = maxSpeed};
+
+    // Push to control queue
+    {
+        std::unique_lock<std::mutex> lock(_twist_mutex);
+        _twist_queue.push(twist);
+    }
+    _twist_cv.notify_one();
+}
+
+//@Brief: Slows down speed based on curve width and confidance, 
+void slowOnCurves(const int peakIdx, const int curveWidth, const int curveConfidance, ParameterMap& param_map) {
+    // Normalize the cross-track error to -1 to 1
+    float crossTrackError = viz::WIDTH / 2 - peakIdx;
+    crossTrackError /= viz::WIDTH / 2;
+    crossTrackError = std::clamp(crossTrackError, -0.2f, 0.2f);
+    bool trackLost = (curveConfidance < 55 || curveWidth > 600);
+    // Trajectory object to hold speed and w_rate
+    Trajectory twist;
+    if (trackLost) {
+        // If track is lost, stop movement and set no rotation
+        twist.w_rate = 0.0f;
+        twist.speed = 0.0f;
+    } else {    
+        float curveFactor =  curveWidth / 600.0f;  // normalize to 0-1
+        float confidenceFactor = curveConfidance / 200.0f;
+        float maxSpeed;
+        (void) param_map.get_value(viz::P_MAX_VEL, maxSpeed);
+
+        twist.speed = maxSpeed * (1 - curveFactor) * confidenceFactor;
+        twist.speed = std::clamp(twist.speed, 0.0f, maxSpeed);
+        twist.w_rate = -crossTrackError;      
+    }
+    // Push the trajectory twist to the queue for the robot control
+    {
+        std::unique_lock<std::mutex> lock(_twist_mutex);
+        _twist_queue.push(twist);
+        lock.unlock();
+        _twist_cv.notify_one();
+    }
+}
+
+
+// @brief: pure pursuit algorithm
+
+//@brief: Trajectory Generation Server
+//@description: Publishes twist trajectory commands 
+void trajGenServer(){
+    zmq::context_t context(1);
+    zmq::socket_t traj_pubsock(context, zmq::socket_type::pub);
+    traj_pubsock.set(zmq::sockopt::linger, 0);
+    traj_pubsock.bind("ipc:///tmp/vizcmds");
+    while(true){
+        std::unique_lock<std::mutex> lock(_twist_mutex);
+        _twist_cv.wait(lock, []{return !_twist_queue.empty();});
+        Trajectory twist = _twist_queue.front();
+        _twist_queue.pop();
+        lock.unlock();
+        // Build command messages
+        std::string msg = "<BR" + std::to_string(twist.w_rate) + "\n";
+        traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
+        traj_pubsock.send(zmq::message_t(msg.c_str(), msg.size()), zmq::send_flags::none);
+        std::string msg2 = "<BM" + std::to_string(twist.speed) + "\n";
+        traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
+        traj_pubsock.send(zmq::message_t(msg2.c_str(), msg2.size()), zmq::send_flags::none);
+    }   
+}
+
+    }
+
+
+namespace cmd {
+//@brief: Command Server
+//@description: Listens for commands on the VISION topic over TCP and IPC; publishes command responses to the VISION topic over TCP
+void command_server(ParameterMap& param_map) {
+    syslog(LOG_INFO, "Starting Command Server");
+    Protocol _proto = { '<', '\n', ':', 'A' };
+    CommandMsg recv_cmd_msg;
+    zmq::context_t context(1);
+
+    zmq::socket_t cmd_subsock(context, zmq::socket_type::sub);
+    cmd_subsock.set(zmq::sockopt::linger, 0);
+    cmd_subsock.set(zmq::sockopt::subscribe, "VISION");
+    cmd_subsock.connect("ipc:///tmp/botcmds");
+    syslog(LOG_INFO, "Subscribed Cmd Server to ipc:///tmp/botcmds");
+
+    zmq::socket_t msg_pubsock(context, zmq::socket_type::pub);
+    msg_pubsock.set(zmq::sockopt::linger, 0);
+    msg_pubsock.bind("ipc:///tmp/botmsgs");
+    syslog(LOG_INFO, "Bound Msg Server to ipc:///tmp/botmsgs");
+
+    while (!viz::_exit_trig) {
+        coms_receive_asciicmd(cmd_subsock, recv_cmd_msg);
+        coms_handle_cmd(recv_cmd_msg, msg_pubsock, param_map, _proto, "VISION");
+    }
+    syslog(LOG_INFO, "Exiting Command Server");
+    context.close();
+    viz::_exit_trig.store(true);
+}
+
+// -------------- Parameter Validation -------------- //
+static inline bool val_hrz_height(float val) { return (val > 0 && val < viz::HEIGHT); }
+static inline bool val_trfm_pad(float val)   { return (val > 0 && val < viz::WIDTH); }
+static inline bool val_prog_mode(float val)  { return (val >= 0 && val < viz::NUM_MODES); }
+static inline bool val_max_vel(float val)    { return (val >= 0 && val < 1); }
+static inline bool val_nav_en(float val)     { return (static_cast<int>(val) % 2 == 0 || static_cast<int>(val) % 2 == 1); } // test if 0 or 1
+static inline bool val_kp(float val)        { return (val >= 0 && val < 100); } // test if 0 or 1
+
+} // namespace cmd
 
 #endif // VISION_HPP
