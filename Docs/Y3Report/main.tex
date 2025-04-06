@@ -367,19 +367,21 @@
 
 
     \section{System Design}
+        The Robot must be designed to approximate the wheel inverted pendulum system, many authors 
+        construct demonstrators supporting a mass with a structure of lead screw. This allows for experimentation 
+        with the systems center of mass and is simple to construct. A proof of concept system was developed in this manner, 
+        however the exposed electronics were susceptible to damage during tuning of the balance and navigation algorithms.
+
+        As such the TWSB body is 3D printed out of PLA plastic in 3 parts for minimal assembly.
+        The battery pack is quickly swappable and both it and the electronics sub assembly 
+        are soft-mounted in a roll cage like housing for protection against impacts. 
+        The wheels are protected by wheel arches which serve to minimize risk of damage to the motor. 
+        Wiring harnesses are routed through channels to minimize snagging and disconnection from vibrations.
+        
         \begin{figure}[H]
             \includegraphics[width=\textwidth]{DesingImgs/bBot Drawing v3.pdf}
             \caption{CAD Drawing of the TWSB system dimensions in mm}
             \label{fig:CAD}
-        \end{figure}
-
-        The TWSB body is 3D printed out of PLA plastic in 3 parts for minimal assembly.
-        The battery pack is quickly swappable and both it and the electronics sub assembly 
-        are soft-mounted in a roll cage like housing for protection against impacts. 
-        \begin{figure}[H]
-            \centering
-            \includegraphics[width=0.55\textwidth]{Diagrams/SystemOverview.pdf}
-            \caption{System Overview}
         \end{figure}
 
         Two brushed DC motors are powered by an H-Bridge IC, DRV7783. 
@@ -414,16 +416,14 @@
         libopencm3 project \cite{BeginningSTM32} as an exercise in low level programming. 
         No dynamic memory allocation is used.
         The resultant binary is 19KB with 892B of RAM used.
-        A simplified sprintf function from [] is the only external dependency.
-        The MCU also presents the same RPC interface over uart serial link.
-        This executes commands and publishes telemetry at 100Hz.
-
+       
         The data-acquisition system obtains a timestamped sample of the 
-        telemetry values transmitted by the MCU through a serial link.
-        This can result in non-uniformly sampled data as parsing the UART IO buffer 
+        telemetry values transmitted by the MCU through a serial link, which 
+        RPC interface over uart at 230400 baud, 
+        it executes commands and publishes telemetry packets at 100Hz.
+        Parsing the UART IO buffer can result in non-uniformly sampled data as it
         is constrained by the OS scheduler, thus an event driven system is used to 
-        minimize CPU overhead. Worst case jitter is observed, under CPU stress 
-        tests to be 0.1ms. This is acceptable for telemetry data. 
+        minimize CPU overhead.
         \pagebreak{}
         \subsubsection{Parameters }
         The system parameters are given in table(1). 
@@ -952,6 +952,8 @@
         effective and simple to impellent, however discards a large portion of the information available in the image. 
         Similar perforce is achieved by \cite{ghani2011two} with optical sensors. 
 
+
+
         \subsection{Camera Sensor}
         Geometric information about the track can be observed from a camera sensor mounted on the TWSB robot.
         This obtains a discreet 2D projection of the environment in the form of a matrix of pixels, each of which encodes 
@@ -1090,38 +1092,93 @@
         The procedure is shown in Fig.\ref{fig:VizNavigation} where the image is split into 3 sections, thus obtaining points at different lookahead distances 
         on the track. 
 
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.6\textwidth]{Diagrams/VIzNav.pdf}
+            \caption{vision System}
+            \label{fig:Vision}
+        \end{figure}
+
         A baseline algorithm reactively changes the steering angel based on the peak obtained closet to the robot, at the bottom of the image frame.  
         A more advanced algorithm makes use of the other peaks to determine the curvature of the track, from which a pure pursuit controller is used to
         determine the steering angle, as shown in Fig.\ref{fig:PurePersuit}.
 
 
-
-
-        \begin{figure}[H]
-            \centering
-            \begin{subfigure}[b]{0.6\textwidth}
-                \includegraphics[width=\textwidth]{Diagrams/VIzNav.pdf}
-                \caption{VizNavigation System}
-                \label{fig:Vision}
-            \end{subfigure}
-            \hfill
-            \begin{subfigure}[b]{0.35\textwidth}
-                \includegraphics[width=0.8\textwidth]{Diagrams/PurePersuit.pdf}
-                \caption{Local Path Following}
-                \label{fig:PurePersuit}
-            \end{subfigure}
-            \caption{Navigation System}
-            \label{fig:NavigationSystem}
-        \end{figure}
-
+        
 
         \subsection{Navigation requirements}
 
 
 
         \subsection{Racing Algorithms}
+            \subsubsection{Intensity Following}
+            A bang bang type steering controller is used obtain a baseline track performance. 
+            This is a reactive controller which uses the cross track error, obtained via a topological peak tracker as described in section 6.2.
+            In this case the velocity target of the robot is set to some constant value. 
+            The virtual sensor is applied to a small section of the bottom of the image frame, representing points on the track which are closest to the robot. 
+            This manages to navigate the track without loosing it on straights and gentle curves, however it is suffers on
+            sharp sequences of curves, chicanes, where the track in the observed section is lost. In this case, by rolling off the last known position 
+            of the track towards the center of the image, and setting the velocity target to zero, the robot is able to navigate the track past the chicane.
+            
+            The robots telemetry is used to build and odometry estimate of the track for a series of experiments, Fig.\ref{fig:TrajTrack} shows that suffers 
+            from oscillations along the straights and overshoots on the curves, here the bold lines represent the estimated robot position, $(x_g, y_g)$, and the
+            translucent fill represents the vector of the robot's heading each sample instant $\psi_g$. 
+        
+            \begin{figure}[H]
+                \centering
+                \begin{subfigure}[c]{0.35\textwidth}
+                    \includegraphics[height=1.2\textwidth]{Track.pdf}
+                    \caption{Race Track}
+                \end{subfigure}
+                \hfill
+                \begin{subfigure}[c]{0.6\textwidth}
+                    \includegraphics[width=\textwidth]{Graphs/Path Following.pdf}
+                    \caption{Map built offline using dead reckoning}
+                \end{subfigure}
+                \caption{Trajectory Tracking and Map Visualization}
+                \label{fig:TrajTrack}
+            \end{figure}
+            From these laps, described in table \ref{tab:lap_stats} variance of the change in steering control vector between samples is small 
+            but increases with speed, together with the large overshoots in heading vector from Fig.\ref{fig:TrajTrack} this indicates 
+            that the robots tracking performance is degraded by non smooth control signals, inducing in large overshoots, where the robot is 
+            unable to catch up to the curvature of the track.
+            The bang bang nature of this controller can also be seen 
+            on the straights, where the control angle oscillates about the centerline. 
+            The linear velocity measured also increases in variance with the setpoint speed, this is due to 
+            the steering controller model in Fig.\ref{fig:PID}. 
+            \begin{table}[h]
+                \centering
+                \begin{tabular}{cccc}
+                    \toprule
+                    \textbf{Time (s)} & $\nu_{trgt}$ \textit{(m/s)} & $\nu_g$ \textit{var}& $\Delta\psi$ \textit{var} \\  
+                    \midrule
+                    40.59 & 0.190 & 0.0112 & 1.0207 \\  
+                    32.00 & 0.240 & 0.0122 & 1.4781 \\  
+                    27.00 & 0.280 & 0.0093 & 1.4958 \\  
+                    27.20 & 0.300 & 0.0105 & 1.6750 \\  
+                    22.80 & 0.350 & 0.0140 & 1.6480 \\  
+                    \bottomrule
+                \end{tabular}
+                \caption{Lap Statistics}
+                \label{tab:lap_stats}
+            \end{table}
 
-        \subsection{Predictive Trajectory Generation}
+
+            Yet, neglecting errors in path following accuracy, this method is still able to perform laps of the track 
+            without loosing the line or crashing into the wall boundary. The is can be attributed to 
+            the implicit loop ahead in the vision system, shown in Fig.\ref{fig:PurePersuit}, where the the bottom of the image frame 
+            captures the track some distance ahead of the robot.
+            
+            \subsubsection{Waypoint Following}
+
+            \begin{figure}[h]
+                \centering
+                \includegraphics[width=0.6\textwidth]{Diagrams/PurePersuit.pdf}
+                \caption{Local Path Following}
+                \label{fig:PurePersuit}
+            \end{figure}
+
+            \subsubsection{Predictive Trajectory Generation}
     
     \pagebreak{}
 
@@ -1130,38 +1187,7 @@
   \section{Results and discussion} % edit section heading as appropriate
     \subsection{Balance Performance}
     \subsection{Line Following}
-    \begin{figure}[H]
-        \centering
-        \begin{subfigure}[c]{0.35\textwidth}
-            \includegraphics[height=1.3\textwidth]{Track.pdf}
-            \caption{Race Track}
-        \end{subfigure}
-        \hfill
-        \begin{subfigure}[c]{0.6\textwidth}
-            \includegraphics[width=\textwidth]{Graphs/Path Following.pdf}
-            \caption{Map built offline using dead reckoning}
-        \end{subfigure}
-        \caption{Trajectory Tracking and Map Visualization}
-        \label{fig:TrajTrack}
-    \end{figure}
-
-    \begin{table}[h]
-        \centering
-        \begin{tabular}{cccc}
-            \toprule
-            \textbf{Time (s)} & $\nu_{trgt}$ \textit{(m/s)} & $\nu_g$ \textit{var}& $\Delta\psi$ \textit{var} \\  
-            \midrule
-            40.59 & 0.1900 & 0.0112 & 1.0207 \\  
-            32.00 & 0.2400 & 0.0122 & 1.4781 \\  
-            27.00 & 0.2800 & 0.0093 & 1.4958 \\  
-            27.20 & 0.3000 & 0.0105 & 1.6750 \\  
-            22.80 & 0.3500 & 0.0140 & 1.6480 \\  
-            \bottomrule
-        \end{tabular}
-        \caption{Lap Statistics}
-        \label{tab:lap_stats}
-    \end{table}
-
+   
 
     \subsection{More detail}
     \subsection{Summary}
