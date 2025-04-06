@@ -6,7 +6,7 @@
 #include <algorithm> 
 #include <numeric>
 
-namespace pkt{
+namespace pk{
 
     // ****************************** Peak Tracking ****************************** //
 struct Peak{
@@ -16,26 +16,40 @@ struct Peak{
     int leftValleyIdx;
     int rightValleyIdx;
     float prominence;
-};
 
+    Peak() : index(320), value(0.0f), width(0), leftValleyIdx(0), rightValleyIdx(0), prominence(0.0f) {}
+};
 
 // Computes the histogram from a ROI of the edge image,
 // normalizes it to 0-255 and applies Gaussian blur to reduce high-frequency noise.
-void computeLineTrend(const cv::Mat& edges, const cv::Rect& roi, const std::array<float, 640>& hist) {
-    cv::Mat section = edges(roi);
-    // Sum vertically to collapse the ROI into a single row histogram.
-    cv::reduce(section, hist, 0, cv::REDUCE_SUM, CV_32F);
-    cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);  // Normalize to 0-255 range
-    cv::GaussianBlur(hist, hist, cv::Size(21, 1), 0, 0);   // Reduce positional high-frequency noise
+struct LineTrend{
+    float median;
+    float max;
+    int index;
+};
+struct LineTrend computeLineTrend(const cv::Mat& frame, std::array<float, 640>& trend) {
+    struct LineTrend lineTrend;
+    cv::Mat hist(640, 1, CV_32F, cv::Scalar(0));
+    cv::reduce(frame, hist, 0, cv::REDUCE_SUM, CV_32F);
+    cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);
+    cv::Point est;
+    cv::minMaxLoc(hist, nullptr, nullptr, nullptr, &est);
+    std::array<float, 640> histSorted = hist;
+    std::sort(histSorted.begin(), histSorted.end());
+    lineTrend.median = histSorted[histSorted.size() / 2];
+    lineTrend.max = histSorted.back();
+    lineTrend.index = est.x;
+    for (int i = 0; i < hist.cols; ++i) {
+        trend[i] = hist.at<float>(i);
+    }
+    return lineTrend;
 }
-
 
 //@Brief: Finds Peaks Above the Noise Floor
 //@Description: Searches around Local Peaks in the histogram to find valleys
 std::vector<Peak> identifyPeakCandidates(const std::array<float, 640>& hist, float noiseFloor) {
     std::vector<Peak> candidates;
     int lengthHist = hist.size();
-
     for (int i = 1; i + 1 < lengthHist; ++i) {
         float val = hist[i];
         // Check if current point is a local peak and above the noise floor.
@@ -50,21 +64,24 @@ std::vector<Peak> identifyPeakCandidates(const std::array<float, 640>& hist, flo
             while (rightValleyIdx + 1 < lengthHist && hist[rightValleyIdx] > noiseFloor) {
                 rightValleyIdx++;
             }
-
-            int width = rightValleyIdx - leftValleyIdx;
-
+            int width = std::abs(rightValleyIdx - leftValleyIdx);
+            
             // Determine valley values (handling edge cases)
             float leftValleyVal = (leftValleyIdx > 0) ? hist[leftValleyIdx] : 0.0f;
             float rightValleyVal = (rightValleyIdx < lengthHist - 1) ? hist[rightValleyIdx] : 0.0f;
-            float prominence = val - std::max(leftValleyVal, rightValleyVal); // Topographic prominence
-
-            Peak peak = {i, val, width, leftValleyIdx, rightValleyIdx, prominence};
+            float prominence = val - std::max(leftValleyVal, rightValleyVal); // Topographic prominence to the left and right valleys
+            Peak peak;
+            peak.index = i;
+            peak.value = val;
+            peak.width = width;
+            peak.leftValleyIdx = leftValleyIdx;
+            peak.rightValleyIdx = rightValleyIdx;
+            peak.prominence = prominence;
             candidates.push_back(peak);
         }
     }
     return candidates;
 }
-
 
 // Analyze candidate peaks to compute the mean prominence and dynamic range.
 std::tuple<float, float> analyzePeaks(const std::vector<Peak>& candidates) {
@@ -89,7 +106,6 @@ struct Peak findDominantPeak(
     float meanProminence, int lastPeakIndex)
 {
     if (candidates.empty()) {return Peak{};}
-
     // Group peaks that are near each other (within 10 indices).
     std::vector<std::vector<Peak>> peakGroups;
     std::vector<Peak> currentGroup;
@@ -139,7 +155,6 @@ struct Peak findDominantPeak(
             break;
         }
     }
-
     // If the selected peak's value is notably less than the maximum in the histogram,
     // assume a significant track change this is potentially a false peak.
     double minVal, histMax;
@@ -150,14 +165,13 @@ struct Peak findDominantPeak(
             return Peak{};
         }
     }
-    Peak bestPeak = {
-        static_cast<int>(bestIndex),
-        candidateVal,
-        bestWidth,
-        filteredCandidates[0].leftValleyIdx,
-        filteredCandidates[0].rightValleyIdx,
-        bestProminence
-    };
+    Peak bestPeak;
+    bestPeak.index = static_cast<int>(bestIndex);
+    bestPeak.value = static_cast<float>(candidateVal);
+    bestPeak.width = static_cast<int>(bestWidth);
+    bestPeak.leftValleyIdx = static_cast<int>(filteredCandidates[0].leftValleyIdx);
+    bestPeak.rightValleyIdx = static_cast<int>(filteredCandidates[0].rightValleyIdx);
+    bestPeak.prominence = static_cast<float>(bestProminence);
     return bestPeak;
 }
 
@@ -166,41 +180,28 @@ struct Peak fallbackFullScan(const std::array<float, 640>& hist, float meanPromi
     auto candidates = identifyPeakCandidates(hist, 0.5f * meanProminence); // lower the threshold
     return findDominantPeak(hist, candidates, meanProminence, lastPeakIndex);
 }
-// --- PeakTracker Class ---
+
 class PeakTracker {
 public:
     // Initializes the tracker with the histogram width and starting position.
-    PeakTracker(int histCols)
-        :   lastPeak{histCols / 2, 0.0f, 0, 0, 0, 0.0f}{}
-
-    Peak topologicalPeakTrack(const cv::Mat& edges, const cv::Rect& roi, std::array<float, 640>& hist) {
-        computeLineTrend(edges, roi, hist);
-        // Compute the noise floor as the median of the histogram values.
-        std::array<float, 640> histSorted = hist;
-        std::sort(histSorted.begin(), histSorted.end());
-        float medianNoiseFloor = histSorted[histSorted.size() / 2];
-        // Identify candidate peaks.
-        std::vector<Peak> candidates = identifyPeakCandidates(hist, medianNoiseFloor*1.5f);
+    PeakTracker() : hist_trend{} {
+        std::fill(hist_trend.begin(), hist_trend.end(), 0.0f);
+    }
+    Peak topologicalPeakTrack(const cv::Mat& frame, const Peak& lastPeak) {
+        struct LineTrend line_trend = computeLineTrend(frame, hist_trend);
+        float medianNoiseFloor = line_trend.median;
+        std::vector<Peak> candidates = identifyPeakCandidates(hist_trend, medianNoiseFloor*8);
         auto [meanProminence, peakDynamicRange] = analyzePeaks(candidates);
         // First attempt: search near the last known peak.
-        struct Peak peak = findDominantPeak(hist, candidates, meanProminence, lastPeak.index);
+        struct Peak peak = findDominantPeak(hist_trend, candidates, meanProminence, lastPeak.index);
         if (peak.prominence == 0) {
-            peak = fallbackFullScan(hist, meanProminence, lastPeak.index);
+            peak = fallbackFullScan(hist_trend, meanProminence, lastPeak.index);
         }
-        // --- Smoothing
-        // Apply a low-pass filter to the peak index, width, and prominence.
-        peak.index = iir_lpf(peak.index, lastPeak.index, 0.8f);
-        peak.width = iir_lpf(peak.width, lastPeak.width, 0.8f);
-        peak.prominence = iir_lpf(peak.prominence, lastPeak.prominence, 0.8f);
-        peak.leftValleyIdx = iir_lpf(peak.leftValleyIdx, lastPeak.leftValleyIdx, 0.8f);
-        peak.rightValleyIdx = iir_lpf(peak.rightValleyIdx, lastPeak.rightValleyIdx, 0.8f);
-        // Update the last known peak.
-        lastPeak = peak;
         return peak;
     }
 
 private:
-    Peak lastPeak;
+    std::array<float, 640> hist_trend;
 };
 }
 

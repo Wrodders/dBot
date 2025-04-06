@@ -22,6 +22,7 @@
 #include "../inc/peakTracker.hpp"
 
 
+//*************************** Vision **************************************** */
 namespace viz {
 
 const char* NODE_NAME = "VISION";
@@ -114,11 +115,8 @@ void extractFloorPlane(const cv::Mat& y_plane, cv::Mat& floor_frame) {
                    cv::INTER_AREA, cv::BORDER_CONSTANT, cv::Scalar(0));
 }
 
-void detectTrackEdges(const cv::Mat& frame, cv::Mat& edges) {
-    // ------- Edge Detection ------- //
-    //cv::GaussianBlur(frame, edges, cv::Size(5, 21), 0);
-    cv::Sobel(frame, edges, CV_8U, 1, 0, 3, 2, 0, cv::BORDER_DEFAULT);
-    cv::medianBlur(edges, edges, 5);
+
+void maskWarpBorder(cv::Mat& frame){
     //  mask warped img boundaries edges fromm sobel
     std::vector<cv::Point> contour = {
         cv::Point(10, 0),
@@ -126,63 +124,16 @@ void detectTrackEdges(const cv::Mat& frame, cv::Mat& edges) {
         cv::Point(frame.cols/2 +200, frame.rows),
         cv::Point(frame.cols/2 -200, frame.rows)
     };
-
-    cv::line(edges, contour[0], contour[3], cv::Scalar(0), 30);
-    cv::line(edges, contour[1], contour[2], cv::Scalar(0), 30); // Mask warped img boundaries
+    cv::line(frame, contour[0], contour[3], cv::Scalar(0), 30);
+    cv::line(frame, contour[1], contour[2], cv::Scalar(0), 30); // Mask warped img boundaries
 }
 
-class PathEstimator {
-public:
-    PathEstimator() :
-        topTracker(640), midTracker(640), lowTracker(640),
-        top_pathTrend{0}, mid_pathTrend{0}, low_pathTrend{0},
-        topRoi(cv::Rect(0, 0, 640, 480 / 5)),
-        midRoi(cv::Rect(0, 480 * 2 / 5, 640, 480 / 5)),
-        lowRoi(cv::Rect(0, 480 * 4 / 5, 640, 480 / 5)) {
-        }
-    void findPathWaypoints(const cv::Mat& trackFrame){
-        // -- Waypoint Detection -
-        pkt::Peak topPeak = topTracker.topologicalPeakTrack(trackFrame, topRoi, top_pathTrend);
-        pkt::Peak midPeak = midTracker.topologicalPeakTrack(trackFrame, midRoi, mid_pathTrend);
-        pkt::Peak lowPeak = lowTracker.topologicalPeakTrack(trackFrame, lowRoi, low_pathTrend);
-    }
-
-    void findPathArc(){
-        // -- Path Arc Estimation --
-
-    }
-
-    inline const PathArc& getPathArc() const {return pathArc;}
-
-    private:
-        pkt::PeakTracker topTracker;
-        pkt::PeakTracker midTracker;
-        pkt::PeakTracker lowTracker;
-        std::array<float, WIDTH> top_pathTrend;
-        std::array<float, WIDTH> mid_pathTrend;
-        std::array<float, WIDTH> low_pathTrend;
-        const cv::Rect topRoi;
-        const cv::Rect midRoi;
-        const cv::Rect lowRoi;
-        PathArc pathArc;
-};
-
-
 // ******************************* Visualization ******************************* //
-void drawTopology(cv::Mat& subFrame, const std::array<float, WIDTH>& hist, int peakIdx, int peakWidth, float peakProminence, cv::Scalar histColor, cv::Scalar peakColor) {
-    //subFrame.setTo(0);
-    // ------- Visualize Dominant Peak ------- //
+void drawTopology(cv::Mat& subFrame, pk::Peak& peak, cv::Scalar color) {
+    int scaledHeight = static_cast<int>(peak.prominence * subFrame.rows / 255.0f);
+    cv::Rect peakRect(peak.index, subFrame.rows - scaledHeight, peak.width, scaledHeight);
+    cv::rectangle(subFrame, peakRect, color, -1);
 
-    // ------- Visualize Histogram ------- //
-    for (size_t i = 0; i < hist.size(); ++i) {
-        int scaledHeight = static_cast<int>(hist[i] * subFrame.rows / 255.0f);
-        cv::line(subFrame, cv::Point(i, subFrame.rows), cv::Point(i, subFrame.rows - scaledHeight), histColor);    }
-
-    if (peakIdx >= 0) {
-        int scaledProminence = static_cast<int>(peakProminence * subFrame.rows / 255.0f);
-        cv::Rect peakRect(peakIdx - peakWidth / 2, subFrame.rows - scaledProminence, peakWidth, scaledProminence);
-        cv::rectangle(subFrame, peakRect, peakColor, -1);
-    }
 }
 
 void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float drivability) {
@@ -196,98 +147,73 @@ void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float 
 
 } // namespace viz
 
-
-namespace nav {
-
-struct Trajectory {
+// ******************************* Navigation ******************************* //
+namespace nav   {
+struct ControlU {
     float w_rate;
     float speed;
 };
 
-std::queue<Trajectory> _twist_queue;
+std::queue<ControlU> _twist_queue;
 std::mutex _twist_mutex;
 std::condition_variable _twist_cv;
 
-//@Brief: Simple Point Tracking Algorithm - Bang Bang
-//@Description: Computes the cross-track error based on the histogram of the image
-//              Sets angular velocity opposing the error. 
-//@Note        Sets linear velocity to max speed parameter
-void bangbang(const int peakIdx, const float maxSpeed, ParameterMap& param_map) {
-    float crossTrackError = 320 - peakIdx;
-    crossTrackError /= 320 / 2; // Normalize error
 
-    // PID state variables
-    static float lastError = 0.0f;
-    static float integral = 0.0f;
-    static auto lastTime = std::chrono::steady_clock::now();
-    // Get time delta
-    auto now = std::chrono::steady_clock::now();
-    std::chrono::duration<float> elapsedTime = now - lastTime;
-    float dt = elapsedTime.count();
-    lastTime = now;
+class PIDController {
+public:
+    PIDController(float kp, float ki, float kd) : Kp(kp), Ki(ki), Kd(kd) {
+        reset();
+    }
     float Kp, Ki, Kd;
-    (void) param_map.get_value(viz::P_KP, Kp);
-    (void) param_map.get_value(viz::P_KI, Ki);
-    (void) param_map.get_value(viz::P_KD, Kd);
-    // PID parameters
+    void reset() {
+        lastError = 0.0f;
+        integral = 0.0f;
+    }
+    float run(float error) {
+        float dt = getTimeDelta();
+        assert(dt > 0.0f); // Ensure dt is positive
+        return compute(error, dt);
+    }
+private:
+    float lastError = 0.0f;
+    float integral = 0.0f;
+    std::chrono::time_point<std::chrono::steady_clock> lastTime = std::chrono::steady_clock::now();
 
-    // PID calculations
-    integral += crossTrackError * dt;               // Accumulate integral
-    integral = std::clamp(integral, -0.5f, 0.5f); // Limit integral
-    float derivative = (crossTrackError - lastError) / dt; // Calculate derivative
-    lastError = crossTrackError;
+    float getTimeDelta() {
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<float> elapsedTime = now - lastTime;
+        lastTime = now;
+        return elapsedTime.count();
+    }
+    float compute(float error, float dt) {
+        integral += error * dt;
+        integral = std::clamp(integral, -5.0f, 5.0f); // Limit integral saturation
+        float derivative = (error - lastError) / dt;
+        lastError = error;
+        return (Kp * error) + (Ki * integral) + (Kd * derivative);
+    }
+};
+int computeCrossTrackError(int peak_idx) {
+    // Compute the cross-track error
+    int crossTrackError = 320 - peak_idx; // Assuming 320 is the center of the image
+    crossTrackError /= 320 / 2; // Normalize
+    return crossTrackError;
+}
+void point_regulator(const float crossTrackError, const float speed, PIDController& pid, ParameterMap& param_map) {
+    (void) param_map.get_value(viz::P_KP, pid.Kp);
+    (void) param_map.get_value(viz::P_KI, pid.Ki);
 
-    float controlSignal = (Kp * crossTrackError) + (Ki * integral) + (Kd * derivative);
-    controlSignal = std::clamp(controlSignal, -0.6f, 0.6f); // Limit output
-
-    // Construct trajectory command
-    struct Trajectory twist = {.w_rate = -controlSignal, .speed = maxSpeed};
-
-    // Push to control queue
+    float steerControl = std::clamp(pid.run(crossTrackError), -6.0f, 6.0f);
+    // --------- Send Reference signals
+    struct ControlU u = {.w_rate = steerControl, .speed = speed};
     {
         std::unique_lock<std::mutex> lock(_twist_mutex);
-        _twist_queue.push(twist);
+        _twist_queue.push(u);
     }
     _twist_cv.notify_one();
 }
-
-//@Brief: Slows down speed based on curve width and confidance, 
-void slowOnCurves(const int peakIdx, const int curveWidth, const int curveConfidance, ParameterMap& param_map) {
-    // Normalize the cross-track error to -1 to 1
-    float crossTrackError = viz::WIDTH / 2 - peakIdx;
-    crossTrackError /= viz::WIDTH / 2;
-    crossTrackError = std::clamp(crossTrackError, -0.2f, 0.2f);
-    bool trackLost = (curveConfidance < 55 || curveWidth > 600);
-    // Trajectory object to hold speed and w_rate
-    Trajectory twist;
-    if (trackLost) {
-        // If track is lost, stop movement and set no rotation
-        twist.w_rate = 0.0f;
-        twist.speed = 0.0f;
-    } else {    
-        float curveFactor =  curveWidth / 600.0f;  // normalize to 0-1
-        float confidenceFactor = curveConfidance / 200.0f;
-        float maxSpeed;
-        (void) param_map.get_value(viz::P_MAX_VEL, maxSpeed);
-
-        twist.speed = maxSpeed * (1 - curveFactor) * confidenceFactor;
-        twist.speed = std::clamp(twist.speed, 0.0f, maxSpeed);
-        twist.w_rate = -crossTrackError;      
-    }
-    // Push the trajectory twist to the queue for the robot control
-    {
-        std::unique_lock<std::mutex> lock(_twist_mutex);
-        _twist_queue.push(twist);
-        lock.unlock();
-        _twist_cv.notify_one();
-    }
-}
-
-
-// @brief: pure pursuit algorithm
-
-//@brief: Trajectory Generation Server
-//@description: Publishes twist trajectory commands 
+//@brief: ControlU Generation Server
+//@description: Publishes u trajectory commands 
 void trajGenServer(){
     zmq::context_t context(1);
     zmq::socket_t traj_pubsock(context, zmq::socket_type::pub);
@@ -296,22 +222,21 @@ void trajGenServer(){
     while(true){
         std::unique_lock<std::mutex> lock(_twist_mutex);
         _twist_cv.wait(lock, []{return !_twist_queue.empty();});
-        Trajectory twist = _twist_queue.front();
+        ControlU u = _twist_queue.front();
         _twist_queue.pop();
         lock.unlock();
         // Build command messages
-        std::string msg = "<BR" + std::to_string(twist.w_rate) + "\n";
+        std::string msg = "<BR" + std::to_string(u.w_rate) + "\n";
         traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
         traj_pubsock.send(zmq::message_t(msg.c_str(), msg.size()), zmq::send_flags::none);
-        std::string msg2 = "<BM" + std::to_string(twist.speed) + "\n";
+        std::string msg2 = "<BM" + std::to_string(u.speed) + "\n";
         traj_pubsock.send(zmq::message_t("TWSB", 5), zmq::send_flags::sndmore);
         traj_pubsock.send(zmq::message_t(msg2.c_str(), msg2.size()), zmq::send_flags::none);
     }   
 }
 
-    }
-
-
+}   // namespace nav
+// ******************************* Command Server ******************************* //
 namespace cmd {
 //@brief: Command Server
 //@description: Listens for commands on the VISION topic over TCP and IPC; publishes command responses to the VISION topic over TCP
@@ -347,7 +272,7 @@ static inline bool val_trfm_pad(float val)   { return (val > 0 && val < viz::WID
 static inline bool val_prog_mode(float val)  { return (val >= 0 && val < viz::NUM_MODES); }
 static inline bool val_max_vel(float val)    { return (val >= 0 && val < 1); }
 static inline bool val_nav_en(float val)     { return (static_cast<int>(val) % 2 == 0 || static_cast<int>(val) % 2 == 1); } // test if 0 or 1
-static inline bool val_kp(float val)        { return (val >= 0 && val < 100); } // test if 0 or 1
+static inline bool val_gain(float val)       { return (val >= 0 && val < 100); }
 
 } // namespace cmd
 

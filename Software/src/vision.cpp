@@ -45,10 +45,13 @@
 
 void handleInitMode(ParameterMap& param_map);
 void handleCalibBEVMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, int& loopRate_ms);
-void handlePathFollowMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, viz::PathEstimator& pathEstimator);
 void handleSegFloorMode(const cv::Mat& undistorted, cv::Mat& outputFrame);
 void handleBirdMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map);
-void handleBangBangMode(const cv::Mat& undistorted, cv::Mat& outputFrame, ParameterMap& param_map);
+
+void handleAlgo1(const cv::Mat& undistorted, cv::Mat& outputFrame, ParameterMap& param_map);
+void handleAlgo2(const cv::Mat& undistorted, cv::Mat& outputFrame, ParameterMap& param_map);
+void handleAlgo3(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map);
+
 
 struct PerfMetrics {
     long loop_count = 0;
@@ -97,9 +100,9 @@ int run(int argc, char* argv[]) {
     param_map.register_parameter(viz::P_LOOK_HRZ_HEIGHT, _params[viz::P_LOOK_HRZ_HEIGHT], cmd::val_hrz_height);
     param_map.register_parameter(viz::P_MAX_VEL, _params[viz::P_MAX_VEL], cmd::val_max_vel);
     param_map.register_parameter(viz::P_NAV_EN, _params[viz::P_NAV_EN], cmd::val_nav_en);
-    param_map.register_parameter(viz::P_KP, _params[viz::P_KP], cmd::val_kp);
-    param_map.register_parameter(viz::P_KI, _params[viz::P_KI], cmd::val_kp);
-    param_map.register_parameter(viz::P_KD, _params[viz::P_KD], cmd::val_kp);
+    param_map.register_parameter(viz::P_KP, _params[viz::P_KP], cmd::val_gain);
+    param_map.register_parameter(viz::P_KI, _params[viz::P_KI], cmd::val_gain);
+    param_map.register_parameter(viz::P_KD, _params[viz::P_KD], cmd::val_gain);
     
     param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
     param_map.set_value(viz::P_LOOK_HRZ_HEIGHT,360);
@@ -118,7 +121,6 @@ int run(int argc, char* argv[]) {
     cv::Mat undistorted(viz::HEIGHT, viz::WIDTH, CV_8UC1);
     cv::Mat outputFrame(viz::HEIGHT, viz::WIDTH, CV_8UC1);
     // --------------- Navigation Pipeline ----------------- //
-    viz::PathEstimator pathEstimator;
     // -------------- Camera Calibration ----------------- //
     cv::Mat cameraMatrix, distCoeffs;
     if (!calib::loadCalibration(cameraMatrix, distCoeffs)) {
@@ -137,7 +139,7 @@ int run(int argc, char* argv[]) {
         param_map.set_value(viz::P_PROG_MODE, viz::M_CALIB_BEV);
     }else {
        syslog(LOG_INFO, "Using loaded homography matrix");
-       param_map.set_value(viz::P_PROG_MODE, viz::M_BANG_BANG);
+       param_map.set_value(viz::P_PROG_MODE, viz::M_PATHFOLLOW);
     }
 
     // -------------- Performance Metrics ----------------- //
@@ -165,10 +167,10 @@ int run(int argc, char* argv[]) {
                 handleCalibBEVMode(undistorted, outputFrame, homography_matrix, param_map, loopRate_ms);
                 break;
             case viz::M_BANG_BANG:
-                handleBangBangMode(y_plane, outputFrame,param_map);
+                handleAlgo1(y_plane, outputFrame,param_map);
                 break;
             case viz::M_PATHFOLLOW:
-                handlePathFollowMode(y_plane, outputFrame, homography_matrix, param_map, pathEstimator);
+                handleAlgo2(y_plane, outputFrame, param_map);
                 break;
             case viz::M_SEG_FLOOR:
                 handleSegFloorMode(undistorted, outputFrame);
@@ -247,7 +249,6 @@ void handleCalibBEVMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Ma
         start_time = std::chrono::steady_clock::now();
         timeout_active = true;
     }
-
     float horz_height;
     param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
     std::array<cv::Point2f, 4> imagePts = {};
@@ -298,102 +299,122 @@ void handleBirdMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& h
 }
 
 
-//@brief: Path Following by cross track error bang bang control
-void handleBangBangMode(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& param_map) {
-    // Extract ROI from horizon refencend the top of the image
+void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& param_map) {
+    static nav::PIDController pid(1.0f, 0.0, 0.0f);
+    // ------- Look Ahead Section------- //
     float horz_height;
     param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
-    cv::Mat roi = inputFrame(cv::Rect(0, horz_height, viz::WIDTH, viz::HEIGHT - horz_height));    
+    cv::Mat roi = inputFrame(cv::Rect(0, horz_height, viz::WIDTH, viz::HEIGHT - horz_height));  
+    // ------- Track Detection ------- //
     cv::medianBlur(roi, roi, 21);
-    // ------- Edge Detection ------- //
-    cv::Mat edges(roi.size(), CV_8U);
-    cv::Sobel(roi, edges, CV_8U, 1, 0, 3, 1, 0);
-
-    //cv::Canny(roi, edges, 100, 200, 3);
-    //cv::threshold(edges, edges, 40, 255, cv::THRESH_BINARY);                                                                                                
-    // ------- HISTOGRAM ------- //
-    cv::Mat hist;
-    cv::reduce(edges(cv::Rect(0, edges.rows / 2, edges.cols, edges.rows / 2)), hist, 0, cv::REDUCE_SUM, CV_32F);
-    cv::normalize(hist, hist, 0, 255, cv::NORM_MINMAX);
-
-
-
-    //cv::GaussianBlur(hist, hist, cv::Size(21, 1), 0);    
-
-    // ------- Compute Noise Floor Using Median ------- //
-    std::vector<float> histVec(hist.cols);
-    for (int i = 0; i < hist.cols; ++i) {
-        histVec[i] = hist.at<float>(0, i);
-    }
-    size_t medianIdx = histVec.size() / 2;
-    std::nth_element(histVec.begin(), histVec.begin() + medianIdx, histVec.end());
-    float median = histVec[medianIdx];
-
-    float threshold = median * 10.0f;
-
-    // ------- Peak Detection ------- //
-    static cv::Point lastEst(320, 0);
-    cv::Point lineStartEst;
-    cv::minMaxLoc(hist, nullptr, nullptr, nullptr, &lineStartEst);
-    float maxSpeed;
-    float peakValue = hist.at<float>(0, lineStartEst.x);
-    if (peakValue < threshold) { // If peak is below threshold
-        lastEst.x = iir_lpf(lastEst.x, 320, 0.001f); // Exponential decay to center
-        lineStartEst.x = lastEst.x; // Apply filtered value
-        maxSpeed = 0.0f;
+    cv::Mat edges;
+    cv::Sobel(roi, edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
+    cv::Mat section = edges(cv::Rect(0, edges.rows / 2, edges.cols, edges.rows / 2));
+    std::array<float, 640> hist_trend;;
+    struct pk::LineTrend line_trend = pk::computeLineTrend(section, hist_trend);
+    float median = line_trend.median;
+    float max = line_trend.max;
+    float threshold = 15 * median;
+    // ------- Stop and search if track lost ------- //
+    static float prev_estidx = 320;
+    float speed, est_idx;
+    if (max < threshold) { // Track lost
+        prev_estidx = iir_lpf(prev_estidx, 320, 0.001f); // Exponential decay to center
+        est_idx = prev_estidx; // Apply filtered value
+        speed = 0.0f; // throttle speed
     } else {
-        lastEst.x = lineStartEst.x; // Update history only when peak is valid
-        (void) param_map.get_value(viz::P_MAX_VEL, maxSpeed);
+        est_idx = line_trend.index; // Use the peak index of the histogram
+        (void) param_map.get_value(viz::P_MAX_VEL, speed);
     }
-
-    nav::bangbang(lineStartEst.x, maxSpeed, param_map);
-
-
-    // ------- Visualize Histogram ------- //
+    // ------- Control ------- //
+    float crossTrackError = nav::computeCrossTrackError(est_idx);
+    nav::point_regulator(-crossTrackError, speed, pid, param_map);
+    
+    // ------- Visualizer ------- //
     cv::resize(edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
-    cv::Mat top_half = outputFrame(cv::Rect(0, 0, edges.cols, edges.rows / 2));
-    for (int i = 0; i < hist.cols; ++i) {
-        int histValue = static_cast<int>(hist.at<float>(0, i));
-        cv::line(top_half, cv::Point(i, top_half.rows), cv::Point(i, top_half.rows - histValue), cv::Scalar(255));
+    cv::Mat viz_section = outputFrame(cv::Rect(0, 0, outputFrame.cols, outputFrame.rows / 2));    
+    for (std::size_t i = 0; i < hist_trend.size(); ++i) {
+        
+        int histValue = static_cast<int>(hist_trend[i]);
+        cv::line(viz_section, cv::Point(i, viz_section.rows), cv::Point(i, viz_section.rows - histValue), cv::Scalar(255));
     }
-    cv::Rect peakRect(lineStartEst.x - 10, top_half.rows - 20, 20, 20);
-    cv::rectangle(top_half, peakRect, cv::Scalar(128), -1);
-    cv::Mat bottom_half = outputFrame(cv::Rect(0, outputFrame.rows / 2, outputFrame.cols, outputFrame.rows / 2));
-    cv::putText(bottom_half, "Peak: " + std::to_string(lineStartEst.x) + " Val: " + std::to_string(peakValue) + " NoiseFloor: " + std::to_string(threshold), cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255), 1);
-
-
+    
+    cv::Rect peakRect(est_idx - 10, viz_section.rows - 20, 20, 20);
+    cv::rectangle(viz_section, peakRect, cv::Scalar(128), -1);
 }
 
-void handlePathFollowMode(const cv::Mat& inputFrame, cv::Mat& outputFrame,cv::Mat& homography_matrix, ParameterMap& param_map, viz::PathEstimator& pathEstimator) {
-    // -- Floor Segmentation --
+void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame,ParameterMap& param_map) {
+    static nav::PIDController pid(1.0f, 0.0, 0.0f);
+    // ------- Adaptive Look Ahead Section ------- //
+    viz::WallDetection walls = viz::estimateWallHorizon(inputFrame);
+    cv::Mat roi = inputFrame(cv::Rect(0, walls.floor_y, viz::WIDTH, viz::HEIGHT - walls.floor_y));
+    cv::medianBlur(roi, roi, 21);
+    // ------- Track Detection ------- //
+    cv::Mat track_edges;
+    cv::Sobel(roi, track_edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
+    bool track_lost = false;
+    const int numSections = 5;
+    const int sectionHeight = track_edges.rows / numSections;
+    std::vector<std::tuple<pk::Peak, int>> waypoints;
+    static std::array<std::tuple<pk::Peak, int>, numSections> prev_waypoints = {};
+    std::array<cv::Rect, numSections> sectionsRoi = {};
+    pk::PeakTracker tracker;
+    // --- SearchWhole image for waypoints ---
+    for(int i = 0; i < numSections; ++i) {
+        int sectionStart = track_edges.rows - (i + 1) * sectionHeight;
+        cv::Rect roi = cv::Rect(0, sectionStart, track_edges.cols, sectionHeight);
+        sectionsRoi[i] = roi;
+        cv::Mat section = track_edges(roi);
+        pk::Peak peak = tracker.topologicalPeakTrack(section, std::get<0>(prev_waypoints[i]));
+        track_lost = (peak.prominence < 100 || peak.width > 200); // Noise floor is too high
+        if(!track_lost ) {
+            waypoints.push_back(std::make_tuple(peak, i));
+        }
+    }
+    cv::resize(track_edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
+    float speed, est_idx;
+    pk::Peak& peak = std::get<0>(prev_waypoints[0]);
+    if(track_lost){ // Stop and search
+        peak.index = iir_lpf(peak.index, 320, 0.1f); // Exponential decay to center;
+        est_idx = peak.index;
+        speed = 0.0f;
+    }else { // Carve into path
+        int pointsFound = waypoints.size();
+        assert( pointsFound > 0);
+        printf("Found %d waypoints\n", pointsFound);
+        (void) param_map.get_value(viz::P_MAX_VEL, speed);
+        speed*=pointsFound/numSections; // Slow Down when less of the track is detected
+        est_idx = std::get<0>(waypoints[0]).index; // use the closest peak found
+        // -- Waypoint Visualization --
+        for (int i = 0; i < pointsFound; ++i) {
+            pk::Peak peak = std::get<0>(waypoints[i]);
+            int sectionIdx = std::get<1>(waypoints[i]);
+            cv::Rect vis_sectRoi = sectionsRoi[sectionIdx];
+            vis_sectRoi.height /=2;
+            cv::Mat subMat = outputFrame(vis_sectRoi);
+            viz::drawTopology(subMat, peak, cv::Scalar(192));
+        }
+        // update the previous waypoints
+        for (int i = 0; i < numSections; ++i) {
+            std::get<0>(prev_waypoints[i]) = std::get<0>(waypoints[i]);
+        }
+    }
+    // -- Control --
+    float crossTrackError = nav::computeCrossTrackError(est_idx);
+    nav::point_regulator(-crossTrackError, speed, pid, param_map);
+
+    return;
+}
+
+void handleAlgo3(const cv::Mat& inputFrame, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map) {
+    // -- Project Track to BEV -- 
     cv::Mat floor_frame;
     viz::extractFloorPlane(inputFrame, floor_frame);
     cv::Mat bev;
     cv::warpPerspective(floor_frame, bev, homography_matrix, floor_frame.size(),
     cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS,
     cv::BORDER_CONSTANT, cv::Scalar(0));
-    // -- Track Detection --
-    cv::Mat trackFrame;
-    viz::detectTrackEdges(bev, trackFrame);
-    // -- Path Tracking --
-    //pathEstimator.findPathWaypoints(trackFrame);
-
-    // -- Define the robot's visual position --
-    // The frame is 480 pixels tall (30 cm), so scaling yields ~16 px/cm.
-    // Given that the robot's position is 25 cm below the bottom, the offset is ~25*16=400 pixels.
-    // However, per specification we use (320, 480+300) = (320, 780).
-    cv::Point2f robotPos(480 + 300, 320);
-
-    // -- Visualization --
-    // Resize the visualizations into the output frame.
-    cv::resize(trackFrame, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
-    cv::Mat topVizFrame = outputFrame(cv::Rect(0, 0, outputFrame.cols, outputFrame.rows / 5));
-    cv::Mat midVizFrame = outputFrame(cv::Rect(0, outputFrame.rows * 2/5, outputFrame.cols, outputFrame.rows / 5));
-    cv::Mat lowVizFrame = outputFrame(cv::Rect(0, outputFrame.rows * 4/5, outputFrame.cols, outputFrame.rows / 5));
 }
-
-
-
 
 // ------------------ Main  ----------------- //
 int main(int argc, char* argv[]) {
