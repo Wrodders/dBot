@@ -129,19 +129,12 @@ void maskWarpBorder(cv::Mat& frame){
 }
 
 // ******************************* Visualization ******************************* //
-void drawTopology(cv::Mat& subFrame, pk::Peak& peak, cv::Scalar color) {
-    int scaledHeight = static_cast<int>(peak.prominence * subFrame.rows / 255.0f);
-    cv::Rect peakRect(peak.index, subFrame.rows - scaledHeight, peak.width, scaledHeight);
+void drawTopology(cv::Mat& subFrame, const pk::LineEstimate& peak, const cv::Scalar color) {
+    cv::Rect peakRect(peak.index, subFrame.rows - peak.prominence, 10, peak.prominence);
     cv::rectangle(subFrame, peakRect, color, -1);
 
 }
 
-void drawHistogram(cv::Mat& subFrame, const std::array<float, 640>& hist_trend, cv::Scalar color) {
-    for (std::size_t i = 0; i < hist_trend.size(); ++i) {
-        int histValue = static_cast<int>(hist_trend[i]);
-        cv::line(subFrame, cv::Point(i, subFrame.rows), cv::Point(i, subFrame.rows - histValue), color);
-    }
-}
 
 void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float drivability) {
     cv::putText(subFrame, "Dominant Prominence: " + std::to_string(peakProminence),

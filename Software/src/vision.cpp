@@ -305,13 +305,13 @@ void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
     float horz_height;
     param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
     cv::Mat roi = inputFrame(cv::Rect(0, horz_height, viz::WIDTH, viz::HEIGHT - horz_height));  
-    // ------- Track Detection ------- //
     cv::medianBlur(roi, roi, 21);
     cv::Mat edges;
     cv::Sobel(roi, edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
+    // ------- Track Detection ------- //
+
     cv::Mat section = edges(cv::Rect(0, edges.rows / 2, edges.cols, edges.rows / 2));
-    std::array<float, 640> hist_trend;;
-    struct pk::LineTrend line_trend = pk::computeLineTrend(section, hist_trend);
+    struct pk::LineEstimate line_trend = pk::computeLineTrend(section);
     float median = line_trend.median;
     float max = line_trend.max;
     float threshold = 15 * median;
@@ -323,101 +323,93 @@ void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
         est_idx = prev_estidx; // Apply filtered value
         speed = 0.0f; // throttle speed
     } else {
-        est_idx = line_trend.index; // Use the peak index of the histogram
+        est_idx = line_trend.index; // Use the pos index of the histogram
         (void) param_map.get_value(viz::P_MAX_VEL, speed);
     }
     // ------- Control ------- //
     float crossTrackError = nav::computeCrossTrackError(est_idx);
     nav::point_regulator(-crossTrackError, speed, pid, param_map);
-    
     // ------- Visualizer ------- //
     cv::resize(edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
-    cv::Mat viz_section = outputFrame(cv::Rect(0, 0, outputFrame.cols, outputFrame.rows / 2));    
-    for (std::size_t i = 0; i < hist_trend.size(); ++i) {
-        
-        int histValue = static_cast<int>(hist_trend[i]);
-        cv::line(viz_section, cv::Point(i, viz_section.rows), cv::Point(i, viz_section.rows - histValue), cv::Scalar(255));
-    }
-    
+    cv::Mat viz_section = outputFrame(cv::Rect(0, 0, outputFrame.cols, outputFrame.rows / 2));        
     cv::Rect peakRect(est_idx - 10, viz_section.rows - 20, 20, 20);
     cv::rectangle(viz_section, peakRect, cv::Scalar(128), -1);
 }
 
-void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame,ParameterMap& param_map) {
-    static nav::PIDController pid(1.0f, 0.0, 0.0f);
+void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& param_map) {
+    static nav::PIDController pid(1.0f, 0.0f, 0.0f);
     // ------- Adaptive Look Ahead Section ------- //
     viz::WallDetection walls = viz::estimateWallHorizon(inputFrame);
-    cv::Mat roi = inputFrame(cv::Rect(0, walls.floor_y, viz::WIDTH, viz::HEIGHT - walls.floor_y));
+    cv::Rect roiRect(0, walls.floor_y, viz::WIDTH, viz::HEIGHT - walls.floor_y);
+    cv::Mat roi = inputFrame(roiRect);
     cv::medianBlur(roi, roi, 21);
-    // ------- Track Detection ------- //
     cv::Mat track_edges;
     cv::Sobel(roi, track_edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
-    const int numSections = 18;
-    const int sectionHeight = track_edges.rows / numSections;
-    std::vector<std::tuple<pk::Peak, int>> waypoints;
-    static std::array<std::tuple<pk::Peak, int>, numSections> prev_waypoints = {};
-    std::array<cv::Rect, numSections> sectionsRoi = {};
-    std::array<std::array<float,640>, numSections> histograms = {};
-    pk::PeakTracker tracker;
+
+    // ------- Track Detection ------- //
+    const int numSections = 40;
+    const int totalRows = track_edges.rows;
+    const int sectionHeight = totalRows / numSections;
+    std::array<std::tuple<pk::LineEstimate, int>, numSections> waypoints = {};
+    int numWaypoints = 0;
+    static int prev_pos_est = 320;
+    std::array<cv::Rect, numSections> sectionsRoi;
+    auto start_time = std::chrono::steady_clock::now();
     // -- Waypoint Tracking --
-    // --- SearchWhole image for waypoints ---
-    float angle = 0.0f;
-    for(int i = 0; i < numSections; i++) {
-        int sectionStart = track_edges.rows - (i + 1) * sectionHeight;
-        cv::Rect sect_roi = cv::Rect(0, sectionStart, track_edges.cols, sectionHeight);
+    for (int i = 0; i < numSections; ++i) {
+        int sectionStart = totalRows - (i + 1) * sectionHeight;
+
+        cv::Rect sect_roi(0, sectionStart, track_edges.cols, sectionHeight);
         sectionsRoi[i] = sect_roi;
         cv::Mat section = track_edges(sect_roi);
-        pk::Peak peak = tracker.topologicalPeakTrack(section); // search aroudn the last pak of the previous section
-        histograms[i] = tracker.getHistogram();
-        if(waypoints.size() > 0){
-            pk::Peak last_peak = std::get<0>(waypoints.back());
-            // find distance between points to check for continuity
-            float dist = std::abs(peak.index - last_peak.index);
-            if(dist > 4*sectionHeight) {break;}
+        pk::LineEstimate pos = pk::computeLineTrend(section);
+        // Ensure continuity between waypoints.
+        if (numWaypoints > 0) {
+            const pk::LineEstimate& prev_pos = std::get<0>(waypoints[numWaypoints - 1]); // previous section's point
+            float dist = std::abs(pos.index - prev_pos.index);
+            if (dist > 4 * sectionHeight) {
+                break; // Discontinuity detected, stop tracking
+            }
         }
-        bool track_lost = (peak.prominence < 50 || peak.width > 300); 
-        if(!track_lost ) {
-            waypoints.push_back(std::make_tuple(peak, i));
+        if (pos.prominence >= 50) { // track is valid
+            waypoints[numWaypoints] = std::make_tuple(pos, i);
+            numWaypoints++;
         }
     }
-    float speed, est_idx;
-    pk::Peak& closest_peak = std::get<0>(prev_waypoints[0]);
-    int pointsFound = waypoints.size();
-    if(pointsFound < 1){ // Stop and search
-        closest_peak.index = iir_lpf(closest_peak.index, 320, 0.1f); // Exponential decay to center;
-        est_idx = closest_peak.index;
+    float speed = 0.0f;
+    float est_idx = 0.0f;
+    if (numWaypoints < 1) { // Track lost: perform search
+        prev_pos_est = iir_lpf(prev_pos_est, 320, 0.1f); // update exponential decay
+        est_idx = prev_pos_est;
         speed = 0.0f;
-        printf("Track Lost: %d\n", pointsFound);
-     
-    }else { // Carve into path
-        (void) param_map.get_value(viz::P_MAX_VEL, speed);
-        speed*=(float)pointsFound/(float)numSections; // Slow Down when less of the track is detected
-        est_idx = std::get<0>(waypoints[0]).index; // use the closest peak found
+    } else { // Track found: compute speed and visualization.
+        (void)param_map.get_value(viz::P_MAX_VEL, speed);
+        speed *= static_cast<float>(numWaypoints) / static_cast<float>(numSections);
+        est_idx = std::get<0>(waypoints[0]).index;
+        prev_pos_est = est_idx; // update previous estimate
         // -- Waypoint Visualization --
-        for (int i = 0; i < pointsFound; ++i) {
-            pk::Peak peak = std::get<0>(waypoints[i]);
-            int sectionIdx = std::get<1>(waypoints[i]);
+        for (int i = 0; i < numWaypoints; ++i) {
+            const pk::LineEstimate& pos = std::get<0>(waypoints[i]);
+            const int sectionIdx = std::get<1>(waypoints[i]);
+            if (sectionIdx < 0 || sectionIdx >= numSections) {
+                continue; // Skip invalid section indices
+            }
             cv::Rect vis_sectRoi = sectionsRoi[sectionIdx];
-            vis_sectRoi.y += sectionHeight/2;
+            vis_sectRoi.y += sectionHeight / 2;
             vis_sectRoi.height /= 2;
-            cv::Mat subMat = track_edges(vis_sectRoi);
-            //viz::drawHistogram(subMat, histograms[sectionIdx], cv::Scalar(128));
-            viz::drawTopology(subMat, peak, cv::Scalar(192));
-        }
-        // update the previous waypoints
-        for (int i = 0; i < numSections; ++i) {
-            std::get<0>(prev_waypoints[i]) = std::get<0>(waypoints[i]);
+            if (vis_sectRoi.y >= 0 && vis_sectRoi.y + vis_sectRoi.height <= track_edges.rows) {
+                cv::Mat subMat = track_edges(vis_sectRoi);
+                viz::drawTopology(subMat, pos, cv::Scalar(192));
+            }
         }
     }
-    cv::resize(track_edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
-
-
+    auto end_time = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_time = end_time - start_time;
+    std::cout << "Elapsed time: " << elapsed_time.count() * 1000 << " ms" << std::endl;
     // -- Control --
     float crossTrackError = nav::computeCrossTrackError(est_idx);
     nav::point_regulator(-crossTrackError, speed, pid, param_map);
-    printf("%f, %f\n", crossTrackError, speed);
-
-    return;
+    cv::resize(track_edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
 }
 
 void handleAlgo3(const cv::Mat& inputFrame, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map) {
