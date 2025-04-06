@@ -136,6 +136,13 @@ void drawTopology(cv::Mat& subFrame, pk::Peak& peak, cv::Scalar color) {
 
 }
 
+void drawHistogram(cv::Mat& subFrame, const std::array<float, 640>& hist_trend, cv::Scalar color) {
+    for (std::size_t i = 0; i < hist_trend.size(); ++i) {
+        int histValue = static_cast<int>(hist_trend[i]);
+        cv::line(subFrame, cv::Point(i, subFrame.rows), cv::Point(i, subFrame.rows - histValue), color);
+    }
+}
+
 void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float drivability) {
     cv::putText(subFrame, "Dominant Prominence: " + std::to_string(peakProminence),
                 cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255), 1);
@@ -193,9 +200,9 @@ private:
         return (Kp * error) + (Ki * integral) + (Kd * derivative);
     }
 };
-int computeCrossTrackError(int peak_idx) {
+float computeCrossTrackError(int peak_idx) {
     // Compute the cross-track error
-    int crossTrackError = 320 - peak_idx; // Assuming 320 is the center of the image
+    float crossTrackError = 320 - peak_idx; // Assuming 320 is the center of the image
     crossTrackError /= 320 / 2; // Normalize
     return crossTrackError;
 }

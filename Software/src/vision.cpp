@@ -352,46 +352,56 @@ void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame,ParameterMap& p
     // ------- Track Detection ------- //
     cv::Mat track_edges;
     cv::Sobel(roi, track_edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
-    bool track_lost = false;
-    const int numSections = 5;
+    const int numSections = 18;
     const int sectionHeight = track_edges.rows / numSections;
     std::vector<std::tuple<pk::Peak, int>> waypoints;
     static std::array<std::tuple<pk::Peak, int>, numSections> prev_waypoints = {};
     std::array<cv::Rect, numSections> sectionsRoi = {};
+    std::array<std::array<float,640>, numSections> histograms = {};
     pk::PeakTracker tracker;
+    // -- Waypoint Tracking --
     // --- SearchWhole image for waypoints ---
-    for(int i = 0; i < numSections; ++i) {
+    float angle = 0.0f;
+    for(int i = 0; i < numSections; i++) {
         int sectionStart = track_edges.rows - (i + 1) * sectionHeight;
-        cv::Rect roi = cv::Rect(0, sectionStart, track_edges.cols, sectionHeight);
-        sectionsRoi[i] = roi;
-        cv::Mat section = track_edges(roi);
-        pk::Peak peak = tracker.topologicalPeakTrack(section, std::get<0>(prev_waypoints[i]));
-        track_lost = (peak.prominence < 100 || peak.width > 200); // Noise floor is too high
+        cv::Rect sect_roi = cv::Rect(0, sectionStart, track_edges.cols, sectionHeight);
+        sectionsRoi[i] = sect_roi;
+        cv::Mat section = track_edges(sect_roi);
+        pk::Peak peak = tracker.topologicalPeakTrack(section); // search aroudn the last pak of the previous section
+        histograms[i] = tracker.getHistogram();
+        if(waypoints.size() > 0){
+            pk::Peak last_peak = std::get<0>(waypoints.back());
+            // find distance between points to check for continuity
+            float dist = std::abs(peak.index - last_peak.index);
+            if(dist > 4*sectionHeight) {break;}
+        }
+        bool track_lost = (peak.prominence < 50 || peak.width > 300); 
         if(!track_lost ) {
             waypoints.push_back(std::make_tuple(peak, i));
         }
     }
-    cv::resize(track_edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
     float speed, est_idx;
-    pk::Peak& peak = std::get<0>(prev_waypoints[0]);
-    if(track_lost){ // Stop and search
-        peak.index = iir_lpf(peak.index, 320, 0.1f); // Exponential decay to center;
-        est_idx = peak.index;
+    pk::Peak& closest_peak = std::get<0>(prev_waypoints[0]);
+    int pointsFound = waypoints.size();
+    if(pointsFound < 1){ // Stop and search
+        closest_peak.index = iir_lpf(closest_peak.index, 320, 0.1f); // Exponential decay to center;
+        est_idx = closest_peak.index;
         speed = 0.0f;
+        printf("Track Lost: %d\n", pointsFound);
+     
     }else { // Carve into path
-        int pointsFound = waypoints.size();
-        assert( pointsFound > 0);
-        printf("Found %d waypoints\n", pointsFound);
         (void) param_map.get_value(viz::P_MAX_VEL, speed);
-        speed*=pointsFound/numSections; // Slow Down when less of the track is detected
+        speed*=(float)pointsFound/(float)numSections; // Slow Down when less of the track is detected
         est_idx = std::get<0>(waypoints[0]).index; // use the closest peak found
         // -- Waypoint Visualization --
         for (int i = 0; i < pointsFound; ++i) {
             pk::Peak peak = std::get<0>(waypoints[i]);
             int sectionIdx = std::get<1>(waypoints[i]);
             cv::Rect vis_sectRoi = sectionsRoi[sectionIdx];
-            vis_sectRoi.height /=2;
-            cv::Mat subMat = outputFrame(vis_sectRoi);
+            vis_sectRoi.y += sectionHeight/2;
+            vis_sectRoi.height /= 2;
+            cv::Mat subMat = track_edges(vis_sectRoi);
+            //viz::drawHistogram(subMat, histograms[sectionIdx], cv::Scalar(128));
             viz::drawTopology(subMat, peak, cv::Scalar(192));
         }
         // update the previous waypoints
@@ -399,9 +409,13 @@ void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame,ParameterMap& p
             std::get<0>(prev_waypoints[i]) = std::get<0>(waypoints[i]);
         }
     }
+    cv::resize(track_edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
+
+
     // -- Control --
     float crossTrackError = nav::computeCrossTrackError(est_idx);
     nav::point_regulator(-crossTrackError, speed, pid, param_map);
+    printf("%f, %f\n", crossTrackError, speed);
 
     return;
 }

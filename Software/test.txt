@@ -1,0 +1,57 @@
+
+    const int numSections = 18;
+    const int sectionHeight = track_edges.rows / numSections;
+    std::vector<std::tuple<pk::Peak, int>> waypoints;
+    static std::array<std::tuple<pk::Peak, int>, numSections> prev_waypoints = {};
+    std::array<cv::Rect, numSections> sectionsRoi = {};
+    std::array<std::array<float,640>, numSections> histograms = {};
+    pk::PeakTracker tracker;
+    // -- Waypoint Tracking --
+    // --- SearchWhole image for waypoints ---
+    float angle = 0.0f;
+    for(int i = 0; i < numSections; i++) {
+        int sectionStart = track_edges.rows - (i + 1) * sectionHeight;
+        cv::Rect sect_roi = cv::Rect(0, sectionStart, track_edges.cols, sectionHeight);
+        sectionsRoi[i] = sect_roi;
+        cv::Mat section = track_edges(sect_roi);
+        pk::Peak peak = tracker.topologicalPeakTrack(section); // search aroudn the last pak of the previous section
+        histograms[i] = tracker.getHistogram();
+        // Find angle between subsequent peaks
+        if(i > 0){
+            pk::Peak prev_peak = std::get<0>(prev_waypoints[i-1]);
+            angle = atan2(peak.index - prev_peak.index, sectionStart - std::get<0>(prev_waypoints[i-1]).index) * 180.0f / M_PI;
+        }
+        bool track_lost = (peak.prominence < 50 || peak.width > 300 || std::abs(angle) > 60); 
+        if(!track_lost ) {
+            waypoints.push_back(std::make_tuple(peak, i));
+        }
+    }
+    float speed, est_idx;
+    pk::Peak& closest_peak = std::get<0>(prev_waypoints[0]);
+    int pointsFound = waypoints.size();
+    if(pointsFound < 1){ // Stop and search
+        closest_peak.index = iir_lpf(closest_peak.index, 320, 0.1f); // Exponential decay to center;
+        est_idx = closest_peak.index;
+        speed = 0.0f;
+        printf("Track Lost: %d\n", pointsFound);
+     
+    }else { // Carve into path
+        (void) param_map.get_value(viz::P_MAX_VEL, speed);
+        speed*=(float)pointsFound/(float)numSections; // Slow Down when less of the track is detected
+        est_idx = std::get<0>(waypoints[0]).index; // use the closest peak found
+        // -- Waypoint Visualization --
+        for (int i = 0; i < pointsFound; ++i) {
+            pk::Peak peak = std::get<0>(waypoints[i]);
+            int sectionIdx = std::get<1>(waypoints[i]);
+            cv::Rect vis_sectRoi = sectionsRoi[sectionIdx];
+            vis_sectRoi.y += sectionHeight/2;
+            vis_sectRoi.height /= 2;
+            cv::Mat subMat = track_edges(vis_sectRoi);
+            //viz::drawHistogram(subMat, histograms[sectionIdx], cv::Scalar(128));
+            //viz::drawTopology(subMat, peak, cv::Scalar(192));
+        }
+        // update the previous waypoints
+        for (int i = 0; i < numSections; ++i) {
+            std::get<0>(prev_waypoints[i]) = std::get<0>(waypoints[i]);
+        }
+    }
