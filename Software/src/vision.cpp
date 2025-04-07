@@ -103,14 +103,16 @@ int run(int argc, char* argv[]) {
     param_map.register_parameter(viz::P_KP, _params[viz::P_KP], cmd::val_gain);
     param_map.register_parameter(viz::P_KI, _params[viz::P_KI], cmd::val_gain);
     param_map.register_parameter(viz::P_KD, _params[viz::P_KD], cmd::val_gain);
+    param_map.register_parameter(viz::P_LOOKAHEAD, _params[viz::P_LOOKAHEAD], cmd::val_lookahead);
     
     param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
     param_map.set_value(viz::P_LOOK_HRZ_HEIGHT,360);
-    param_map.set_value(viz::P_MAX_VEL, 0.1);
+    param_map.set_value(viz::P_MAX_VEL, 0.35);
     param_map.set_value(viz::P_NAV_EN, 1);
-    param_map.set_value(viz::P_KP, 1);
-    param_map.set_value(viz::P_KI, 0);
-    param_map.set_value(viz::P_KD, 0);
+    param_map.set_value(viz::P_KP, 0.8);
+    param_map.set_value(viz::P_KI, 0.01);
+    param_map.set_value(viz::P_KD, 0.5);
+    param_map.set_value(viz::P_LOOKAHEAD, 0.9);
     
     // ------------- Command Server & Trajectory Threads ----------------- //
     std::thread cmd_thread(cmd::command_server, std::ref(param_map));
@@ -139,7 +141,7 @@ int run(int argc, char* argv[]) {
         param_map.set_value(viz::P_PROG_MODE, viz::M_CALIB_BEV);
     }else {
        syslog(LOG_INFO, "Using loaded homography matrix");
-       param_map.set_value(viz::P_PROG_MODE, viz::M_PATHFOLLOW);
+       param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
     }
 
     // -------------- Performance Metrics ----------------- //
@@ -155,31 +157,35 @@ int run(int argc, char* argv[]) {
         }
         auto process_start = std::chrono::steady_clock::now();
         // ------------ Undistort ------------ //
-        cv::remap(y_plane, undistorted, map1, map2, cv::INTER_LINEAR);
+        //cv::remap(y_plane, undistorted, map1, map2, cv::INTER_LINEAR);
         // ------------ Processing ------------ //
         float progmode;
         param_map.get_value(viz::P_PROG_MODE, progmode);
         switch ((int)progmode) {
             case viz::M_INIT:
-                handleInitMode(param_map);
+                syslog(LOG_INFO, "Initializing Vision Pipeline");
+                param_map.set_value(viz::P_PROG_MODE, viz::M_ALGO2);
                 break;
             case viz::M_CALIB_BEV:
-                handleCalibBEVMode(undistorted, outputFrame, homography_matrix, param_map, loopRate_ms);
+                handleCalibBEVMode(y_plane, outputFrame, homography_matrix, param_map, loopRate_ms);
                 break;
-            case viz::M_BANG_BANG:
+            case viz::M_ALGO1:
                 handleAlgo1(y_plane, outputFrame,param_map);
                 break;
-            case viz::M_PATHFOLLOW:
+            case viz::M_ALGO2:
                 handleAlgo2(y_plane, outputFrame, param_map);
                 break;
+            case viz::M_ALGO3:
+                handleAlgo3(y_plane, outputFrame, homography_matrix, param_map);
+                break;
             case viz::M_SEG_FLOOR:
-                handleSegFloorMode(undistorted, outputFrame);
+                handleSegFloorMode(y_plane, outputFrame);
                 break;
             case viz::M_BIRD:
-                handleBirdMode(undistorted, outputFrame, homography_matrix, param_map);
+                handleBirdMode(y_plane, outputFrame, homography_matrix, param_map);
                 break;
             case viz::M_VIZ:
-                undistorted.copyTo(outputFrame);
+                y_plane.copyTo(outputFrame);
                 break;
             default:
                 syslog(LOG_ERR, "Invalid Program Mode");
@@ -236,10 +242,6 @@ int run(int argc, char* argv[]) {
 
 
 // ------------------ PROGRAM MODES ----------------- //
-void handleInitMode(ParameterMap& param_map) {
-    syslog(LOG_INFO, "Initializing Vision Pipeline");
-    param_map.set_value(viz::P_PROG_MODE, viz::M_PATHFOLLOW);
-}
 
 void handleCalibBEVMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map, int& loopRate_ms) {
     static auto start_time = std::chrono::steady_clock::now();
@@ -298,14 +300,14 @@ void handleBirdMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& h
                         cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS, cv::BORDER_CONSTANT, cv::Scalar(164));
 }
 
-
 void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& param_map) {
     static nav::PIDController pid(1.0f, 0.0, 0.0f);
     // ------- Look Ahead Section------- //
     float horz_height;
     param_map.get_value(viz::P_LOOK_HRZ_HEIGHT, horz_height);
     cv::Mat roi = inputFrame(cv::Rect(0, horz_height, viz::WIDTH, viz::HEIGHT - horz_height));  
-    cv::medianBlur(roi, roi, 21);
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3), cv::Point(-1, -1));
+    cv::dilate(roi, roi, kernel, cv::Point(-1, -1), 2);
     cv::Mat edges;
     cv::Sobel(roi, edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
     // ------- Track Detection ------- //
@@ -319,7 +321,7 @@ void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
     static float prev_estidx = 320;
     float speed, est_idx;
     if (max < threshold) { // Track lost
-        prev_estidx = iir_lpf(prev_estidx, 320, 0.001f); // Exponential decay to center
+        prev_estidx = iir_lpf(320, prev_estidx, 0.01f); // Exponential decay to center
         est_idx = prev_estidx; // Apply filtered value
         speed = 0.0f; // throttle speed
     } else {
@@ -327,8 +329,12 @@ void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
         (void) param_map.get_value(viz::P_MAX_VEL, speed);
     }
     // ------- Control ------- //
-    float crossTrackError = nav::computeCrossTrackError(est_idx);
-    nav::point_regulator(-crossTrackError, speed, pid, param_map);
+    float nav_en;
+    param_map.get_value(viz::P_NAV_EN, nav_en);
+    if (nav_en > 0) {
+        float crossTrackError = nav::computeCrossTrackError(est_idx);
+        nav::point_regulator(-crossTrackError, speed, pid, param_map);
+    }
     // ------- Visualizer ------- //
     cv::resize(edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
     cv::Mat viz_section = outputFrame(cv::Rect(0, 0, outputFrame.cols, outputFrame.rows / 2));        
@@ -339,26 +345,22 @@ void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
 void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& param_map) {
     static nav::PIDController pid(1.0f, 0.0f, 0.0f);
     // ------- Adaptive Look Ahead Section ------- //
-    viz::WallDetection walls = viz::estimateWallHorizon(inputFrame);
-    cv::Rect roiRect(0, walls.floor_y, viz::WIDTH, viz::HEIGHT - walls.floor_y);
+    cv::Rect roiRect(0, 100, viz::WIDTH, viz::HEIGHT - 100);
     cv::Mat roi = inputFrame(roiRect);
-    cv::medianBlur(roi, roi, 21);
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3), cv::Point(-1, -1));
+    cv::dilate(roi, roi, kernel, cv::Point(-1, -1), 2);
     cv::Mat track_edges;
     cv::Sobel(roi, track_edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
-
     // ------- Track Detection ------- //
-    const int numSections = 40;
+    const int numSections =40;
     const int totalRows = track_edges.rows;
     const int sectionHeight = totalRows / numSections;
     std::array<std::tuple<pk::LineEstimate, int>, numSections> waypoints = {};
     int numWaypoints = 0;
-    static int prev_pos_est = 320;
     std::array<cv::Rect, numSections> sectionsRoi;
-    auto start_time = std::chrono::steady_clock::now();
     // -- Waypoint Tracking --
     for (int i = 0; i < numSections; ++i) {
         int sectionStart = totalRows - (i + 1) * sectionHeight;
-
         cv::Rect sect_roi(0, sectionStart, track_edges.cols, sectionHeight);
         sectionsRoi[i] = sect_roi;
         cv::Mat section = track_edges(sect_roi);
@@ -376,39 +378,63 @@ void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
             numWaypoints++;
         }
     }
-    float speed = 0.0f;
-    float est_idx = 0.0f;
-    if (numWaypoints < 1) { // Track lost: perform search
-        prev_pos_est = iir_lpf(prev_pos_est, 320, 0.1f); // update exponential decay
-        est_idx = prev_pos_est;
-        speed = 0.0f;
+    static float prev_speed = 0.0f;
+    static float prev_estidx = 320;
+    float speed, est_idx;
+    (void)param_map.get_value(viz::P_MAX_VEL, speed);
+    static bool  lost = false;
+    if (numWaypoints < 2) { // Track lost shape input
+        est_idx = iir_lpf(320, prev_estidx, 0.01f); // Exponential decay to center
+        speed = iir_lpf(0.0f, prev_speed, 0.01f); // throttle speed
+        lost = true;
     } else { // Track found: compute speed and visualization.
-        (void)param_map.get_value(viz::P_MAX_VEL, speed);
-        speed *= static_cast<float>(numWaypoints) / static_cast<float>(numSections);
-        est_idx = std::get<0>(waypoints[0]).index;
-        prev_pos_est = est_idx; // update previous estimate
-        // -- Waypoint Visualization --
-        for (int i = 0; i < numWaypoints; ++i) {
-            const pk::LineEstimate& pos = std::get<0>(waypoints[i]);
-            const int sectionIdx = std::get<1>(waypoints[i]);
-            if (sectionIdx < 0 || sectionIdx >= numSections) {
-                continue; // Skip invalid section indices
+        
+            const float track_confidence = static_cast<float>(numWaypoints) / static_cast<float>(numSections);
+            speed *= track_confidence; // Adjust speed based on track confidence
+            float lookahead_ratio;
+            param_map.get_value(viz::P_LOOKAHEAD, lookahead_ratio);
+            lookahead_ratio = lookahead_ratio * (1.0f - track_confidence); // Adjust lookahead ratio based on track confidence
+            lookahead_ratio = std::clamp(lookahead_ratio, 0.0f, 1.0f); // Clamp to [0, 1]
+            int lookahead_idx = numWaypoints  > 0 ? numWaypoints*lookahead_ratio : 0;
+            est_idx = std::get<0>(waypoints[lookahead_idx]).index;
+            if(lost){  // shape out
+                est_idx = iir_lpf(est_idx, prev_estidx, 0.01f); // Exponential decay to center
+                speed = iir_lpf(speed, prev_speed, 0.01f); // throttle speed
+                lost = false;
+            }   
+            est_idx = iir_lpf(est_idx, prev_estidx, 0.8f); // Exponential decay to center
+            
+            // -- Waypoint Visualization --
+            for (int i = 0; i < numWaypoints; ++i) {
+                const pk::LineEstimate& pos = std::get<0>(waypoints[i]);
+                const int sectionIdx = std::get<1>(waypoints[i]);
+                if (sectionIdx < 0 || sectionIdx >= numSections) {
+                    continue; // Skip invalid section indices
+                }
+                cv::Rect vis_sectRoi = sectionsRoi[sectionIdx];
+                vis_sectRoi.y += sectionHeight / 2;
+                vis_sectRoi.height /= 2;
+                if (vis_sectRoi.y >= 0 && vis_sectRoi.y + vis_sectRoi.height <= track_edges.rows) {
+                    cv::Mat subMat = track_edges(vis_sectRoi);
+                    if(i == lookahead_idx) {
+                        viz::drawTopology(subMat, pos, cv::Scalar(255));
+                    } else {
+                        viz::drawTopology(subMat, pos, cv::Scalar(128));
+                    }
+                }
             }
-            cv::Rect vis_sectRoi = sectionsRoi[sectionIdx];
-            vis_sectRoi.y += sectionHeight / 2;
-            vis_sectRoi.height /= 2;
-            if (vis_sectRoi.y >= 0 && vis_sectRoi.y + vis_sectRoi.height <= track_edges.rows) {
-                cv::Mat subMat = track_edges(vis_sectRoi);
-                viz::drawTopology(subMat, pos, cv::Scalar(192));
-            }
-        }
-    }
-    auto end_time = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_time = end_time - start_time;
-    std::cout << "Elapsed time: " << elapsed_time.count() * 1000 << " ms" << std::endl;
+        }    
+
     // -- Control --
-    float crossTrackError = nav::computeCrossTrackError(est_idx);
-    nav::point_regulator(-crossTrackError, speed, pid, param_map);
+    prev_speed = speed; // Apply filtered value
+    prev_estidx = est_idx; // Apply filtered value
+    float nav_en;
+    param_map.get_value(viz::P_NAV_EN, nav_en);
+    if (nav_en > 0) {
+        float crossTrackError = nav::computeCrossTrackError(est_idx);
+        nav::point_regulator(-crossTrackError, speed, pid, param_map);
+    }
+    // --- output ---
     cv::resize(track_edges, outputFrame, outputFrame.size(), 0, 0, cv::INTER_LINEAR);
 }
 

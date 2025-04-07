@@ -167,5 +167,5 @@ if __name__ == "__main__":
     parser.add_argument("--video", type=str, help="Path to input video file.")
     args = parser.parse_args()
 
-    video_source = args.video if args.video else 1  # Default to camera index 1
+    video_source = args.video if args.video else 0  # Default to camera index 1
     main(video_source)

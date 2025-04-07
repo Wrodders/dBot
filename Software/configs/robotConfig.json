@@ -7,7 +7,8 @@
             {"name": "NAV_EN",            "id": 3, "access": "W", "format": "%d", "description": "Enable Navigation"},
             {"name": "KP",                "id": 4, "access":"W",  "format": "%f", "description": "Steering Kp"},
             {"name": "KI",                "id": 5, "access":"W",  "format": "%f", "description": "Steering Ki"},
-            {"name": "KD",                "id": 6, "access":"W",  "format": "%f", "description": "Steering Kd"}
+            {"name": "KD",                "id": 6, "access":"W",  "format": "%f", "description": "Steering Kd"},
+            {"name": "LOOKAHEAD",         "id": 7, "access":"W",  "format": "%f", "description": "Look Ahead Distance"}
             ],
         "publishers": [
             {"name": "CMD_RET",         "id": 0, "description": "Return Cmd Value", "format": "%s:%d", "args": "retval, timestamp"},
@@ -63,7 +64,7 @@
             {"name": "TELEM",       
                 "id": 4,   
                 "description": "Telemetry Data",   
-                "format": "%0.3f:%0.3f:0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", 
+                "format": "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f", 
                 "args":  ["PITCH",    "ROLL",
                           "ACCEL_X", "ACCEL_Y",  "ACCEL_Z",
                           "GYRO_X",  "GYRO_Y",   "GYRO_Z",
@@ -71,7 +72,7 @@
                           "RIGHT_SHAFT_RPS", "RIGHT_WHEEL_TRGT", "RIGHT_VOLTAGE", 
                           "LINEAR_VEL",      "LIN_VEL_TRGT",     "BALANCE_ANGLE",
                           "ANGULAR_VEL",     "ANG_VEL_TRGT",     "STEER_DIFF",
-                          "XPOS", "LQR_U"]
+                          "XPOS", "XG", "YG", "PSIG", "LQR_U"]
             }
 
         ]

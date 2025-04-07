@@ -58,7 +58,7 @@ static struct Motor motorInit(const uint32_t timPerif,const uint32_t pwmPort,
         .drv.en = initGPIO(enPin, enPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE),
         .speedCtrl = pidInit(-VSYS, VSYS, SPEED_KP, SPEED_KI, SPEED_KD, (WSPEED_CNTRL_PERIOD * MS_TO_S))
     };
-    pwmInit(m.drv.timPerif,25000); 
+    pwmInit(m.drv.timPerif); 
 	pwmConfig(m.drv.timPerif, m.drv.timCH_A, m.drv.pwmA.port, m.drv.pwmA.pin, GPIO_AF1); 
 	pwmConfig(m.drv.timPerif, m.drv.timCH_B, m.drv.pwmB.port, m.drv.pwmB.pin, GPIO_AF1); 
     pwmStart(m.drv.timPerif);
@@ -89,9 +89,9 @@ static void motorEnable(struct Motor *motor){
 }
 // @Brief: Stops Motor Driver
 static void motorDisable(struct Motor *motor){
+    gpio_clear(motor->drv.en.port, motor->drv.en.pin); // disable driver board
     pidClear(&motor->speedCtrl);
     pidDisable(&motor->speedCtrl);
-    gpio_clear(motor->drv.en.port, motor->drv.en.pin); // disable driver board
 }
 
 /*
@@ -173,7 +173,7 @@ static void motorEstSpeed(struct Motor* motor) {
     if (dCount > (UINT16_MAX / 2)) { dCount -= (UINT16_MAX + 1);}  // Convert to signed range [-32768, 32767]
     motor->enc->lastCount = mCount; 
     float measuredRPS = (float)dCount * TICKS_TO_RPS * -motor->flipDir * motor->enc->flipDir; // convert to rotations per second at gearbox output
-    motor->wheelRPS = lagFilter(motor->alpha, measuredRPS, motor->wheelRPS); 
+    motor->wheelRPS = iir_lpf(motor->alpha, measuredRPS, motor->wheelRPS); 
 }
 
 

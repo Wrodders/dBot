@@ -39,13 +39,13 @@ User defines the Application Specific Topics and Parameters
 
 #define MAX_SERIALIZED_FLOAT_SIZE 8 //-999.999    
 
-#define SERIALIZED_TELEM_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
+#define SERIALIZED_TELEM_FMT  "%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f:%0.3f"
 #define SERIALIZED_ERROR_FMT  "%s"
 #define SERIALIZED_INFO_FMT   "%s"
 #define SERIALIZED_DEBUG_FMT  "%s"
 #define SERIALIZED_CMDRET_FTM "%s"
 // 22 Floats + 21 Delimiters 
-#define MAX_MSG_DATA_SIZE MAX_SERIALIZED_FLOAT_SIZE * 22 + 21
+#define MAX_MSG_DATA_SIZE MAX_SERIALIZED_FLOAT_SIZE * 25 + 24
 
 #define MAX_MSG_FRAME_SIZE MSG_OVERHEAD_SIZE + MAX_MSG_DATA_SIZE
 #define PROT_CMD_IDX 0  // Command position in Frame

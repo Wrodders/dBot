@@ -28,9 +28,9 @@ namespace viz {
 const char* NODE_NAME = "VISION";
 
 // -------------- Program Modes -------------- //
-enum { M_INIT = 0, M_CALIB_BEV, M_CALIB_LENS, M_BANG_BANG, M_PATHFOLLOW, M_SEG_FLOOR, M_BIRD, M_VIZ, NUM_MODES };
+enum { M_INIT = 0, M_CALIB_BEV, M_CALIB_LENS, M_ALGO1, M_ALGO2, M_ALGO3, M_SEG_FLOOR, M_BIRD, M_VIZ, NUM_MODES };
 // -------------- Parameter IDs -------------- //
-enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, P_NAV_EN, P_KP, P_KI, P_KD, NUM_PARAMS }; 
+enum { P_PROG_MODE = 0, P_LOOK_HRZ_HEIGHT, P_MAX_VEL, P_NAV_EN, P_KP, P_KI, P_KD,  P_LOOKAHEAD, NUM_PARAMS }; 
 // -------------- Global Variables -------------- //
 std::atomic<bool> _exit_trig(false);
 // -------------- Frame Setup -------------- //
@@ -135,7 +135,6 @@ void drawTopology(cv::Mat& subFrame, const pk::LineEstimate& peak, const cv::Sca
 
 }
 
-
 void displayStats(cv::Mat& subFrame, float peakProminence, int peakWidth, float drivability) {
     cv::putText(subFrame, "Dominant Prominence: " + std::to_string(peakProminence),
                 cv::Point(10, 20), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255), 1);
@@ -200,10 +199,11 @@ float computeCrossTrackError(int peak_idx) {
     return crossTrackError;
 }
 void point_regulator(const float crossTrackError, const float speed, PIDController& pid, ParameterMap& param_map) {
+
     (void) param_map.get_value(viz::P_KP, pid.Kp);
     (void) param_map.get_value(viz::P_KI, pid.Ki);
 
-    float steerControl = std::clamp(pid.run(crossTrackError), -6.0f, 6.0f);
+    float steerControl = std::clamp(pid.run(crossTrackError), -1.6f, 1.6f);
     // --------- Send Reference signals
     struct ControlU u = {.w_rate = steerControl, .speed = speed};
     {
@@ -273,6 +273,7 @@ static inline bool val_prog_mode(float val)  { return (val >= 0 && val < viz::NU
 static inline bool val_max_vel(float val)    { return (val >= 0 && val < 1); }
 static inline bool val_nav_en(float val)     { return (static_cast<int>(val) % 2 == 0 || static_cast<int>(val) % 2 == 1); } // test if 0 or 1
 static inline bool val_gain(float val)       { return (val >= 0 && val < 100); }
+static inline bool val_lookahead(float val)  { return (val >= 0 && val < 1); } 
 
 } // namespace cmd
 

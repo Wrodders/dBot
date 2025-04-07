@@ -19,13 +19,12 @@ float uuid = 3.14159;
 // ********** CASCADED PID FUNCTIONS ***************************************//
 //@Brief: Motor Speed Control Loop
 static void runMotorSpeedLoop(struct Motor *m){
-    motorEstSpeed(m);
     m->speedCtrl.out = pidRun(&m->speedCtrl, m->wheelRPS);
     motorSetVoltage(m, m->speedCtrl.out);
 }
 //@Brief: Balance Angle Control Loop
 static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, struct IMU *imu, 
-                    struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
+                            struct Motor *motorL, struct Motor *motorR){
     // error = (Reference - Calibrated Offset) - Estimated Pitch
     balanceAngleCtrl->out = pidRun(balanceAngleCtrl, imu->kal.pitch); // Unicycle Wheel Speed output
     motorSetTrgtSpeed(motorL, (balanceAngleCtrl->out + steerCtrl->out)); // Apply Steering Correction
@@ -33,16 +32,13 @@ static void runBalanceLoop(struct PID *balanceAngleCtrl, struct PID *steerCtrl, 
 }
 //@Brief: Differential Drive Velocity Control Loop
 static void runVelocityLoop(struct PID *velCtrl,struct PID *steerCtrl, struct PID *balanceAngleCtrl, 
-                            struct DiffDriveModel *ddmr, struct Motor *motorL, struct Motor *motorR){
-    // Twist Velocity Control Loop
-    float linvelFilt = ddmr->v_b; 
-    float angvelFilt = ddmr->w_b;
+                            struct DiffDriveModel *ddmr){          
     velCtrl->out = pidRun(velCtrl, ddmr->v_b); // Reference - odometry velocity 
     steerCtrl->out = pidRun(steerCtrl,ddmr->w_b); // Reference - odometry angular velocity
     pidSetRef(balanceAngleCtrl, -velCtrl->out); // Sets Balance Reference point to reach desired velocity
 }
 // ********** LQR FUNCTIONS ***************************************//
-void runLQR(struct LQR *lqr, struct Motor *motorL, struct Motor *motorR){
+static void runLQR(struct LQR *lqr, struct Motor *motorL, struct Motor *motorR){
     float xpos = *lqr->state.x[0];
     float linVel = *lqr->state.x[1];
     float pitch = *lqr->state.x[2] * DEG_TO_RAD;
@@ -58,7 +54,7 @@ int main(void){
     float nextMode = 0;
 	// ***************************** HARDWARE SETUP ******************************************************** //
 	systemClockSetup();      // Main System external XTAL 25MHz Init Peripheral Clocks
-	systick_setup();    // 1ms Tick
+	systick_setup();    // 1ms Tick 
 	struct GPIO led = initGPIO(GPIO13, GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE);
     struct GPIO drvMode = initGPIO(DRV_MODE_PIN, DRV_MODE_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLDOWN); // Set DRV8876 Mode
     gpio_clear(drvMode.port, drvMode.pin); // Gnd == PWM Mode
@@ -68,8 +64,7 @@ int main(void){
                             NVIC_USART1_IRQ, 
                             rx1_buf_, ARRAY_SIZE(rx1_buf_), 
                             tx1_buf_, ARRAY_SIZE(tx1_buf_));
-    serialConfig(&ser1, 230400, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);
-   
+    serialConfig(&ser1, 230400, 8, 1, USART_PARITY_NONE, USART_FLOWCONTROL_NONE);// Baud > 9*(PacketByteSize*rate)
     // IMU 
     i2cInit(IMU_PERIF, IMU_PORT, IMU_SCL, IMU_SDA);
     struct MPU6050 mpu6050 = mpu6050Init(IMU_PERIF);
@@ -89,8 +84,8 @@ int main(void){
     struct PID balanceAngleCtrl = pidInit(-RPS_MAX, RPS_MAX, BAL_KP, BAL_KI, BAL_KD, (BAL_CNTRL_PERIOD * MS_TO_S));
     pidSetRef(&balanceAngleCtrl, -7.5f);
     // DIFFERENTIAL DRIVE MODEL (LinVel, AngVel)
-    struct DiffDriveModel ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, STEER_ALPHA);
-    struct PID velCtrl = pidInit(-6, 6, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
+    struct DiffDriveModel ddmr = ddmrInit(WHEEL_RADIUS, WHEEL_BASE, VEL_ALPHA, STEER_ALPHA, ODOM_PERIOD * MS_TO_S);
+    struct PID velCtrl = pidInit(-3, 3, VEL_P, VEL_I, VEL_D, (VEL_CNTRL_PERIOD * MS_TO_S));   
     struct PID steerCtrl = pidInit(-5,5, STEER_KP, STEER_KI, STEER_KD, VEL_CNTRL_PERIOD * MS_TO_S);
     // LQR Controller
     struct LQR lqr ={.K[0] = LQR_K1, .K[1] = LQR_K2, .K[2] = LQR_K3, .K[3] = LQR_K4, 
@@ -154,6 +149,7 @@ int main(void){
     struct FixedTimeTask comsCmdTask = createTask(COMSCMD_PERIOD); // SUB RPC 
     struct FixedTimeTask comsPUBTask = createTask(COMSPUB_PERIOD); // PUB Telemetry
     struct FixedTimeTask imuTask =  createTask(IMU_PERIOD); // IMU Read
+    struct FixedTimeTask odomTask =  createTask(ODOM_PERIOD); // Odometry
     struct FixedTimeTask wspeedCntlTask = createTask(WSPEED_CNTRL_PERIOD); // Motor Speed Control
     struct FixedTimeTask balanceCntrlTask = createTask(BAL_CNTRL_PERIOD);  // Balance Control Loop
     struct FixedTimeTask velCtrlTask = createTask(VEL_CNTRL_PERIOD);  // Velocity Control Loop
@@ -225,12 +221,11 @@ int main(void){
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 if(CHECK_PERIOD(balanceCntrlTask, loopTick)){  
-                    runBalanceLoop(&balanceAngleCtrl, &steerCtrl, &imu, &ddmr, &motorL, &motorR);
+                    runBalanceLoop(&balanceAngleCtrl, &steerCtrl, &imu, &motorL, &motorR);
                     balanceCntrlTask.lastTick = loopTick;
                 }
                 if(CHECK_PERIOD(velCtrlTask, loopTick)){    
-                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
-                    runVelocityLoop(&velCtrl, &steerCtrl, &balanceAngleCtrl, &ddmr, &motorL, &motorR);
+                    runVelocityLoop(&velCtrl, &steerCtrl, &balanceAngleCtrl, &ddmr);
                     velCtrlTask.lastTick= loopTick;
                 }
                 break;
@@ -243,11 +238,6 @@ int main(void){
                     break;
                 }
                 if(CHECK_PERIOD(lqrTask, loopTick)){
-                    // Update State 
-                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
-                    motorEstSpeed(&motorL);
-                    motorEstSpeed(&motorR);
-                    // TEMP untill observer is implemented
                     runLQR(&lqr, &motorL, &motorR);
                     lqrTask.lastTick = loopTick;
                 }
@@ -260,7 +250,6 @@ int main(void){
                 break;
             case COMMISSION:
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
-                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     runMotorSpeedLoop(&motorL);
                     runMotorSpeedLoop(&motorR);
                     wspeedCntlTask.lastTick = loopTick;
@@ -270,17 +259,21 @@ int main(void){
                 if(CHECK_PERIOD(wspeedCntlTask, loopTick)){
                     motorSetVoltage(&motorL, motorL.speedCtrl.ref);
                     motorSetVoltage(&motorR, motorR.speedCtrl.ref);
-                    motorEstSpeed(&motorL);
-                    motorEstSpeed(&motorR);
-                    ddmrEstimateOdom(&ddmr, &motorL, &motorR);
                     wspeedCntlTask.lastTick = loopTick;
                 }
                 break;
             default:
                 nextMode = PARK;
-                break;  
+                break;   
         };
 
+        // ********** ODOMETRY ********************************************************************************* //
+        if(CHECK_PERIOD(odomTask, loopTick)){
+            motorEstSpeed(&motorL);
+            motorEstSpeed(&motorR);
+            ddmrEstimateOdom(&ddmr, &motorL, &motorR);
+            odomTask.lastTick = loopTick;
+        }
         // ********** IMU ********************************************************************************* //
         if(CHECK_PERIOD(imuTask, loopTick)){
             mpu6050Read(&mpu6050);
@@ -301,16 +294,17 @@ int main(void){
         }
         if(CHECK_PERIOD(comsPUBTask, loopTick)){
             // TX Publishing Telemetry
-            comsSendMsg(&coms, &ser1, PUB_TELEM,    imu.kal.pitch,      imu.kal.roll, 
+            comsSendMsg(&coms, &ser1, PUB_TELEM,    
+                imu.kal.pitch,      imu.kal.roll, 
                 imu.lpf.accel.x,    imu.lpf.accel.y,        imu.lpf.accel.z,
                 imu.lpf.gyro.x,     imu.lpf.gyro.y,         imu.lpf.gyro.z,
                 motorL.wheelRPS,    motorL.speedCtrl.ref,   motorL.speedCtrl.out,
                 motorR.wheelRPS,    motorR.speedCtrl.ref,   motorR.speedCtrl.out,
-                ddmr.v_b,     velCtrl.ref,            balanceAngleCtrl.ref, 
-                ddmr.w_b,    steerCtrl.ref,          steerCtrl.out,
-                ddmr.posX, lqr.u);
+                ddmr.v_b,           velCtrl.ref,            balanceAngleCtrl.ref, 
+                ddmr.w_b,           steerCtrl.ref,          steerCtrl.out,
+                ddmr.posX,          ddmr.x_g,               ddmr.y_g,
+                ddmr.psi,           lqr.u);
 
-            
             comsPUBTask.lastTick = loopTick;
         }
 
