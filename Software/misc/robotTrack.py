@@ -1,6 +1,7 @@
 #-----------------------------------------------------------
 # @brief Tracks Robot from top-down view using AprilTag detection.
 # @details Uses Continuity Camera or Video file as input.
+
 import cv2
 import numpy as np
 import argparse
@@ -8,11 +9,17 @@ import matplotlib.pyplot as plt
 import time
 import sys
 import os
-
+import subprocess
 import multiprocessing as mp
 
+# Constants
+RESOLUTION = '1920x1080'
+FPS = 30
+DURATION = 60 
+OUTPUT_FILE = 'tracked.mp4'
 
 marker_center = []
+
 def plot_track():
     data = np.loadtxt('track.csv', delimiter=',', dtype=int)
     plt.plot(data[:, 0], data[:, 1])
@@ -67,22 +74,17 @@ def find_robot(gray, frame, apriltag_dict_16h5, apriltag_dict_36h10, parameters)
             cv2.rectangle(frame, (rect1[0], rect1[1]), (rect1[2], rect1[3]), (255, 0, 0), 2)
             return rect1
     return None
-    
 
 def filterTrack(gray):
-    # Preprocess the image extract roi 
-
     roi = gray[0:1080, 0:1750] 
     roi = cv2.bilateralFilter(roi, 19, 75, 75)
     thresh = cv2.adaptiveThreshold(roi, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
     thresh = cv2.medianBlur(thresh, 5)
 
-    # Apply morphological operations to clean up noise
     kernel = np.ones((7, 7), np.uint8)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
     thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
     return thresh
-
 
 def findTrack(frame, rect, last_track_contours) -> bool:
     track_found = False
@@ -100,7 +102,6 @@ def findTrack(frame, rect, last_track_contours) -> bool:
         cv2.drawContours(mask_current, [largest_contour], -1, 255, -1)
         if last_track_contours is not None:
             cv2.drawContours(mask_last, [last_track_contours], -1, 255, -1)
-            # OR current track with last track
             mask_combined = cv2.bitwise_or(mask_current, mask_last)
             contours_combined, _ = cv2.findContours(mask_combined, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             largest_contour = max(contours_combined, key=cv2.contourArea)
@@ -119,6 +120,22 @@ def main(video_source):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
+    ffmpeg_cmd = [
+        'ffmpeg', '-y',
+        '-f', 'rawvideo',
+        '-vcodec', 'rawvideo',
+        '-pix_fmt', 'bgr24',
+        '-s', RESOLUTION,
+        '-r', str(FPS),
+        '-i', '-',
+        '-an',
+        '-vcodec', 'libx264',
+        '-preset', 'fast',
+        OUTPUT_FILE
+    ]
+
+    ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+
     apriltag_dict_16h5 = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_16H5)
     apriltag_dict_36h10 = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36H10)
     parameters = cv2.aruco.DetectorParameters()
@@ -126,46 +143,47 @@ def main(video_source):
     last_track_contours = None
     track_found = False
 
-
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
-        
+
         robotFrame = frame.copy()
         rect = find_robot(robotFrame, robotFrame, apriltag_dict_16h5, apriltag_dict_36h10, parameters)
-        if(track_found == False):
+        if not track_found:
             last_track_contours, track_found = findTrack(frame, rect, last_track_contours)
         if last_track_contours is not None:
             img = np.zeros(frame.shape, dtype=frame.dtype)
-            # Draw the largest contour on the image
             cv2.drawContours(img, [last_track_contours], -1, (0, 255, 0), 2)
-            # overlay the mask on the original image
             robotFrame = cv2.addWeighted(img, 0.5, robotFrame, 0.5, 0)
+
+        # Write processed frame to FFmpeg
+        try:
+            ffmpeg_process.stdin.write(robotFrame.tobytes())
+        except BrokenPipeError:
+            print("FFmpeg pipe closed.")
+            break
 
         cv2.imshow("Track Detection", robotFrame)
         if cv2.waitKey(1) == ord('q'):
             break
 
     cap.release()
+    ffmpeg_process.stdin.close()
+    ffmpeg_process.wait()
     cv2.destroyAllWindows()
 
-    # Save the detected markers data to a CSV file
     with open('markers_data.csv', 'w') as f:
         for marker in marker_center:
             f.write(f"{marker[0]},{marker[1]}\n")
-        
-    # Save the detected markers data
+
     print("Markers data saved to markers_data.csv")
-
-    # plot the track and the markers
     print("Track detection completed.")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Track detection with contour averaging.")
     parser.add_argument("--video", type=str, help="Path to input video file.")
     args = parser.parse_args()
 
-    video_source = args.video if args.video else 0  # Default to camera index 1
+    video_source = args.video if args.video else 0
     main(video_source)

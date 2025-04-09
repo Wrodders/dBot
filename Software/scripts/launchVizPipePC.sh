@@ -14,7 +14,7 @@ cleanup() {
 # Trap exit signals to clean up properly
 trap cleanup SIGINT SIGTERM EXIT
 
-FILE="recordings/recRaw6.mp4"
+FILE="recordings/recRaw7.mp4"
 
 # Check if the file exists before continuing
 if [[ ! -f "$FILE" ]]; then

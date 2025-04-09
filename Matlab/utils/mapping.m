@@ -1,14 +1,10 @@
 function [x, y, theta, linvel, stats] = mapping(data, dt, config)
     % Extract linear and angular velocities from the data
-    linvel = -data(config.start:config.stop, 15);
-    angvel = -data(config.start:config.stop, 18) * 2 * pi;  % Convert to rad/s
+    linvel = data(config.start:config.stop, 15);
+    angvel = data(config.start:config.stop, 18) * 2 * pi;  % Convert to rad/s
     stats.trgtVel = data(1, 16);
     stats.vel_dev = std(linvel);
     stats.vel_var = var(linvel);
-
-    
-   
-
     n = length(linvel);
     x = zeros(n, 1);
     y = zeros(n, 1);

@@ -40,6 +40,9 @@
     % Add your packages here
     %\usepackage{pdfcomment}            % for alt text for accessibility
     \usepackage{booktabs}              % for better looking tables
+    \usepackage[ruled,vlined]{algorithm2e}
+
+
     % Then to add images use:
     % \pdftooltip{\includegraphics[width=0.5\textwidth]{image.pdf}}{Alt-text here}
     % This makes the text in the image non-select-able though (assuming it's a vector file)
@@ -115,33 +118,32 @@
     Substantial research, has been conducted on the similarly unstable 1-DOF inverted pendulum on a cart 
     as a benchmark for control techniques \cite{boubaker2013inverted}. 
     The TWSB robot serves as a cost-effective platform for research and education in complex control 
-    strategies less commonly applied statically stable wheeled robots \cite{educationPlatform}.
+    strategies less commonly applied to statically stable wheeled robots \cite{educationPlatform}.
     
     Controlling this unstable degree of freedom expands the range of autonomous behaviors that 
     can be explored \cite{RoboLimbo} \cite{jeong2008wheeled} \cite{Browning2004TurningSI}. 
     These behaviors necessitate a hierarchical design in the system's architecture,
     where planning and navigation algorithms though linked, are decoupled by levels of abstraction 
-    from the low-level stability control and even lower level motor control.
+    from the low-level stability control and even lower level motor control. This paper explores 
+    the design tradeoffs at each of these levels, and the challenges with developing a robust system 
+    capable of autonomous navigation in a variety of indoor environments using a monocular camera.
     
     A notable work on the TWSB system is \cite{grasser2002joe} which designed a TWSB robot capable of disturbance
-    rejection and static stability on an inclined plane. This was achieved using an FPGA-based DSP system, 
-    and by decoupling the balancing and steering torques in state space an optimum Linear Quadratic Regulator (LQR). 
-    Intuitive references of linear velocity and angular rate are used for teleoperation. An early challenge in the navigation of the TWSB system 
-    identified by \cite{SelfContainedMobileTWSB} is the sensor system used for state estimation. The proposed solution 
-    maintains a running sum of the gyroscope as a augmented state variable in the form of a slowly monotonically increasing function of the gyroscope's bias.
+    rejection and static stability on an inclined plane. This was implemented using an FPGA-based DSP system.
+    By decoupling the balancing and steering torques in state space an optimum Linear Quadratic Regulator (LQR), the platform 
+    is able to turn about its center effectively.
+    An early challenge in the navigation of the TWSB system identified by \cite{SelfContainedMobileTWSB} is the sensor 
+    system used for state estimation. The proposed solution uses a gyroscope as a angular rate sensor, which was noted to suffer
+    from drift. Accounting for this drift as a linear function over time, the authors were able to stabilize the system and
+    teleoperated it over short distances. 
 
     Advances in the cost-to-performance of embedded systems and micro-electromechanical sensors (MEMS) \cite{MEMS} 
-    have allowed \cite{juang2013design} \cite{Velazquez2016VelocityAM} to remotely control the TWSB system 
-    using low-powered microcontrolers. This is accomplished through a cascaded PID controller, 
-    similar to those employed in quadrotor control.
-    
+    have allowed \cite{juang2013design} \cite{Velazquez2016VelocityAM} to control the TWSB system 
+    using low-powered microcontrolers. 
     Recent research has also applied reinforcement learning to the TWSB system \cite{kober2013reinforcement}.
-    Neural networks are proposed as nonlinear function approximations to model the system's dynamics. 
-    These methods demonstrate robustness to un-modeled dynamics \cite{guo2021optimal}. By utilizing 
-    brushless motors that lend themselves to torque control in direct drive systems, the TWSB’s pitch 
-    angle can be regulated via a PID controller, minimizing positional drift caused by backlash-induced 
-    vibrations when balancing.
-    
+    Neural networks are proposed as nonlinear function approximations to model the system's response. 
+    These methods demonstrate robustness to un-modeled dynamics \cite{guo2021optimal}.
+
     In mobile robotics, the ability to navigate requires perception. LIDARs are commonly used, as  
     the information they capture naturally lends itself to path-planning algorithms [].
     Another commonly used multimodal sensor is the CMOS camera, which measures light intensity at each pixel. 
@@ -151,12 +153,11 @@
     Both sensors provide rich environmental data that can be leveraged to develop long-term path-planning algorithms.
     
     This paper presents the design of a TWSB robotic platform capable of autonomously navigating an 
-    indoor line track. The line is assumed to be of significant contrast to the environment, with computer 
-    vision algorithms used to locate it. A racing algorithm is proposed,
+    indoor line track. A racing algorithm is proposed,
     based on three key metrics of the line: drivability, confidence, and prominence.
     \cite{visionlinetwsb} utilizes a camera as a matrix of binary intensity sensors and a rule-based 
     algorithm to follow a line while balancing. A similar approach by \cite{ghani2011two} uses infrared sensors. 
-    \cite{nntwsbvision} trained an end-to-end neural network to perform the same task, while [] proposes a 
+    \cite{nntwsbvision} trained an end-to-end neural network to perform the same task. while [] proposes a 
     convolutional neural network-based method that uses RDB-Depth camera data to autonomously 
     navigate with human-centric social behavior. Similarly, [] develops planar-wheeled robot navigation 
     algorithms through lane segmentation using geometric computer vision techniques.
@@ -166,7 +167,6 @@
     in a Model Predictive Controller (MPC). This adaptive control strategy is robust to the un-modeled 
     environment and plant dynamics, allowing for autonomous aggressive maneuvers along a mapped track.
     
-    This project develops a TWSB robot capable of autonomously navigating a line track.
     The platform is demonstrated as a cost-effective solution providing foundation for further research in mobile robotics.
     Autonomy is achieved using a stabilizing feedback controller, with cascaded PID and 
     LQR control strategies explored for balancing and stabilizing the robot's position. 
@@ -931,150 +931,156 @@
 
         \pagebreak{}
         \section{Navigation System}
-        The TWSB robot is tasked with navigating around a line track, assumed to be of significant contrast to to its surrounding environment.
-        This contains straights, curves and a chicane, each of these are related to the speed, maneuverability and accuracy
-        performance metrics of the TWSB robot.
-
+        The TWSB robot is tasked with navigating around a track, marked by a line assumed to be of significant contrast to to its 
+        surrounding environment. The performance of the navigation system can be characterized by the cross track error and the lap time, 
+        with the former being a critical failure mode, where position diverges significant from the track in a non-recoverable manner.
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.6\textwidth]{TestTrack.pdf}
+            \caption{Test Track, (1) Chicane, (2) Hairpin, (3) Wall Proximity, (4) Straight, (5) Shallow Curvature, (6) Apex}
+            \label{fig:TestTrack}
+        \end{figure}
+        The reference track tests common navigation tasks and challenges highlighted in Fig.(\ref{fig:TestTrack}). 
+        Here the environment is nonideal as the floor has various textures, marks, and colors.
+        Lighting conditions are also nonuniform and the track is physically bounded by walls on all sides, enforcing hard accuracy constraints. 
+        When teleoperated using the camera feed, it is challenging to avoid crashes. A human operator with 
+        full view of the environment can navigate the robot around the track, at moderate speeds the line is often lost 
+        from the camera view. This mandates a corrective action using information about the robot's global pose, 
+        which is not available to the TWSB. This track is therefore a suitability challenging test for autonomous mobile navigation.
+            
         Map building is a popular approach for mobile navigation in a closed loop as it allows for a large 
-        context of the environment to be considered.  Closed maps can be built iteratively, by exploration 
-        and subsequent loop closure, or based on $\textit{a priori}$ knowledge, in this case guarantees can also be made, 
-        such as obstacle avoidance and path selection by optimization functions \cite{Macenski_2020}. This is referred to as global navigation.
-        In this report however, no map is initially available and the robot must navigate the track using only
-        the information obtained from the camera sensor. This is commonly known as local navigation.
+        context of the environment to be considered. Closed maps can be built iteratively, by exploration 
+        and subsequent loop closure. In this case, guarantees can also be made, 
+        such as static obstacle avoidance and path selection by optimization functions \cite{Macenski_2020}. 
+        This is referred to as global navigation and often requires advanced localization sensors 
+        and algorithms to triangulate the robot's pose within the global environment.
+        
+        In this report, however, no global map data is available and the robot must navigate 
+        the track using only the information obtained from the camera sensor. This is commonly known as local navigation
+        and is fundamental to autonomous behavior where it is often impractical to obtain and maintain such a map. Without a map, 
+        however, the robot must infer its pose relative to the track, and in cases where the track is not visible, the robot is lost. 
+        Robust autonomy must be able to handle cases where the robot is lost, and safely search for the track or remain stationary. 
 
-        Path following is a form of local navigation, which aims to reduce the error between a point on the track 
-        and the robots pose. This differs from trajectory following where a velocity profile is followed together with the path. 
-              
-        The latter requires some form of planning, where a local 2D map is used to generate a dynamic path based on estimating 
-        the robots pose relative to the track and from this determining a velocity profile. The former is a reactive control
-        method, where, as implemented by \cite{visionlinetwsb}, a camera is used to classify a small 
-        section of the track into discreet states and a rule based system is used to determine the next action. This is demonstrated to be 
-        effective and simple to impellent, however discards a large portion of the information available in the image. 
-        Similar perforce is achieved by \cite{ghani2011two} with optical sensors. 
+        Path following is commonly implemented with a lateral and a longitudinal controller. This follows from the 
+        inputs and non holonomic constraints of the DDMR system in eq(\ref{eq:DDMRGlobal}).
+        The longitudinal controller regulates the linear velocity of the robot where, in the simplest form, the reference speed 
+        is set to a constant value, and the lateral controller keeps the robot heading aligned with the track. 
+        This method is suitable for simple tracks and low speeds.
+        
+        In contrast, trajectory tracking is a method that generates some optimum path from the sensed environment and subsequently follows this path.
+        This 2 stage process is falls under planning and is useful in cases where the lap time is more important than the cross-track error.
+        In racing, the robot has to to perform at the limits of its handling capabilities \cite{wischnewski2022indy}. Hence a method 
+        for automatic safety is required, a common method extends planning by predicting the robot's position over some horizon,
+        a velocity profile can be then obtained whilst maintaining the robot within certain bounds, often the profile is 
+        designed in such a manner to stop the robot at the end of its horizon \cite{williams2016aggressive}. These kinds of model predictive controllers 
+        have been demonstrated to have impressive performance but are complex methods that require a high fidelity model of the robot within its environment. 
+        The time constraints of this project preclude the exploration of data driven 
+        or learning methods employed to build such a model of the TWSB robot. As such a series of reactive controllers are used within different 
+        racing-line algorithms based on curvature of the track ahead as baseline methods.
+            
+        Many local navigation methods rely on obtaining a geometric representation of the track ahead, effectively building a local map.
+        Commonly a path can be represented as a piece-wise arc or a form of cubic spline, from which parameters such as curvature, $\kappa$, 
+        can be obtained. Simpler methods of path following by monocular camera have been applied to the TWSB robot, these do not measure the 
+        geometry of the track, but rather use the image data to classify a set of features and use these in a rule-based algorithm to follow the 
+        track, \cite{visionlinetwsb} \cite{ismail2009vision} \cite{nntwsbvision}.
+        These methods are found to limit the track to shallow curvature or low speeds as they only utilize a small 
+        a subset of the information available from the camera sensor. 
 
-
+        In this paper a method is developed that obtains a set of track waypoints from a grayscale monocular camera. 
+        Whilst these do not predict the future poses of the robot, the nature of the 
+        monocular camera sensor's information allows for a dynamic velocity component to be added to path following.
 
         \subsection{Camera Sensor}
         Geometric information about the track can be observed from a camera sensor mounted on the TWSB robot.
         This obtains a discreet 2D projection of the environment in the form of a matrix of pixels, each of which encodes 
-        its identity value as an 8 bit unsigned integer. Considering such an image, it is non trivial to
+        its value as an 8 bit unsigned integer. Considering such an image, it is non trivial to
         obtain a map of the track with reference to the robot, as the data is highly encoded in a large measurement space. 
         Perceptual sensors of this form differ from the physical sensors found elsewhere on the TWSB robot as the quantity measured; 
-        light intensity, is not directly usable in all but simple autonomous behavior, photo-taxis \cite{hasslacher1995living}. 
-        
+        light intensity, is not directly usable as a state variable, except in simple autonomous behavior like photo-taxis \cite{hasslacher1995living}. 
+
         The question of what quantifies useful information in an image is a long standing problem,  \cite{siegwart2011introduction} classifies 
         perception as the process of condensing the detailed information contained within each image, or sequence of images, 
         into features that are useful to track for the task at hand.
-        In the case of monocular mobile navigation the notion models of features is a key concept in active perception \cite{Activeperception},
-        these models are used to infer $\textit{percepts}$. These are used to make decisions in controlling the robots pose within its environment 
+        In the case of monocular mobile navigation, the notion of feature models is a key concept in active perception \cite{Activeperception}.
+        These models are used to infer $\textit{percepts}$, which are then used to make decisions in controlling the robots pose within its environment 
         \cite{hutchinson1996tutorial}. 
 
         The field of computer vision is concerned with the extraction of these percepts from the image data. 
-        Recent advances in parallel computing have proliferated the use of neural networks in computer vision, which apply a 
-        series of latent filters to the image data. These are trained on large datasets of images 
-        or online \cite{tai2017virtual} \cite{lee2013line} \cite{kober2013reinforcement}. 
-
         Classical computer vision algorithms are used to extract spacial information about the sensed environment over the visible 
-        horizon. Common features are reasoned by geometry, 
-        \cite{lee2009geometric} such as edges, corners, lines and blobs of texture. These are typically processed using a series of 2D convolutional filters,
-        for large images this is computationally expensive and often requires the use of a GPU to parallelize the operations. For performance the image is restricted 
-        to 640x480 pixels and processed in grayscale as the color information is not required.
+        horizon. Common features are reasoned by geometry, \cite{lee2009geometric} such as edges, corners, lines and blobs of texture. 
+        These are typically processed using a series of 2D convolutional filters, or kernels, which for large images is
+        computationally expensive and often requires the use of a GPU to parallelize the operations. In these cases the
+        advances in parallel computing have proliferated the use of neural networks in computer vision, which apply a 
+        series of latent filters to the image data. These are trained on large datasets of images 
+        or online \cite{tai2017virtual} \cite{lee2013line} \cite{kober2013reinforcement}, and aim to simply the process of feature extraction. 
+        
+        The TWSB is equipped with a Raspberry Pi Camera Module V3, which is a rolling shutter camera. Images are obtained 
+        in grayscale directly from the Y plane of the camera driver at 640x480 resolution to improve encoding speed and 
+        minimize wireless transmission bandwidth.
 
         \subsubsection{Calibration}
-        The Raspberry Pi Camera Module V3 Wide angle is used as the physical sensor for the vision system.
-        The camera has a non symmetric field of view, being wider in the horizontal direction than the vertical.
-        This proves useful in identifying large, shallow curvatures in the track 
-        but requires calibration to remove barrel distortion. 
-
+        Cameras are optical devices and are subject to lens and pixel distortion. Modern cameras are assumed to have square pixels, 
+        but still require some calibration to undistort the barrel effect of the lens. 
         The camera is mounted on the TWSB robot at a height of 18cm with an angle of 15 degrees to the floor plane.
-        
-       
-        The camera matrix and distortion coefficients are obtained by taking calibration sequence of images of a 
-        chessboard pattern. The commonly used Zhang's Method is used to obtain the camera matrix and distortion coefficients. 
-       
-        \begin{equation}
-            \begin{aligned}
-                H = \begin{bmatrix}
-                    1 & 0 & -\frac{w}{2} \\
-                    0 & 1 & -\frac{h}{2} \\
-                    0 & 0 & 1
-                \end{bmatrix}
-                \begin{bmatrix}
-                    cos(\theta) & -sin(\theta) & 0 \\
-                    sin(\theta) & cos(\theta) & 0 \\
-                    0 & 0 & 1
-                \end{bmatrix}.
-            \end{aligned}
-            \label{eq:Homography Matrix}
-        \end{equation}
-        The chessboard patters is also used to recalculate the homography matrix between the camera and the floor plane, which when
-        applied to the image frame, produces a birds eye view of the environment. 
-        Homography assumes that the camera is orthogonal to the floor plane, the pitch angle of the TWSB is applied 
-        through a rotation matrix to the image frame given by:
-        
-        This acts to correct the geometric distortion of the image from non-orthogonal projection of the camera. 
-
-        \subsection{Indoor Drivability Segmentation}
-        A simple floor segmentation method is used to estimate the horizon, where the floor meets the wall, 
-        by finding the largest horizontal line in the image. 
-
+        This perspective results in rectangles in the environment being projected into trapezoids.  This makes it difficult to 
+        obtain distances between different features identified in the image \cite{tuohy2010distance}
+        A top down, orthographic view of the floor plane is is desired, where there is a linear function mapping pixels sizes 
+        to real world distances. A chessboard pattern of known dimensions is placed on the floor plane in front of the camera, 
+        this encompasses the entire field of view. From the position of the chessboard corners in the image, 
+        a homography matrix is obtained which maps the image coordinates to the real world coordinates, 
+        resulting in the corrected perspective transform shown in Fig.(\ref{fig:perspective}). 
+        This method assumes the pitch angle, and thus its field of view of the camera to be constant, it it diverges too much the 
+        mapping needs to be re-calibrated. 
         \begin{figure}[H]
             \centering
-            \begin{subfigure}[b]{0.45\textwidth}
-                \includegraphics[width=0.8\textwidth]{ApprachWallCurve.png}
-                \caption{Floor Segmentation}
-                \label{fig:FloorSegmentation}
-            \end{subfigure}
-            \hfill
-            \begin{subfigure}[b]{0.45\textwidth}
-                \includegraphics[width=0.8\textwidth]{Obstacles.png}
-                \caption{Obstacle Detection}
-                \label{fig:ObstacleDetection}
-            \end{subfigure}
-            \caption{Floor Segmentation}
+            \includegraphics[width=0.6\textwidth]{visionpipeline/WallCuveLeft.png}
+            \caption{Perspective Correction}
+            \label{fig:perspective}
         \end{figure}
 
         \pagebreak{}
-        \subsection{Robust Line Detection Algorithms}
-
+        \subsection{Track Detection}
+        The robot must be able to obtain an estimate of where the track line is, relative to its forward direction.
         In non ideal environments, significant noise is present in the image data, 
-        and simple edge thresholding methods are not adequate. This noise can lead large errors
-        in the estimated position of the track. Once the birds eye view map of the track is obtained, 
-        from Fig.\ref{fig:LineDetection} by weighted summing the pixel in the x direction, it can be seen that the 
-        curvature of line can be parametrized by the width of the identified peak. The ideal straight line can be through of as
-        a single peak in the middle of the image.  
-
+        and simple edge thresholding methods[] are not sufficient. This noise can lead large errors
+        in the estimated position of the track. The information in the image needs to be condensed into a set of features
+        which describe the track. Summing the pixels values in each column, a distribution of the edges 
+        across the image is found. The ideal straight line can be thought of as a single peak in the center of the frame.  
+        It can be seen in Fig.\ref{fig:Line Detection and Segmentation} that this method results in peaks of different 
+        shapes depending on the curvature of the track, however the track position in the image plane is readily 
+        segmented by the peaks topological prominence, that is the difference between 
+        a peak and the local minima around it. 
         \begin{figure}[H]
             \centering
             \begin{subfigure}[b]{0.45\textwidth}
-                \includegraphics[width=\textwidth]{vizSmallCurve.png}
+                \includegraphics[width=\textwidth]{visionpipeline/vizSmallCurve.png}
                 \caption{Low Curvature}
                 \label{fig:LineDetection}
             \end{subfigure}
             \hfill
             \begin{subfigure}[b]{0.45\textwidth}
-                \includegraphics[width=\textwidth]{vizBigCurve.png}
+                \includegraphics[width=\textwidth]{visionpipeline/vizBigCurve.png}
                 \caption{Sharp Curvature}
                 \label{fig:Sharp Curvature}
             \end{subfigure}
             \caption{Line Detection and Segmentation}   
         \end{figure}
 
-        Some challenging cases, where simpler methods may fail, are shown in Fig.\ref{fig:ChallengingEnvironments}.
-        Here it can be seen these cases have a higher noise floor, that is the the peak is not as prominent. 
-        This prominence can be used as as an indicator of the quality of the line detection algorithm, where good algorithms 
-        maximize the peak to noise ratio.
+        Some challenging cases, where simpler methods may fail, are shown in 
+        Fig.\ref{fig:ChallengingEnvironments}. Here it can be seen that these cases have a higher noise floor, 
+        that is the the peak is not as prominent. This prominence can be used as as an indicator of the confidence that 
+        the peak is the true position of the track. 
 
         \begin{figure}[H]
             \centering
             \begin{subfigure}[b]{0.45\textwidth}
-                \includegraphics[width=\textwidth]{vizEnvNoise.png}
+                \includegraphics[width=\textwidth]{visionpipeline/vizFalsePos.png}
                 \caption{False Positives}
                 \label{fig:FalsePositives}
             \end{subfigure}
             \hfill
             \begin{subfigure}[b]{0.45\textwidth}
-                \includegraphics[width=\textwidth]{vizLightOclusion.png}
+                \includegraphics[width=\textwidth]{visionpipeline/vizLightOclusion.png}
                 \caption{Reflective Occlusion}
                 \label{fig:ReflectOcclusion}
             \end{subfigure}
@@ -1082,36 +1088,51 @@
             \label{fig:ChallengingEnvironments}
         \end{figure}
 
-        False positive are a serious issue with line detection algorithms as they often cause the robot to loose track of the original path. 
-        These are difficult to remove as outliers in the image data as they form peaks of similar shapes to other features. This non unique mapping 
-        of image data to classified set of features is a common issue in robotic navigation. 
-        Assuming that the robot is initially on the track, then the search space for the peak can be expanded around the last known position of the track. 
-        A topological peak tracker grouping peaks of similar shape, width prominence and position, further reducing outliers. 
-        This results an a set of best candidate peaks, which are sorted by their distance from last known position and prominence. 
-
-        The procedure is shown in Fig.\ref{fig:VizNavigation} where the image is split into 3 sections, thus obtaining points at different lookahead distances 
-        on the track. 
-
-        \begin{figure}[H]
-            \centering
-            \includegraphics[width=0.6\textwidth]{Diagrams/VIzNav.pdf}
-            \caption{vision System}
-            \label{fig:Vision}
-        \end{figure}
-
-        A baseline algorithm reactively changes the steering angel based on the peak obtained closet to the robot, at the bottom of the image frame.  
-        A more advanced algorithm makes use of the other peaks to determine the curvature of the track, from which a pure pursuit controller is used to
-        determine the steering angle, as shown in Fig.\ref{fig:PurePersuit}.
-
-
+        False positive as shown in Fig.(\ref{fig:FalsePositives}) are a serious issue with line detection algorithms as 
+        they often cause the robot to loose track of the original path in a non recoverable manner.
+        These are difficult to remove once present in the 1D histogram of the edges, as they form peaks of similar shapes to desired features. 
+        This non unique mapping of data to a set of features is a common issue in robotic perception, as such the control and perception methods 
+        must be co designed to reject these robustly.
         
+        From these images 3 sources of noise features are identified: salt and pepper noise, arising mainly through impulses in texture 
+        variation of the floor, objects boundaries resulting in an edge of similar shape to the track, and occlusions from reflections 
+        or movement blur stemming from the rolling shutter of the camera.
 
-        \subsection{Navigation requirements}
-
-
+        Pre-filters like the median filter can be used to remove salt and pepper noise, however this is computationally expensive, taking on average 10ms
+        to process a single frame on the selected hardware resulting an the enter pipelining not running in realtime. 
+        The proposed vision pipeline uses morphological operators to modify the shape of the features in the image.
+        By eroding and dilating these features, the impulse noise is removed, this lowers the median noise floor, increasing the prominence of the peaks. 
+        Assuming that the robot is initially on the track, then the search space for the peak representing the track can be expanded around the last
+        known position of the track. Subsequently, the track peak is searched for staring at the bottom of the image, and sliding a window upwards, 
+        until a large discontinuity is found. This is done by searching for the largest peak in the histogram, warm starting each sections search from the position 
+        of the peak found in the section bellow it, and then checking if the next peak is within a certain distance. In this manner
+        a series of waypoints on the track is obtained, which as shown in Fig.\ref{fig:LineDetection} are robust to the sources of noise discussed. 
+        The algorithm processes each frame and obtains a continuous set of waypoints describing the track on average in 0.15ms when running on the Raspberry Pi 5.
+        \begin{figure}[H]
+              \centering
+              \begin{subfigure}[b]{0.32\textwidth}
+                 \includegraphics[width=\textwidth,height=0.2\textheight]{visionpipeline/curverightapprach.png}
+                 \caption{Right Curve Approach}
+                 \label{fig:appoachRight}
+              \end{subfigure}
+              \hfill 
+              \begin{subfigure}[b]{0.32\textwidth}
+                 \includegraphics[width=\textwidth,height=0.2\textheight]{visionpipeline/straightoffsetleft.png}
+                 \caption{Off Straight}
+                 \label{fig:straight} 
+              \end{subfigure}
+              \hfill
+              \begin{subfigure}[b]{0.32\textwidth}
+                 \includegraphics[width=\textwidth,height=0.2\textheight]{visionpipeline/apprachLeft.png}
+                 \caption{Exit Chicane}
+                 \label{fig:exitChicane}
+              \end{subfigure}
+              \caption{Path Waypoints}
+              \label{fig:PathWayPoints}
+           \end{figure}
 
         \subsection{Racing Algorithms}
-            \subsubsection{Intensity Following}
+            \subsubsection{Lateral Control}
             A bang bang type steering controller is used obtain a baseline track performance. 
             This is a reactive controller which uses the cross track error, obtained via a topological peak tracker as described in section 6.2.
             In this case the velocity target of the robot is set to some constant value. 
@@ -1120,56 +1141,49 @@
             sharp sequences of curves, chicanes, where the track in the observed section is lost. In this case, by rolling off the last known position 
             of the track towards the center of the image, and setting the velocity target to zero, the robot is able to navigate the track past the chicane.
             
-            The robots telemetry is used to build and odometry estimate of the track for a series of experiments, Fig.\ref{fig:TrajTrack} shows that suffers 
-            from oscillations along the straights and overshoots on the curves, here the bold lines represent the estimated robot position, $(x_g, y_g)$, and the
-            translucent fill represents the vector of the robot's heading each sample instant $\psi_g$. 
-        
+            The robots telemetry odometry is used to build estimate of the path taken by the robot across a series of experiments, Fig.\ref{fig:TrajTrack} shows 
+            that performance suffers from oscillations along the straights and overshoots on the curves, here the bold lines represent the estimated robot position,
+            $(x_g, y_g)$, and the translucent fill represents the vector of the robot's heading each sample instant $\psi_g$. 
             \begin{figure}[H]
                 \centering
-                \begin{subfigure}[c]{0.35\textwidth}
-                    \includegraphics[height=1.2\textwidth]{Track.pdf}
-                    \caption{Race Track}
-                \end{subfigure}
-                \hfill
-                \begin{subfigure}[c]{0.6\textwidth}
-                    \includegraphics[width=\textwidth]{Graphs/Path Following.pdf}
-                    \caption{Map built offline using dead reckoning}
-                \end{subfigure}
-                \caption{Trajectory Tracking and Map Visualization}
+                \includegraphics[width=0.7\textwidth]{Graphs/Path Following.pdf}
+                \caption{Map built offline using dead reckoning}
+                \caption{Lateral Control}
                 \label{fig:TrajTrack}
             \end{figure}
+
             From these laps, described in table \ref{tab:lap_stats} variance of the change in steering control vector between samples is small 
             but increases with speed, together with the large overshoots in heading vector from Fig.\ref{fig:TrajTrack} this indicates 
-            that the robots tracking performance is degraded by non smooth control signals, inducing in large overshoots, where the robot is 
-            unable to catch up to the curvature of the track.
-            The bang bang nature of this controller can also be seen 
-            on the straights, where the control angle oscillates about the centerline. 
-            The linear velocity measured also increases in variance with the setpoint speed, this is due to 
-            the steering controller model in Fig.\ref{fig:PID}. 
-            \begin{table}[h]
-                \centering
-                \begin{tabular}{cccc}
-                    \toprule
-                    \textbf{Time (s)} & $\nu_{trgt}$ \textit{(m/s)} & $\nu_g$ \textit{var}& $\Delta\psi$ \textit{var} \\  
-                    \midrule
-                    40.59 & 0.190 & 0.0112 & 1.0207 \\  
-                    32.00 & 0.240 & 0.0122 & 1.4781 \\  
-                    27.00 & 0.280 & 0.0093 & 1.4958 \\  
-                    27.20 & 0.300 & 0.0105 & 1.6750 \\  
-                    22.80 & 0.350 & 0.0140 & 1.6480 \\  
-                    \bottomrule
-                \end{tabular}
-                \caption{Lap Statistics}
-                \label{tab:lap_stats}
-            \end{table}
-
-
+            that the robots tracking performance is degraded by non smooth control signals so the robot is unable to catch up to the curvature of the track.
+            The bang bang nature of this controller can also be seen on the straights, where the control angle oscillates about the centerline.             
+            For each target speed 10 laps of the track are performed, at higher speeds the robot is unable to repeatability navigate the track using this method. 
+  
             Yet, neglecting errors in path following accuracy, this method is still able to perform laps of the track 
-            without loosing the line or crashing into the wall boundary. The is can be attributed to 
-            the implicit loop ahead in the vision system, shown in Fig.\ref{fig:PurePersuit}, where the the bottom of the image frame 
-            captures the track some distance ahead of the robot.
+            without loosing the line or crashing into the wall boundary. This can be attributed to 
+            the implicit look ahead in the vision system, shown in Fig.\ref{fig:PurePersuit}, where the the bottom of the image frame 
+            captures the track some distance ahead of the robot. 
             
-            \subsubsection{Waypoint Following}
+            \subsubsection{Adaptive Lookahead and Longitunal control}
+            Towards better racing performance, the faliuers cases of understeering on curves and oversteerign on straights 
+            are improved in 2 manners. The linear velocity 
+            of the robot is inversly proportional to the numer of waypoints found vision system, as this represents much track there is 
+            ahead of the robot.  This slows the robot down as it approaches a curve and allows it to accelerate on straights. 
+            By entring the cuvers at a lower speed, the robot no longer looses the track from its frame. The chicane poses a challenge as 
+            the robot must enter it sloly but it is desirebel to accleerate out of it. Considering that upon enterign the chicane, 
+            the logitunal controler slows the robot down, so more of the track is visible, hence in order ot accelrare out of the track 
+            the lookahead distance is increased inversly proportional to the number of waypoints. 
+            This approach is counter intutive as commonly, on straights the lookead distance is increased 
+            and decreased on curves, however in the case of the TWSB robot, when the lookahead distance is too small the dead zone
+            in the vision system causes track to leave the image frame on sharp curves such at the apex of
+            the chicane shown in Fig.\ref{fig:Chicane}.
+
+                    
+            In order to suitably race the TWSB it must be able to quickly and stably decelerate to a stop. Moreover, at sharp corners, the linear velocity must be 
+            reduced, as otherwise cornering forces become significant and the TWSB may lose wheel traction, 
+            losing balancing control authority and crashing. 
+            By increasing the lookahead distance in such a manner  the robot obtains a waypoint which is past the apex of the chicane allowing it to accelerate out 
+            of the curve. This late apex racing strategy  is commonly use by human divers, \cite{kegelman2017insights}. 
+
 
             \begin{figure}[h]
                 \centering
@@ -1177,17 +1191,28 @@
                 \caption{Local Path Following}
                 \label{fig:PurePersuit}
             \end{figure}
-
-            \subsubsection{Predictive Trajectory Generation}
-    
     \pagebreak{}
 
 
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
   \section{Results and discussion} % edit section heading as appropriate
     \subsection{Balance Performance}
-    \subsection{Line Following}
-   
+    \subsection{Race Performance}
+            
+    \begin{figure} [H]
+        \centering
+        \begin{subfigure}[b]{0.48\textwidth}
+            \includegraphics[width=\textwidth]{Graphs/Trial1.pdf}
+            \caption{Trial 1}
+            \label{fig:Trial1}
+        \end{subfigure}
+        \hfill
+        \begin{subfigure}[b]{0.48\textwidth}
+            \includegraphics[width=\textwidth]{Graphs/Trial4.pdf}
+            \caption{Trial 2}
+            \label{fig:Trial2}
+        \end{subfigure}
+    \end{figure}
 
     \subsection{More detail}
     \subsection{Summary}

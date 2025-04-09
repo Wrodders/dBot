@@ -202,7 +202,7 @@ int main(void){
                     pidClear(&velCtrl);
                     pidClear(&balanceAngleCtrl);
                     pidClear(&steerCtrl);
-                    ddmr.posX = 0.0f;
+                    ddmrReset(&ddmr);
                     nextMode = CASCADE;
                     comsSendMsg(&coms, &ser1, PUB_INFO, "PARK => RUN");
                 }

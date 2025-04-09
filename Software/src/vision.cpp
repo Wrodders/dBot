@@ -108,10 +108,10 @@ int run(int argc, char* argv[]) {
     param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
     param_map.set_value(viz::P_LOOK_HRZ_HEIGHT,360);
     param_map.set_value(viz::P_MAX_VEL, 0.35);
-    param_map.set_value(viz::P_NAV_EN, 1);
-    param_map.set_value(viz::P_KP, 0.8);
-    param_map.set_value(viz::P_KI, 0.01);
-    param_map.set_value(viz::P_KD, 0.5);
+    param_map.set_value(viz::P_NAV_EN, 0);
+    param_map.set_value(viz::P_KP, 1.1);
+    param_map.set_value(viz::P_KI, 0.09);
+    param_map.set_value(viz::P_KD, 1.2);
     param_map.set_value(viz::P_LOOKAHEAD, 0.9);
     
     // ------------- Command Server & Trajectory Threads ----------------- //
@@ -173,7 +173,7 @@ int run(int argc, char* argv[]) {
                 handleAlgo1(y_plane, outputFrame,param_map);
                 break;
             case viz::M_ALGO2:
-                handleAlgo2(y_plane, outputFrame, param_map);
+                handleAlgo2(y_plane, outputFrame,param_map);
                 break;
             case viz::M_ALGO3:
                 handleAlgo3(y_plane, outputFrame, homography_matrix, param_map);
@@ -300,7 +300,7 @@ void handleBirdMode(const cv::Mat& undistorted, cv::Mat& outputFrame, cv::Mat& h
                         cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS, cv::BORDER_CONSTANT, cv::Scalar(164));
 }
 
-void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& param_map) {
+void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame,ParameterMap& param_map) {
     static nav::PIDController pid(1.0f, 0.0, 0.0f);
     // ------- Look Ahead Section------- //
     float horz_height;
@@ -341,6 +341,7 @@ void handleAlgo1(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
     cv::Rect peakRect(est_idx - 10, viz_section.rows - 20, 20, 20);
     cv::rectangle(viz_section, peakRect, cv::Scalar(128), -1);
 }
+
 
 void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& param_map) {
     static nav::PIDController pid(1.0f, 0.0f, 0.0f);
@@ -440,12 +441,18 @@ void handleAlgo2(const cv::Mat& inputFrame, cv::Mat& outputFrame, ParameterMap& 
 
 void handleAlgo3(const cv::Mat& inputFrame, cv::Mat& outputFrame, cv::Mat& homography_matrix, ParameterMap& param_map) {
     // -- Project Track to BEV -- 
-    cv::Mat floor_frame;
-    viz::extractFloorPlane(inputFrame, floor_frame);
+    cv::Rect roiRect(0, 100, viz::WIDTH, viz::HEIGHT - 100);
+    cv::Mat roi = inputFrame(roiRect);
     cv::Mat bev;
-    cv::warpPerspective(floor_frame, bev, homography_matrix, floor_frame.size(),
+    cv::warpPerspective(roi, bev, homography_matrix, roi.size(),
     cv::WARP_INVERSE_MAP | cv::INTER_LINEAR | cv::WARP_FILL_OUTLIERS,
     cv::BORDER_CONSTANT, cv::Scalar(0));
+
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3), cv::Point(-1, -1));
+    cv::dilate(bev, bev, kernel, cv::Point(-1, -1), 2);
+    cv::Mat track_edges;
+    cv::Sobel(bev, track_edges, CV_8U, 1, 0, 3, 1, 0, cv::BORDER_DEFAULT);
+    viz::maskWarpBorder(track_edges);
 }
 
 // ------------------ Main  ----------------- //

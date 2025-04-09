@@ -121,7 +121,7 @@ void maskWarpBorder(cv::Mat& frame){
     std::vector<cv::Point> contour = {
         cv::Point(10, 0),
         cv::Point(frame.cols-10, 0),
-        cv::Point(frame.cols/2 +200, frame.rows),
+        cv::Point(frame.cols/2 + 200, frame.rows),
         cv::Point(frame.cols/2 -200, frame.rows)
     };
     cv::line(frame, contour[0], contour[3], cv::Scalar(0), 30);

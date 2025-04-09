@@ -16,7 +16,7 @@ struct DiffDriveModel{
     // kinematic state
     float v_b;   // linear velocity m/s    
     float posX;  // x position [m] in robot frame
-    float w_b;   // angular vel [rad/s]
+    float w_b;   // angular vel [rps]
    
     float x_g;   // x position [m] in global frame
     float y_g;   // y position [m] in global frame
