@@ -270,7 +270,7 @@ void command_server(ParameterMap& param_map) {
 static inline bool val_hrz_height(float val) { return (val > 0 && val < viz::HEIGHT); }
 static inline bool val_trfm_pad(float val)   { return (val > 0 && val < viz::WIDTH); }
 static inline bool val_prog_mode(float val)  { return (val >= 0 && val < viz::NUM_MODES); }
-static inline bool val_max_vel(float val)    { return (val >= 0 && val < 1); }
+static inline bool val_max_vel(float val)    { return (val >= 0 && val < 3); }
 static inline bool val_nav_en(float val)     { return (static_cast<int>(val) % 2 == 0 || static_cast<int>(val) % 2 == 1); } // test if 0 or 1
 static inline bool val_gain(float val)       { return (val >= 0 && val < 100); }
 static inline bool val_lookahead(float val)  { return (val >= 0 && val < 1); } 

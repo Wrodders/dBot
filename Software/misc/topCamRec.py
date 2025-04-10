@@ -8,7 +8,7 @@ import signal
 import sys
 import os
 
-CAMERA_INDEX = 1  # Change if needed
+CAMERA_INDEX = 0  
 RESOLUTION = "1920x1080"
 FPS = 30
 DURATION = 60  # Seconds
