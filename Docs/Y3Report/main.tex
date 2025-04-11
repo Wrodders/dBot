@@ -345,10 +345,7 @@
     W_2 = W_1 \left(\frac{J_b }{M_b L} + L\right)
     \]
 
-    where $M_w$ is the mass of the wheel, $J_w$ is the moment of inertia of the wheel, 
-    $M_b$ is the mass of the body and its mass moment $J_b$ can be obtained by the parallel axis theorem.
-
- 
+    where $M_w$ is the mass of the wheel, $J_w$ is the moment of inertia of the wheel.
     \pagebreak{}
 
     \section{System Design}
@@ -738,8 +735,6 @@
         This manages to stabilize the pitch angle yet $x$ position drifts over time as this 
         state variable is not controlled.
         More complete control laws are discussed in the following sections.
-
-
         \subsubsection{Controler requirements}
 
         The TWSB achieves balance by controlling the oscillations of the pitch angle about the 
@@ -753,7 +748,8 @@
         In the sequence the low level controls are developed to meet these requirements:
         \begin{enumerate}
             \item The pitch angle must be regulated to $±1$ degree.
-            \item The global $x$ position should be controlled by a linear velocity reference.
+            \item The robot must be able to safely recover from disturbances due to external forces and the environmental.
+            \item The robot must be able track a reference velocity, with minimum overshoot.
         \end{enumerate}
 
         \subsection{Cascade PID}
@@ -769,40 +765,30 @@
         Again, simscape multibody is used to verify the feasibility of this kind of controller Fig.(\ref{fig:SimPID}).
         \begin{figure}[H]
             \centering
-            \includegraphics[width=0.8\textwidth]{Graphs/Simulation Cascade PID.pdf}
+            \includegraphics[width=0.7\textwidth]{Graphs/Simulation Cascade PID.pdf}
             \caption{Simscape Multibody Simulation of PID Cascade Controller regulating the linear velocity of the TWSB}
             \label{fig:SimPID}
         \end{figure}
 
-        In order to determine the maximum operating frequency of the outer loop, 
-        the inner motor speed loop is closed at 500Hz. Then the system is observed.
-        through the Ziegler-Nichols method and the PID gains for each DC Motors speed control loop 
+       
+        Through the Ziegler-Nichols method and the PID gains for each DC Motors speed control loop 
         are obtained as shown in table(2). This process however may cause damage to the motors 
         during the sustained oscillations at the critical gain. 
-       
-        \begin{table}[H]
-            \centering
-            \begin{tabular}{|r|c|c|}
-                \hline
-                Parameter & $K_p$ & $K_i$ \\
-                \hline
-                Motor 1 & 2.4 & 5 \\
-                Motor 2 & 2.8 & 5 \\
-                \hline
-            \end{tabular}
-            \caption{DC Motor PI Gains}
-        \end{table}
+        In order to determine the maximum operating frequency of the outer loop, 
+        the inner motor speed loop is closed at 500Hz. Then the system is observed under chirp inputs to the motor, and from 
+        these responses the error of the pitch angle is subsequently regulated by a PID controller operating at 100Hz.
 
-        A P controller is used to correct the steering control signal, which  is modeled
-        as a disturbance from the 2D dynamics model.
-
-        The error of the pitch angle is regulated by a PID controller operating at 100Hz.
-        This results in a stable system in 1DOF space, controlling the body velocity requires the outermost loop to be closed at 20Hz.
-        The final cascaded closed loop pid controller is shown in fig(5) with the gains in table(5)
+        This results in a stable system in 1DOF space. To minimize chatter in the pitch angle control signal, the outermost 
+        loop controlling the body velocity is be closed at 20Hz.
+        The final cascaded closed loop pid controller is shown in Fig.(\ref{fig:Cascade}) with the gains in table(\ref{tab:PIDGains}). 
+        This control system is able to adjust its target balancing point in such a manner as to come to an equilibrium, overcoming small 
+        errors in construction of the robot which might result in a center of mass  which is not directly above the wheel axel. 
+        Without the outermost loop controller the TWSB is sensitive to this error and the offset must be tuned experimentally.
 
         \begin{figure}[H]
             \includegraphics[width=\textwidth]{Diagrams/cascade.pdf}
             \caption{Cascaded PID Controller}
+            \label{fig:Cascade}
         \end{figure}
 
         \begin{table}[H]
@@ -813,20 +799,20 @@
                 \hline
                 Parameter & $v_b$ & $\theta$  & $\omega_L$ & $\omega_R$ & $\dot{\psi_b}$ \\
                 \hline      
-                $K_p$ & 2.2 & 0.19 & 2.4 & 2.9 & 0.8 \\
-                $K_i$ & 0.8 & 5.6 & 24.8 & 24.8 & 2\\
-                $K_d$ & 0 & 0.003 & 0 & 0  &  0\\
+                $K_p$ & 3.5 & 0.19 & 2.4 & 2.9 & 0.7 \\
+                $K_i$ & 0.8 & 5.6 & 24.8 & 24.8 & 0 \\
+                $K_d$ & 0 & 0.003 & 0 & 0  &  0 \\
                 \hline
             \end{tabular}
-            \caption{PID Gains}
+            \caption{Control system PID Gains}
+            \label{tab:PIDGains}
         \end{table}
       
-
         \pagebreak{}
         \section{Navigation System}
         The TWSB robot is tasked with navigating around a track, marked by a line assumed to be of significant contrast to to its 
         surrounding environment. The performance of the navigation system can be characterized by the cross track error and the lap time, 
-        with the former being a critical failure mode, where position diverges significant from the track in a non-recoverable manner.
+        with the former being a critical failure mode, if position diverges significantly from the track in a non-recoverable manner.
         \begin{figure}[H]
             \centering
             \includegraphics[width=0.6\textwidth]{TestTrack.pdf}
@@ -861,7 +847,7 @@
         This method is suitable for simple tracks and low speeds.
         
         In contrast, trajectory tracking is a method that generates some optimum path from the sensed environment and subsequently follows this path.
-        This 2 stage process is falls under planning and is useful in cases where the lap time is more important than the cross-track error.
+        This two stage process is falls under planning and is useful in cases where the lap time is more important than the cross-track error.
         In racing, the robot has to to perform at the limits of its handling capabilities \cite{wischnewski2022indy}. Hence a method 
         for automatic safety is required, a common method extends planning by predicting the robot's position over some horizon,
         a velocity profile can be then obtained whilst maintaining the robot within certain bounds, often the profile is 
@@ -920,13 +906,13 @@
         A top down, orthographic view of the floor plane is is desired, where there is a linear function mapping pixels sizes 
         to real world distances. A chessboard pattern of known dimensions is placed on the floor plane in front of the camera, 
         this encompasses the entire field of view. From the position of the chessboard corners in the image, 
-        a homography matrix is obtained which maps the image coordinates to the real world coordinates, 
+        a homography matrix is obtained which maps the image coordinates to the real world coordinates \cite{bradski2008learning},
         resulting in the corrected perspective transform shown in Fig.(\ref{fig:perspective}). 
         This method assumes the pitch angle, and thus its field of view of the camera to be constant, it it diverges too much the 
-        mapping needs to be re-calibrated. 
+        mapping needs to be re-calibrated which is computationally expensive on the Raspberry Pi.
         \begin{figure}[H]
             \centering
-            \includegraphics[width=0.6\textwidth]{visionpipeline/WallCuveLeft.png}
+            \includegraphics[width=0.6\textwidth]{visionpipeline/perspective.png}
             \caption{Perspective Correction}
             \label{fig:perspective}
         \end{figure}
@@ -935,7 +921,7 @@
         \subsection{Track Detection}
         The robot must be able to obtain an estimate of where the track line is, relative to its forward direction.
         In non ideal environments, significant noise is present in the image data, 
-        and simple edge thresholding methods[] are not sufficient. This noise can lead large errors
+        and simple edge thresholding methods are not sufficient. This noise can lead large errors
         in the estimated position of the track. The information in the image needs to be condensed into a set of features
         which describe the track. Summing the pixels values in each column, a distribution of the edges 
         across the image is found. The ideal straight line can be thought of as a single peak in the center of the frame.  
@@ -957,6 +943,7 @@
                 \label{fig:Sharp Curvature}
             \end{subfigure}
             \caption{Line Detection and Segmentation}   
+            \label{fig:Line Detection and Segmentation}
         \end{figure}
 
         Some challenging cases, where simpler methods may fail, are shown in 
@@ -987,12 +974,12 @@
         This non unique mapping of data to a set of features is a common issue in robotic perception, as such the control and perception methods 
         must be co designed to reject these robustly.
         
-        From these images 3 sources of noise features are identified: salt and pepper noise, arising mainly through impulses in texture 
+        From these images, three sources of noise features are identified: salt and pepper noise, arising mainly through impulses in texture 
         variation of the floor, objects boundaries resulting in an edge of similar shape to the track, and occlusions from reflections 
         or movement blur stemming from the rolling shutter of the camera.
 
         Pre-filters like the median filter can be used to remove salt and pepper noise, however this is computationally expensive, taking on average 10ms
-        to process a single frame on the selected hardware resulting an the enter pipelining not running in realtime. 
+        to process a single frame on the selected hardware; resulting an the entire pipelining not running in realtime. 
         The proposed vision pipeline uses morphological operators to modify the shape of the features in the image.
         By eroding and dilating these features, the impulse noise is removed, this lowers the median noise floor, increasing the prominence of the peaks. 
         Assuming that the robot is initially on the track, then the search space for the peak representing the track can be expanded around the last
@@ -1024,6 +1011,16 @@
               \label{fig:PathWayPoints}
            \end{figure}
 
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.4\textwidth, height=0.2\textheight]{Diagrams/PurePersuit.pdf}
+            \caption{Local Waypoint Following}
+            \label{fig:PurePersuit}
+        \end{figure}
+
+        
+        \pagebreak{}
         \subsection{Racing Algorithms}
             \subsubsection{Lateral Control}
             A bang bang type steering controller is used obtain a baseline track performance. 
@@ -1031,65 +1028,95 @@
             In this case the velocity target of the robot is set to some constant value. 
             The virtual sensor is applied to a small section of the bottom of the image frame, representing points on the track which are closest to the robot. 
             This manages to navigate the track without loosing it on straights and gentle curves, however it is suffers on
-            sharp sequences of curves, chicanes, where the track in the observed section is lost. In this case, by rolling off the last known position 
-            of the track towards the center of the image, and setting the velocity target to zero, the robot is able to navigate the track past the chicane.
-            
-            The robots telemetry odometry is used to build estimate of the path taken by the robot across a series of experiments, Fig.\ref{fig:TrajTrack} shows 
-            that performance suffers from oscillations along the straights and overshoots on the curves, here the bold lines represent the estimated robot position,
-            $(x_g, y_g)$, and the translucent fill represents the vector of the robot's heading each sample instant $\psi_g$. 
-            \begin{figure}[H]
-                \centering
-                \includegraphics[width=0.7\textwidth]{Graphs/Path Following.pdf}
-                \caption{Map built offline using dead reckoning}
-                \caption{Lateral Control}
-                \label{fig:TrajTrack}
-            \end{figure}
-
-            From these laps, described in table \ref{tab:lap_stats} variance of the change in steering control vector between samples is small 
-            but increases with speed, together with the large overshoots in heading vector from Fig.\ref{fig:TrajTrack} this indicates 
-            that the robots tracking performance is degraded by non smooth control signals so the robot is unable to catch up to the curvature of the track.
-            The bang bang nature of this controller can also be seen on the straights, where the control angle oscillates about the centerline.             
-            For each target speed 10 laps of the track are performed, at higher speeds the robot is unable to repeatability navigate the track using this method. 
-  
-            Yet, neglecting errors in path following accuracy, this method is still able to perform laps of the track 
-            without loosing the line or crashing into the wall boundary. This can be attributed to 
-            the implicit look ahead in the vision system, shown in Fig.\ref{fig:PurePersuit}, where the the bottom of the image frame 
-            captures the track some distance ahead of the robot. 
+            sharp sequences of curves, chicanes, where the track in the observed section is lost or degraded. In this case, by rolling off the last known position 
+            of the track towards the center of the image at each frame sample, and setting the velocity target to zero when no line is detected,
+            the robot is able to navigate the track past the chicane. This control method is not robust or reliable and few trials are able to be performed where 
+            the robot does not loose the track is forced to come to a stop.
+            Despite the limitations in path-following accuracy, this simple method is capable of completing laps of the track at a
+            low speed, \( v_{\text{max}} \ll 0.3 \, \text{m/s} \).
+            This can be attributed to the implicit look ahead in the vision system, shown in Fig.\ref{fig:PurePersuit}, where the the bottom of the image frame 
+            captures the track some distance ahead of the robot and not exactly at its current position.
             
             \subsubsection{Adaptive Lookahead and Longitunal control}
-            Towards better racing performance, the faliuers cases of understeering on curves and oversteerign on straights 
-            are improved in 2 manners. The linear velocity 
-            of the robot is inversly proportional to the numer of waypoints found vision system, as this represents much track there is 
-            ahead of the robot.  This slows the robot down as it approaches a curve and allows it to accelerate on straights. 
-            By entring the cuvers at a lower speed, the robot no longer looses the track from its frame. The chicane poses a challenge as 
-            the robot must enter it sloly but it is desirebel to accleerate out of it. Considering that upon enterign the chicane, 
-            the logitunal controler slows the robot down, so more of the track is visible, hence in order ot accelrare out of the track 
-            the lookahead distance is increased inversly proportional to the number of waypoints. 
-            This approach is counter intutive as commonly, on straights the lookead distance is increased 
+            Constant parameter tuning is undesirable in a racign context as the robot must be able to adapt to the environment.
+            Lookahead distance one of such parameters which are often fixed or tuned experimentally,
+            towards better racing performance, the failures cases of understeering on curves and oversteering on straights 
+            are improved in 2 manners. The linear velocity of the robot is set to be inversely proportional to the number of waypoints found vision system,
+            as this represents much track there is ahead of the robot. This implicitly slows the robot down as it approaches a curve, 
+            and handles adverse environmental conditions such as occlusions in the track automatically and in a predicable and safe manner. 
+            It allows it to accelerate on straights. By entering the cures at a lower speed, the robot no longer looses the track from its frame. 
+            
+            The chicane now poses a different challenge, as the robot must enter it slowly but it is desirable to accelerate out of it.
+            Considering that upon entering the chicane, the longitudinal controller slows the robot down, so more of the track is visible, 
+            hence in order to accelerate out of the curve the lookahead distance is increased inversely proportional to the number of waypoints. 
+            This approach is counter intuitive as commonly, on straights the looked distance is increased 
             and decreased on curves, however in the case of the TWSB robot, when the lookahead distance is too small the dead zone
             in the vision system causes track to leave the image frame on sharp curves such at the apex of
-            the chicane shown in Fig.\ref{fig:Chicane}.
-
-                    
-            In order to suitably race the TWSB it must be able to quickly and stably decelerate to a stop. Moreover, at sharp corners, the linear velocity must be 
-            reduced, as otherwise cornering forces become significant and the TWSB may lose wheel traction, 
-            losing balancing control authority and crashing. 
-            By increasing the lookahead distance in such a manner  the robot obtains a waypoint which is past the apex of the chicane allowing it to accelerate out 
-            of the curve. This late apex racing strategy  is commonly use by human divers, \cite{kegelman2017insights}. 
-
-
-            \begin{figure}[h]
-                \centering
-                \includegraphics[width=0.6\textwidth]{Diagrams/PurePersuit.pdf}
-                \caption{Local Path Following}
-                \label{fig:PurePersuit}
-            \end{figure}
+            the chicane. By increasing the lookahead distance robot takes shallower turns, notably on the hair pin section of the track, enabling it to 
+            increase its speed as the robot obtains a waypoint which is past the apex of the chicane allowing it to accelerate out 
+            of the curve. This late apex racing strategy is commonly use by human racing divers \cite{kegelman2017insights}.
+        
     \pagebreak{}
 
 
   %%%%%%%%%%%%%%%%%% SECTION 4 %%%%%%%%%%%%%%%%%%
   \section{Results and discussion} % edit section heading as appropriate
     \subsection{Balance Performance}
+    A set of experimatnetes are performed on the TWSB to evaluate the suitability of the controller designed in section 5 for the task of racing. 
+    Data is collected at 100Hz and timestamped to ns resolution using the Raspberry Pi's internal clock. 
+
+    The TWSB is righted from rest to a vertical position on a flat surface and the controller is activated. 
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.7\textwidth]{Graphs/Static Balancing.pdf}
+        \caption{Balance Performance}
+        \label{fig:BalancePerformance}
+    \end{figure}
+
+    Fig.\ref{BalancePerformance} shows the 
+    the distribution pitch angle and x position as measured by the robots sensors. 
+    This experiment addresses the static balancing problem of TWSB system, it was run continuously for 95 seconds,
+    after which the it was manually stopped. The results demonstrate that the robot maintains its position within ±1 mm, 
+    while regulating its pitch angle within ±1° of the vertical. The pitch distribution exhibits a sharp mode centered
+    at approximately $-0.3\deg$, indicating a consistent, small offset from the theoretical upright equilibrium. 
+    In contrast, the X position distribution is broader, with a relatively uniform frequency across the range. 
+    This reflects low-amplitude, periodic oscillations in wheel position, which are intrinsic to the balancing process. 
+    These oscillations result from the control effort required to counteract destabilizing torques and maintain upright stability. 
+    Given that the 1 mm deviation represents less than $0.5\%$ of the wheel circumference $\appx{25 cm}$, 
+    it can be concluded that the robot effectively maintains static balance with negligible positional drift.
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.7\textwidth]{Graphs/Disturbance Rejection.pdf}
+        \caption{Disturbance Rejection}
+        \label{fig:DisturbanceRejection}
+    \end{figure}
+
+    In the experiment shown in Fig.\ref{fig:DisturbanceRejection}, the robot is subjected to a series of external disturbances. 
+    Rough terrain, including small household objects such as pens, coins, and other irregular items, is placed in its path. 
+    Additionally, large impulsive forces are applied manually at approximately sample times $k = 800$ and $k = 3200$. 
+    These disturbances displace the robot from its equilibrium, prompting it to regain balance by accelerating forward.
+    Interestingly, despite the fact that the $x$ position is not explicitly regulated by the control system, 
+    the TWSB robot gradually returns to its original position. As the robot traverses the small obstacles during this recovery, 
+    minor oscillations are observed in the $x$ position signal, superimposed on the decaying trend back to zero.
+    The pitch angle also responds to the disturbances, exhibiting transient overshoot relative to the 
+    target angle  $\theta_{\text{trgt}}$. These results confirm the robot's ability to reject both terrain-induced 
+    and impulsive external disturbances, while maintaining dynamic stability.
+
+    \subsection{Velocity Tracking}
+
+    Before testing the robot in a race track enviorment it must be verfied that it is able to track a velocity setpoints, accelerat and most 
+    importantly decelerate whilst maintaining balance. 
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.7\textwidth]{Graphs/Velocity_Tracking.pdf}
+        \caption{Velocity Tracking}
+        \label{fig:VelocityTracking}
+    \end{figure}
+
+    In the experiment shown in Fig.\ref{fig:VelocityTracking}, the robot is commanded via a series of 
+    ramp functions to accelerate and decelerate at a constant rate. These aim to replicate the kinds of reference velocity profiles 
+    the robot will have to perform if it is to achieve good lap times
     \subsection{Race Performance}
             
     \begin{figure} [H]
@@ -1107,10 +1134,18 @@
         \end{subfigure}
     \end{figure}
 
-    \subsection{More detail}
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.7\textwidth]{Graphs/Path Following.pdf}
+        \caption{Map built offline using dead reckoning}
+        \caption{Lateral Control}
+        \label{fig:TrajTrack}
+    \end{figure} 
+
     \subsection{Summary}
   %%%%%%%%%%%%%%%%%% SECTION 5 %%%%%%%%%%%%%%%%%%
-  \section{Conclusions and future work} % edit section heading as appropriate
+  \section{Conclusions and future work} 
     \subsection{Conclusions}
       \subsection{Future work}
   %%%%%%%%%%%%%%%%%% REFERENCES %%%%%%%%%%%%%%%%%%
