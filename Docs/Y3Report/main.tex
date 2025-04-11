@@ -70,14 +70,14 @@
 
     \begin{document}
     \makeatletter
-    \title{Development of Two Wheel Self Balancing Line Following Robot} % title of your thesis
+    \title{Design of a Two Wheel Self Balancing Line Racing Platform} % title of your thesis
     \author{Winston Scott}
     \studentid{107067151}
     \makeatother                                               
-    \wordcount{1000}		                    % use \wordcount{} to set the count, \thewordcount to print in the text
     \maketitle
 
     %%%%%%%%%%%%%%%%%% LISTS OF CONTENT %%%%%%%%%%%%%%%%%%
+    \wordcount{1000}		                    % use \wordcount{} to set the count, \thewordcount to print in the text
     \uomtoc
     \begin{uomterms}
         \textbf{TWSB}:Two Wheel Self Balancing \\
@@ -91,6 +91,8 @@
         \textbf{ppr}:Pulses Per Revolution \\
         \textbf{KF}:Kalman Filter \\
     \end{uomterms}
+
+    \uomdeclarations
 
     %%%%%%%%%%%%%%%%%% ABSTRACT %%%%%%%%%%%%%%%%%%
     \begin{abstract} % put abstract here. Limit is 1 page.
@@ -108,11 +110,9 @@
   \end{abstract}%
   \clearpage
 
-  \uomdeclarations
-
   %%%%%%%%%%%%%%%%%% SECTION 1 %%%%%%%%%%%%%%%%%%
     \section{Introduction}
-    The Two Wheel Self Balancing (TWSB) system is a nonlinear, underactuated system that is dynamically stable.
+    The Two Wheel Self Balancing (TWSB) platform is a nonlinear, underactuated system which is only dynamically stable.
     Compared to the differential drive mobile platform (DDMR), the TWSB requires active control effort
     to maintain its upright posture while in motion and when stationary.
     Substantial research, has been conducted on the similarly unstable 1-DOF inverted pendulum on a cart 
@@ -129,55 +129,46 @@
     capable of autonomous navigation in a variety of indoor environments using a monocular camera.
     
     A notable work on the TWSB system is \cite{grasser2002joe} which designed a TWSB robot capable of disturbance
-    rejection and static stability on an inclined plane. This was implemented using an FPGA-based DSP system.
-    By decoupling the balancing and steering torques in state space an optimum Linear Quadratic Regulator (LQR), the platform 
-    is able to turn about its center effectively.
+    rejection and static pose control on an inclined plane. This was implemented using an FPGA-based DSP system.
+    The controller designed decouples the balancing and steering torques in state space though the Linear Quadratic Regulator (LQR), 
+    allowing the platform is able to turn about its center effectively. This is a behavior which is fundamental to differential drive robots, 
+    and accomplishing this allows for the TWSB to be navigated in a similar manner.
     An early challenge in the navigation of the TWSB system identified by \cite{SelfContainedMobileTWSB} is the sensor 
-    system used for state estimation. The proposed solution uses a gyroscope as a angular rate sensor, which was noted to suffer
-    from drift. Accounting for this drift as a linear function over time, the authors were able to stabilize the system and
-    teleoperated it over short distances. 
+    system used for state estimation. The proposed solution uses a gyroscope as a angular rate sensor, though it 
+    was noted to suffer from drift. Accounting for this drift as a linear function over time, the authors were able to 
+    stabilize the system and teleoperated it over short distances. 
 
     Advances in the cost-to-performance of embedded systems and micro-electromechanical sensors (MEMS) \cite{MEMS} 
     have allowed \cite{juang2013design} \cite{Velazquez2016VelocityAM} to control the TWSB system 
-    using low-powered microcontrolers. 
-    Recent research has also applied reinforcement learning to the TWSB system \cite{kober2013reinforcement}.
+    using low-powered microcontrolers. This then poses the question of how to expand the capabilities 
+    of the TWSB system beyond teleoperation by utilizing modern emmbeded computers for high level autonomy. 
+    Recent research has also applied reinforcement learning to the mobile robotic systems \cite{kober2013reinforcement}.
     Neural networks are proposed as nonlinear function approximations to model the system's response. 
-    These methods demonstrate robustness to un-modeled dynamics \cite{guo2021optimal}.
+    These methods demonstrate robustness to un-modeled or neglected dynamics \cite{guo2021optimal}.
 
     In mobile robotics, the ability to navigate requires perception. LIDARs are commonly used, as  
-    the information they capture naturally lends itself to path-planning algorithms [].
+    the depth information they capture naturally lends itself to path-planning algorithms.
     Another commonly used multimodal sensor is the CMOS camera, which measures light intensity at each pixel. 
-    When paired in stereo, it can efficiently infer depth [], providing a suitable alternative to the point 
+    When paired in stereo, it can efficiently infer depth, providing a suitable alternative to the point 
     clouds generated by LIDAR. Although monocular vision systems are desirable due to their simplicity, 
-    the redundancy of stereo vision proves beneficial in safety-critical applications [].
-    Both sensors provide rich environmental data that can be leveraged to develop long-term path-planning algorithms.
+    the redundancy of stereo vision is beneficial in safety-critical applications.
+    Both these sensors provide rich environmental data that can be leveraged to develop long-term path-planning algorithms \cite{gonzalez2015review}.
     
-    This paper presents the design of a TWSB robotic platform capable of autonomously navigating an 
-    indoor line track. A racing algorithm is proposed,
-    based on three key metrics of the line: drivability, confidence, and prominence.
-    \cite{visionlinetwsb} utilizes a camera as a matrix of binary intensity sensors and a rule-based 
-    algorithm to follow a line while balancing. A similar approach by \cite{ghani2011two} uses infrared sensors. 
-    \cite{nntwsbvision} trained an end-to-end neural network to perform the same task. while [] proposes a 
-    convolutional neural network-based method that uses RDB-Depth camera data to autonomously 
-    navigate with human-centric social behavior. Similarly, [] develops planar-wheeled robot navigation 
-    algorithms through lane segmentation using geometric computer vision techniques.
-    While considerable success has been achieved by obtaining a linear approximation of the dynamics in a similar fashio to 
-    of the classic inverted pendulum, \cite{AdvancedWIP} explores the use of non-linear control strategies, such as backstepping or 
-    sliding mode control. An online data-driven model of a mobile system and embeds it 
-    in a Model Predictive Controller (MPC). This adaptive control strategy is robust to the un-modeled 
-    environment and plant dynamics, allowing for autonomous aggressive maneuvers along a mapped track.
-    
-    The platform is demonstrated as a cost-effective solution providing foundation for further research in mobile robotics.
-    Autonomy is achieved using a stabilizing feedback controller, with cascaded PID and 
-    LQR control strategies explored for balancing and stabilizing the robot's position. 
+    This paper is split in 2 parts, the first part focuses on the design of the TWSB system, the second part
+    developes a vision based line-following algorithm, geared towards racing applications. By exploring 
+    the performance of the TWSB at its handling limits, this project tests viability of the designed robot
+    as a platform for further research on wheel robotic navigation. 
+   
+    Autonomy is achieved using a higherachcichal cascaded PID feedback controller. This aims 
+    to regulate the pitch angle maintaining balance when controlling the robots linear velocity. 
     Once these requirements are met, the robot can be teleoperated intuitively via a 
     smartphone-based web interface. The remainder of this paper focuses on incorporating 
     multimodal sensor data from the camera to develop line-racing algorithms.
     The robot algorithmically infers and follows an unknown line using a monocular camera. 
-    A hardware-in-the-loop software architecture is implemented, enabling telemetry data and control 
-    commands to be exchanged between the robot and a remote computer. Visualization of this telemetry
-    data provides a straightforward means of validating the robot's performance.
-    \pagebreak{}
+    A hardware-in-the-loop software architecture is implemented, enabling realtime telemetry data and control 
+    commands to be exchanged between the robot and a remote computer, but all computations are performed onboard. 
+    Visualization of this telemetry data provides a straightforward means of validating the robot's performance.
+
 
   %%%%%%%%%%%%%%%%%% SECTION 2 %%%%%%%%%%%%%%%%%%
     \section{Mathematical Modeling} % edit section heading as appropriate
@@ -185,6 +176,8 @@
     separately.
     Effective control and planning algorithms for such platforms require the designer to obtain a mathematical model describing the behavior
     of the robot.  
+    For the TWSB system these models are commonly obtained by a linear approximation of the dynamics in a similar fashion to 
+    of the classic inverted pendulum \cite{AdvancedWIP}.
     \begin{figure}[h]
         \centering
         \begin{subfigure}[b]{0.4\textwidth}
@@ -234,7 +227,7 @@
 
     The motion of the DDMR is bounded by its non-holonomic constraints, 
     preventing lateral movement along the $Y'$ axis. 
-    Under the pure rolling assumption,the wheels do not slip, the robot's kinematics 
+    Under the pure rolling assumption, the wheels do not slip, the robot's kinematics 
     are governed by the wheel radius $r$ and wheelbase $d$. These parameters define 
     the mapping between the left and right wheel velocities, $\omega_L$ and $\omega_R$, 
     and the global velocities $v_g$ and $\omega_g$, by:
@@ -257,7 +250,7 @@
 
     
     \subsection{DC Motor Model}    
-    The robot is driven by two DC motors,through planetary gearboxes, as shown in Fig.~\ref{fig:DCMotor}.
+    The robot is driven by two DC motors, through planetary gearboxes, as shown in Fig.~\ref{fig:DCMotor}.
     When a voltage $V_a$ is applied, the DC motor generates a torque, $\tau$, 
     proportional to the armature current, $i_a$.
     According to Lenz's law, the back electromotive force (emf), $e_a(t)$, 
@@ -276,10 +269,7 @@
         \caption{Gearbox DC Motor Model Diagram}
         \label{fig:DCMotor}
     \end{figure}
-    The ratio between the inductance $L_a$ and armature resistance $R_a$ 
-    determines the time constant $\tau_e$ of the motor, that is, the time required 
-    for $i_a$ to reach 63.2\% of its final value. In small motors, $\tau_e$ is 
-    small, and since $L_a \ll R_a$, the electrical dynamics can be approximated as:
+    In small motors, since $L_a \ll R_a$, the electrical dynamics can be approximated as:
     \begin{equation}
         i_a (t) = \frac{V_a (t) - K_e \dot{\phi}_r (t)}{R_a}
     \end{equation}
@@ -291,10 +281,11 @@
             \tau_w = n\tau_r
     \end{equation}
     where $N_1$ and $N_2$ are the number of teeth on the input and output gears, respectively.
-    The rotor's inertia $J_r$ and damping $B_r$ are considered negligible.
+    The rotor's inertia $J_r$ and the drive train damping, $B_r$ and $B_g$, are also considered negligible.
     By summing the torques of the rotor and gearbox subsystems, the output torque is given as:
     \begin{equation}
-        \tau_w = - J_g \ddot{\phi}_w - \dot{\phi}_w \left( \frac{K_t K_e}{R_a} n^2 + B_g \right) + \frac{n K_t V_a}{R_a}
+        \tau_w = - J_g \ddot{\phi}_w - \dot{\phi}_w \left( \frac{K_t K_e}{R_a} n^2 \right) + \frac{n K_t V_a}{R_a}
+        \label{eq:DCMotorTorque}
     \end{equation}
     where $J_g$ represents the gearbox's inertia and $B_g$ its damping coefficient.
 
@@ -307,75 +298,70 @@
     the vertical axis $Z$. The body is assumed to be a point mass $M_b$ with a moment of inertia $J_b$ 
     about the axis of rotation. 
     
-    The system of equations governing the time evolution of the WIP are 
-    commonly found by Lagrangian mechanics \cite{AdvancedWIP}. This is an energy-based approach that
-    facilitates describing losses in the system in a general manner through a 
-    dissipative term \cite{frankovsky2017modeling} \cite{ModelingWIPLagrange}.
+    The system of equations governing the time evolution of the WIP are well known
+    \cite{frankovsky2017modeling} \cite{ModelingWIPLagrange}.
+    This paper uses the 2DOF state space model as obtained by \cite{Velazquez2016VelocityAM} since it describes 
+    hardware of similar configuration to the TWSB designed in this project. 
+    Incorporating the torque produced by each actuator, eq(\ref{eq:DCMotorTorque}),
+    and reiterating the no slip condition 
     \begin{equation}
-        D = \frac{b_w}{r^2} \dot{x}^2
+        \phi_w = \frac{x}{r}
     \end{equation}
-    Following this approach, the system is linearized about the vertical equilibrium position $\theta = 0$,
-    yielding the following coupled differential equations of motion:
-
-    \begin{subequations}
-        \begin{align}
-            \tau_R + \tau_L &= - M_b L \ddot{x}  
-            - (M_b L^2 + J_b) \ddot{\theta}  
-            + g M_b L \theta, \\
-            \frac{\tau_R + \tau_L}{r} &= \left( M_b + 2M_w + 2\frac{J_w}{r^2} \right) \ddot{x}  
-            + 2\frac{b_w}{r^2} \dot{x}  
-            + M_b L \ddot{\theta}.
-        \end{align}
-        \label{eq:2DOFWIP}
-    \end{subequations}
-
-    Where $\tau_R$ and $\tau_L$ are the torques applied to the right and left wheels. 
-    The wheel's inertia is denoted by $J_w$, its damping by $b_w$, and its mass by $M_w$. 
-
-    Incorporating the torque produced by each actuator $\tau_w$, 
-    and reiterating the no slip condition $\phi_w = \frac{x}{r}$,
-    eq(\ref{eq:2DOFWIP}) can be written in state space form as:
-
+    the model is re expressed in the notation of this report as 
     \begin{equation}
         \begin{bmatrix}
-            \ddot{x} \\
-            \ddot{\theta}
-        \end{bmatrix}
-        =
+        \dot{x} \\
+        \ddot{x} \\
+        \dot{\theta} \\
+        \ddot{\theta} 
+        \end{bmatrix} =
         \begin{bmatrix}
-            -\frac{b_w}{r^2} & 0 \\
-            \frac{1}{M_b L} & -\frac{M_b L + M_w r^2}{M_b L (M_b L^2 + J_b)}
+        0 & 0 & 0 & 0\\
+        0 & \frac{2n^2 K_t K_e }{r^2 R_a W_1 } & \frac{-M_b^2 L^2 g}{W_1 \left(J_b +M_b L^2 \right)} & 0\\
+        0 & 0 & 0 & 1\\
+        0 & \frac{2n^2 K_t K_e }{r^2 R_a W_2 } & \frac{-M_b^2 L^2 g}{W_2 \left(\left(J_b +M_b L^2 \right)+W_1 g\right)} & 0
         \end{bmatrix}
         \begin{bmatrix}
-            \dot{x} \\
-            \dot{\theta}
-        \end{bmatrix}
-        +
+        x\\
+        \dot{x} \\
+        \theta \\
+        \dot{\theta} 
+        \end{bmatrix} +
         \begin{bmatrix}
-            \frac{1}{M_b L} \\
-            \frac{1}{M_b L (M_b L^2 + J_b)}
+        0\\
+        -2n\frac{K_t }{W_1 R_a r}\\
+        0\\
+        -2n\;\frac{K_t }{W_2 R_a r}
         \end{bmatrix}
-        \tau_w
-        \label{eq:2DOF}
+        V_a
+    \label{eq:2DOF}
     \end{equation}
 
+    with 
+    \[
+    W_1 = 2\left(\frac{-n^2 J_g + J_w }{r^2 } - M_w \right) - M_b + \frac{M_b^2 L^2 }{J_b + M_b L^2 }
+    \]
+    \[
+    W_2 = W_1 \left(\frac{J_b }{M_b L} + L\right)
+    \]
 
-   
+    where $M_w$ is the mass of the wheel, $J_w$ is the moment of inertia of the wheel, 
+    $M_b$ is the mass of the body and its mass moment $J_b$ can be obtained by the parallel axis theorem.
 
-    
+ 
     \pagebreak{}
 
-
     \section{System Design}
-        The Robot must be designed to approximate the wheel inverted pendulum system, many authors 
-        construct demonstrators supporting a mass with a structure of lead screw. This allows for experimentation 
-        with the systems center of mass and is simple to construct. A proof of concept system was developed in this manner, 
-        however the exposed electronics were susceptible to damage during tuning of the balance and navigation algorithms.
+        The robot must be designed to approximate the wheel inverted pendulum system, many authors 
+        construct demonstrators supporting a mass with a rectangular structure built out of lead screws. 
+        This allows for experimentation with the systems center of mass and is simple to construct. 
+        A proof of concept system was developed in this manner, however the exposed electronics were 
+        susceptible to damage during tuning of the balance and navigation algorithms.
 
         As such the TWSB body is 3D printed out of PLA plastic in 3 parts for minimal assembly.
         The battery pack is quickly swappable and both it and the electronics sub assembly 
         are soft-mounted in a roll cage like housing for protection against impacts. 
-        The wheels are protected by wheel arches which serve to minimize risk of damage to the motor. 
+        The wheels are protected by wheel arches which serve to minimize risk of damage to the motor shaft on wheel impacts. 
         Wiring harnesses are routed through channels to minimize snagging and disconnection from vibrations.
         
         \begin{figure}[H]
@@ -387,18 +373,18 @@
         Two brushed DC motors are powered by an H-Bridge IC, DRV7783. 
         The STM32F411RE Microcontroler Unit (MCU) is used to control the 
         motors and monitor the 6 Axis Inertial Measurement Unit (IMU) over I2C. It communicates with the 
-        Raspberry Pi 5 over UART via a custom ASCII protocol discussed in section 2.4. 
+        Raspberry Pi 5 over UART via a custom ASCII protocol discussed in section 3.1. 
         The system is powered by a 12V nominal Li-ion Battery pack. A USB-C CC-CV charger is used for quick 
         and accessible recharging, critical for mobile robotics applications. 
-        Battery voltage is monitored by the MCU and the pack is protected by a BMS and a 3A poly-fuse.
+        Battery voltage is monitored by the MCU and the pack is protected by a BMS.
         A simple circuit adapted from \cite{chu2008designing} is used to safely load share between the battery pack and the charger.
 
         \subsection{Software Architecture}
         The modern standard for robotics software is the Robot Operating System 2 (ROS2) \cite{Macenski2022RobotOS}. 
         It is composed of several highly configurable applications that are designed to be manged in a distributed system.
         Distributed systems are beneficial in robotics development as they functionally decouple the software components, 
-        enabling robust failure recovery and ease of integrating new features. This is useful for this project as 
-        the core control and vision systems are developed in parallel. The controls, logs and error recovery systems mandating 
+        enabling robust failure recovery and ease of integrating new features. This concept is useful for this project as 
+        the core control and vision systems are developed in parallel. The controls, logs and error recovery systems mandate 
         high availability compared to user interfaces such as the remote control webapp. 
         Whilst this is a powerful tool, it is deemed too complex to learn for meeting the project deadline.
         Nevertheless some core concepts are used such as sharing state by message passing between components, 
@@ -418,20 +404,19 @@
         The resultant binary is 19KB with 892B of RAM used.
        
         The data-acquisition system obtains a timestamped sample of the 
-        telemetry values transmitted by the MCU through a serial link, which 
+        telemetry values transmitted by the MCU through a serial link, which implementes the
         RPC interface over uart at 230400 baud, 
         it executes commands and publishes telemetry packets at 100Hz.
         Parsing the UART IO buffer can result in non-uniformly sampled data as it
         is constrained by the OS scheduler, thus an event driven system is used to 
         minimize CPU overhead.
-        \pagebreak{}
         \subsubsection{Parameters }
         The system parameters are given in table(1). 
         The mass of the sub-components obtained by weighing,
         and estimates of the 3D printed parts mass are given by the slicer software. 
         The CAD files are used in MATLAB's Multibody Simulink environment, which 
-        computes the center of mass and the moments of inertia.
-        The Motor parameters and estimated as per [] using the manufacturers dataset[] summarized in table(2).
+        computes the center of mass and the moments of inertia can subsequently be estimated.
+        The Motor parameters are estimated though the system identification experiments discussed in section 3.2.
     
         \begin{table} [H]
             \centering
@@ -439,15 +424,18 @@
                 \hline
                 Parameter & Value & Units & Description \\
                 \hline
-                $m$ & 1.5 & kg & Mass of the body \\
-                $l$ & 0.1 & m & Length of the body \\
-                $J_b$ & 0.01 & $kgm^2$ & Moment of inertia of the body \\
-                $r$ & 0.03 & m & Radius of the wheel \\
+                $M_b$ & 0.8 & kg & Mass of the body \\
+                $L$ & 0.08135 & m & Height of COM above wheel axel \\
+                $J_b$ & 0.0071& $kgm^2$ & Moment of inertia of the body \\
+                $r$ & 0.04 & m & Radius of the wheel \\
+                $M_w$ & 0.09 & Kg & Mass of wheel assembly \\
+                $J_w$ & 0.000072 & $kgm^2$ & Moment of inertia of the wheel \\
                 $d$ & 0.132 & m & Wheel base \\
                 $R_a$ & 1.5 & $\Omega$ & Resistance of the motor \\
-                $K_t$ & 0.01 & Nm/A & Torque constant of the motor \\
-                $K_v$ & 0.01 & V/rad/s & Back EMF constant of the motor \\
-                $J_w$ & 0.01 & $kgm^2$ & Moment of inertia of the wheel \\
+                $K_t$ & 0.24 & Nm/A & Torque constant of the motor \\
+                $K_e$ & 0.018 & V/rad/s & Back EMF constant of the motor \\
+                $n$ & 20 & - & Gear ratio \\
+                $J_g$ & 0.0003 & $kgm^2$ & Moment of inertia of the gearbox \\
                 \hline
             \end{tabular}
             \caption{System Parameters}
@@ -455,6 +443,7 @@
 
         \subsection{System Identification}
         A set of experiments are conducted to obtain an estimate transfer function of the motors.
+
         \begin{table}[H]
             \centering
                 \begin{tabular}{|r|c|c|c|c|c|c|}
@@ -466,25 +455,25 @@
                 \end{tabular}
                 \caption{Manufacturer Provided Motor Parameters}
         \end{table}
+
         A telemetry and analysis software system developed in python. It is used as 
         test bench  setup shown in Fig.\ref{fig:SysIDSetUp}, a series of reference 
-        ramp, step, sine and chirp inputs are applied to each motor, 
-        the resultant input outputs are shown 
-        in Fig.\ref{fig:openloop}.
+        ramp, step, sine and chirp inputs are applied to each motor.
+  
+        The test suite contains a timeseries signal generators, with preview and playback functionality.
+        The systems logs and messages are displayed in a terminal window, and the user is able to fully configure 
+        each nodes runtime parameters remotely over a network connection, utilizing the RPC ASCII protocol.
+        A line plotter, is configured by JSON to display any number of signals the robot may produce.
+        This architecture allows for repeatability in obtaining robot data, something 
+        is is a challenge in mobile robotics.
        
         \begin{figure}[H]
             \centering
-            \includegraphics[height=0.\textwidth]{SysIDMotorSetUp.png}
+            \includegraphics[width=0.9\textwidth]{SysIDMotorSetUp.png}
             \caption{System Identification Testbench Setup}
             \label{fig:SysIDSetUp}
         \end{figure}
-        The test suit contains a timeseries signal generators, with preview and playback functionality.
-        The Systems logs and messages are displayed in a terminal window, and the user is able to fully configure 
-        each nodes runtime parameters remotely over a network connection, utilizing the RPC ASCII protocol.
-        A line plotter, is configured by JSON to display any number of signals.
-        This architecture allows for repeatability in obtaining robot data, something 
-        is is a challenge in mobile robotics[]. 
-        
+      
         This software system is also utilized for huristic tuning of the control
         and vision systems. The program is able to visualize control signal streams in soft real time, 
         and provides a useful insight into the effects of the control system on the plant.
@@ -492,7 +481,7 @@
         \begin{figure}[H]
             \centering
             \begin{subfigure}[b]{0.45\textwidth}
-            \includegraphics[width=\textwidth]{Graphs/openstep.pdf}
+            \includegraphics[width=\textwidth]{Graphs/OpenLoopStep.pdf}
             \caption{Open Loop Step Response}
             \label{fig:openstep}
             \end{subfigure}
@@ -508,22 +497,16 @@
 
 
         From these experiments it is clear that the motor is has significant deadzones, 
-        and the input output relationship is non linear at low armature voltages. When the motor is operating at 
-        its rated current, seen by the experiments in Fig.\ref{fig:speedvolt}, its its linearity is improved. 
+        and the input output relationship is non linear at low armature voltages. 
         The maximum no load speed within the manufacturers operating range is found to be 8 rotations per second.
         To increase control authority, the motors are powered by 12V, with the armature voltage is modulated by 
         the duty cycle of the PWM signal. The DRV7783 Integrates current sensing and over current protection,
         used to limit the current to the motors to 1.5A.
-        \begin{figure}[H]
-            \centering
-            \includegraphics[width=0.5\textwidth]{Graphs/SpeedVoltageCurve.pdf}
-            \caption{Speed Voltage Relationship}
-            \label{fig:speedvolt}
-        \end{figure}
+       
         For stationary balancing of the TWSB robot
         the actuators are required to be operate mostly in a sinusoidal fashion, 
-        similar to Fig.\ref{fig:opensine} in order to regulate the pitch angle of the body.
-        Considering this a closed loop controller is developed in section 4.1 to regulate the motors speed,
+        similar to Fig.\ref{fig:opensine}, in order to regulate the pitch angle of the body.
+        Considering this a closed loop controller is developed in section 5.1 to regulate the motors speed,
         and maintain the device is it operating region. 
 
     \section{State Estimation}
@@ -542,17 +525,17 @@
         Considering the gearbox ratio $n=20$, an effective resolution of 960 PPR is attained.
         The rotational speed of the wheel is computed by sampling the change in the pulse counts
         over a sample period $\Delta t$. Thus the error in the velocity estimate, 
-        is inversely proportional sample period, resulting in large errors at low speeds.
+        is inversely proportional sample period, resulting in larger errors at low speeds.
         Yet, it is observed that more significant sources of error arise from the mechanical backlash in the gearbox.
-        The sample time is set to 2ms, and a low-pass filter is given by the recursive relation
-            \begin{equation}
-        y_k = \alpha x_k + (1-\alpha)y_{k-1}
-                \label{eq:lpf}
-            \end{equation}
-        Selecting $\alpha = 0.95$, attenuates exponentially sudden deviations in the velocity estimate.
+        The sample time is set to 2 ms, a low-pass filter is given by the infinite recursive relation as
+        \begin{equation}
+            y_k = \alpha x_k + (1-\alpha)y_{k-1}
+            \label{eq:lpf}
+        \end{equation}
+        exponentially attenuates sudden deviations in the velocity estimate by selecting $\alpha = 0.95$.
 
-        Utilizing this velocity in the model of the DDMR in eq(\ref{eq:DDMR}) to obtain the
-        position of the robot in the cartesian plane as ($x_g,y_g$)is known as odometry.
+        Using this velocity estimate in the model of the DDMR from eq(\ref{eq:DDMR}) to obtain the
+        position of the robot in the cartesian plane as ($x_g,y_g$) is known as odometry.
         There are various sources of errors in 
         this process, arising from assembly imperfections and conditions in 
         the environment which may break the constraints assumed in the kinematics of the DDMR.
@@ -566,10 +549,10 @@
         This leads to the decision that other forms of systematic odometry errors have to be 
         either disregarded in the short term or corrected by landmark methods by $exteroceptive$ sensors. 
 
-        The IMU is a 6 axis MEMS sensor[] which measures the local linear acceleration 
+        The IMU is a 6 axis MEMS sensor \cite{ComplimentaryKalman} which measures the local linear acceleration 
         and angular velocity.
-        The 3D acceleration $\vec{a}$ is used to obtain an 
-        estimate of the pitch angle as    $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$
+        The 3D acceleration, $\vec{a}$, is used to obtain an 
+        estimate of the pitch angle as $\hat{\theta} = \mathrm{atan2}\left(-a_x ,a_z \right)$
 
         The variance of this $\hat{\theta}$ is small when the system is at rest, but grows larger when subject to vibration from the motors
         as shown by the experiment in Fig.\ref{fig:accelNoise} where the TWSB is placed horizontally at rest and motor control commands are issued. 
@@ -587,9 +570,9 @@
                 \includegraphics[width=\textwidth]{Graphs/noisyPitchEst.pdf}
                 \caption{Wide Variance on pitch estimate at rest}
                 \label{fig:pitchNoise}
-            \label{fig:accelNoise}
             \end{subfigure}
             \caption{Accelerometer Noise}   
+            \label{fig:accelNoise}
         \end{figure}
 
         From \ref{fig:pitchNoise} it can be seen that the IMU is not mounted perfectly orthogonal to the body frame. 
@@ -606,10 +589,7 @@
             \caption{Accelerometer Mounting Offset (m/s$^{2}$)}
             \label{tab:accelOffset}
         \end{table}
-        This systematic error is removed by utilizing calibrated values in table obtained as per \ref{tab:accelOffset}.
-        
-        
-        \pagebreak{}
+        This systematic error is removed by utilizing calibrated values in table \ref{tab:accelOffset}.
         \subsection{Kalman Filter}
         The Kalman Filter (KF) and its variants  are widely used in robotics to fuse 
         complementary sources of information \cite{Thrun2005ProbabilisticRobotics} \cite{perez2023quadcopter} \cite{Moore2014AGE}.
@@ -623,7 +603,6 @@
         The Kalman Gain computed as \ref{eq:KalmanGain} provides the optimal weighting between t
         he beliefs from the prediction \ref{eq:KalmanPredict} and the measurement update \ref{eq:KalmanUpdate}.
         
-
         \begin{subequations}
             \begin{equation}
                 \bar{bel}(x_k) = \begin{cases}
@@ -660,91 +639,15 @@
      
         The MPU6050 6-Axis IMU can estimate the pitch through the gyroscope measurement $\vec\omega_{gyro}$ and the accelerometer measurement $\vec a_{x}$.
 
-        \begin{equation}
-            \begin{aligned}
-                \begin{bmatrix}
-                    \theta_{g{k}} \\
-                    \beta_{k} 
-                \end{bmatrix}
-                &= 
-                \begin{bmatrix}
-                    1 & -\Delta t \\
-                    0 & 1
-                \end{bmatrix}
-                \begin{bmatrix}
-                    \theta_{g{k-1}} \\
-                    \beta_{k-1}
-                \end{bmatrix}
-                +
-                \begin{bmatrix}
-                    \Delta t \\
-                    0
-                \end{bmatrix}
-                + \begin{bmatrix}
-                    -\rho_{k-1}\cdot\Delta t \\
-                    \rho_b
-                \end{bmatrix}
-            \end{aligned}
-            \label{eq:gyroBias1}
-        \end{equation}
-        
-        \begin{equation}
-            \begin{aligned}
-                z_k &= \begin{bmatrix}
-                    1 & 0
-                \end{bmatrix}
-                \begin{bmatrix}
-                    \theta_k \\
-                    \nu_{g{k}}
-                \end{bmatrix}
-                + \begin{bmatrix}
-                    \rho_{a{k}}
-                \end{bmatrix}
-            \end{aligned}
-            \label{eq:gyroBias2}
-        \end{equation}
-        
-
         \begin{figure}[H]
             \centering
             \includegraphics[width=0.8\textwidth]{Graphs/SensorFusion.pdf}
             \caption{Sensor Fusion of accelerometer and gyroscope}
             \label{fig:SensorFusion}
         \end{figure}
-
-        The MPU6050 parameters are obtained from the dataset[] as 
-        \begin{table}[H]
-            \centering
-            \begin{tabular}{|c|c|c|}
-                \hline
-                Parameter & Value & Units \\
-                \hline
-                $a_{sensitivity}$ & 16384 & LSB/g \\
-                $g_{sensitivity}$ & 131 & LSB/deg/s \\
-                \hline
-            \end{tabular}
-            \caption{MPU6050 Parameters}
-        \end{table}
-        The kalman gain matrix is obtained operating the motors to simulate typical high frequency conditions 
-        and tuning the process and measurement noise matrices.
-        \begin{table}[H]
-            \centering
-            \begin{tabular}{|c|c|c|}
-                \hline
-                Parameter & Value & Units \\
-                \hline
-                $Q$ & 0.01 & $rad^2$ \\
-                $R$ & 0.01 & $rad^2$ \\
-                \hline
-            \end{tabular}
-            \caption{Kalman Filter Noise Parameters}
-        \end{table}
-
        
         Fig.\ref{fig:SensorFusion} shows that the Kalman Filter's produces a smooth estimate of the pitch angle
-        under conditions of the experiment in Fig.\ref{fig:accelNoise}. It is observed that when there is a 
-        large change in the motors set-point  the angular momentum built up from the wheels is sufficient to 
-        disturb the system from rest seen at $k \approx [170, 380, 580]$.
+        under conditions of the experiment in Fig.\ref{fig:accelNoise}. 
         \pagebreak{}
 
     \section{Control System}
@@ -766,7 +669,7 @@
         on the systems parameters, \cite{RoboLimbo} utilizes advanced nonlinear strategies to determine these
         boundary conditions.
 
-        The tracking performance of reactive control strategies is bounded by the control effort 
+        The tracking performance of reactive control strategies is often bounded by the control effort 
         demanded within the bandwidth of the actuators. Typically in feedback systems, a saturation function 
         is utilized on the reference to enforce safe operation. This discontinuity breaks the linearity of the 
         controller often leading to oscillations, and care must be taken to avoid such limit cycles.
@@ -776,17 +679,18 @@
         obtained by a sensor, and the control law $u_k$ is computed reactively to an error signal at each timestamp $k$.
         Oftentimes, intuition about the signal's physical units is sufficient to tune the feedback gains adequately. 
         However, performance validation in the model-free case must be evaluated at runtime, this may prove to be 
-        challenging or destructive cases of unstable or safety-critical systems. Huristic methods such as Ziegler-Nichols[]
+        challenging or destructive in cases of unstable or safety-critical systems. 
+        
+        Huristic methods such as Ziegler-Nichols[]
         formulate approaches to black-box tuning of a plant by observing the system 
         performance under sustained instability and designers experimentally tune such algorithms.
-    
-        For example, the input-output data of the selected actuators obtained in Fig.\ref{fig:openloop}, 
+        For example, from the input-output data of the selected actuators obtained in Fig.\ref{fig:openloop}, 
         it can be seen that a large integral action is needed to overcome the steady-state error.
         This is a common issue in low-cost DC motors, where the static friction of the gearbox presents 
-        a nonlinearity which is most notable at low voltages. 
+        a nonlinearity which is most notable at low control authority and difficult to model. 
     
         Model-based control allows the designer to validate the performance of the system in simulation. 
-        Often frequency domain tools are used to analyze the plan in an open loop. From this, a control law is designed around 
+        Often frequency domain tools are used to analyze the plant in an open loop. From this, a control law is designed around 
         the controllable state variables with physical information on the behavior of the system.
         Given a model of the system, designers also can formulate constraints, 
         and obtain an optimal control signal which meets these. For example, by minimizing the control effort in a cost function
@@ -794,19 +698,17 @@
     
         Parameter uncertainty a common issues in controlling mobile robotics, and approximations of these often lead to 
         discrepancies between the mathematical optimal solutions found in simulation \cite{eide2011lqg} 
-        and in real world performance \cite{tran2023fuzzy}. The difficulty with purely model-based approaches 
+        and in real world performance \cite{tran2023fuzzy}. The difficulty with purely model-based approaches is
         the need for a high fidelity model, and access to low uncertainty measurements of the state variables.
     
-        A model of the TWSB robot, incorporating the non-idealities of low-cost DC motors is proposed by \cite{yamamoto2008nxtway}.
+        A model of a TWSB robot, incorporating the non-idealities of low-cost DC motors is proposed by \cite{yamamoto2008nxtway}.
         It is used together with a simulation study of a WIP platform as a reference solution for the TWSB problem.
-    
-        Another approach is to use actuators with more favorable characteristics for the task at hand, such as stepper motors []. 
-        The static balancing problem aims to control $\theta$ and regulate the linear displacement $\dot x_b=v_b$. The coupling of the 
+
+        Another approach is to use actuators with more favorable characteristics for the task at hand, such as stepper motors.
+        The static balancing problem aims to control $\theta$ and regulate the linear displacement. The coupling of the 
         pitch angle to the rate of change in linear position requires active control, resulting in oscillations in both these state variables. 
         Stepper motors draw a nominal current, thus maintaining high torque at low speeds, eliminating the need for gearboxes and the 
-        backlash associated with them. With suitable micro-stepping, shaft position control 
-        leads to a smoother reaction to control signals and the TWSB balances about a point without the need to incorporate the  
-        TWSB model in the feedback controller design. 
+        backlash associated with them. 
             
         The field of adaptive control proposes dealing with system uncertainties by designing controllers that may 
         learn over time. Online trial-and-error data and statistical techniques like regression-based transfer
@@ -815,13 +717,12 @@
                 
         In a similar vein, \cite{williams2016aggressive} embeds a neural network as an online function approximator to learn 
         predictions of the dynamics of the system. This prediction is then used as part of a trajectory planner in race-line optimization. 
-    
         Some modern microcontrolers have sufficient computational power requirements needed for Model Predictive Control (MPC) and 
         effective implementations of convex optimizers \cite{nguyen2024tinympc} have been used in small mobile robots \cite{giernacki2017crazyflie}.
             
         An attractive aspect of predictive approaches to control is that they lend themselves naturally to 
-        planning long horizons. These methods utilize numerical simulation techniques to evolve the system over time 
-        and estimate the distribution of state probabilities through Monte Carlo sampling of control actions. 
+        planning long horizons. These methods use numerical simulation techniques to evolve the system over time 
+        and estimate the distribution of state probabilities through sampling of control actions. 
         The optimal control sequence is then chosen from these samples using a cost function.
                 
         The autonomous behavior of the TWSB robot explored in this paper is that of path 
@@ -834,8 +735,10 @@
         A simple PID controller operating on the pitch error is tested in simscape multibody; 
         a physics based simulation where the control law is an applided force to a prismatic joint. 
         This force is coupled through the revolute joint to the pitch angle as descried by \ref{eq:2DOF}.
-        This manages to stabilize the pitch angle yet as shown by fig, $x_b$ position drifts over time.
-        More complex control laws are discussed in the following sections.
+        This manages to stabilize the pitch angle yet $x$ position drifts over time as this 
+        state variable is not controlled.
+        More complete control laws are discussed in the following sections.
+
 
         \subsubsection{Controler requirements}
 
@@ -855,45 +758,45 @@
 
         \subsection{Cascade PID}
         
-        In the planer case shwon in fig Fig.\ref{fig:WIP} the trajectory of the center of mass is parametrized by 
+        In the planer case shown in Fig.\ref{fig:WIP} the trajectory of the center of mass is parametrized by 
         the pitch angle $\theta$ and the linear velocity $v_b$. 
     
-
         A cascaded pid controller is used to control the pitch angle and the linear velocity. 
         Control of the position $(x_g,y_g)$ is left to a higher level planner.  
         If the inner loop dynamics are much faster than the outer loop, 
-        then the inner loop can be approximated as a disturbance[].
+        then the inner loop can be approximated as a disturbance \cite{Robust2DofPID}.
+
+        Again, simscape multibody is used to verify the feasibility of this kind of controller Fig.(\ref{fig:SimPID}).
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.8\textwidth]{Graphs/Simulation Cascade PID.pdf}
+            \caption{Simscape Multibody Simulation of PID Cascade Controller regulating the linear velocity of the TWSB}
+            \label{fig:SimPID}
+        \end{figure}
 
         In order to determine the maximum operating frequency of the outer loop, 
-        the inner motor speed loop is closed at 200Hz and the system is observed.
-        
-        Through the Ziegler-Nichols method[], the PID gains for each DC Motors speed control loop 
+        the inner motor speed loop is closed at 500Hz. Then the system is observed.
+        through the Ziegler-Nichols method and the PID gains for each DC Motors speed control loop 
         are obtained as shown in table(2). This process however may cause damage to the motors 
         during the sustained oscillations at the critical gain. 
        
-        The frequency response of the transfer function is shown in fig(4) 
-        and its closed loop bandwidth is determined to be ... rads
-
-        This is then used to obtain the PID gains in table(4) in MATLAB using pole-placement techniques
         \begin{table}[H]
             \centering
-            \begin{tabular}{|c|c|c|}
+            \begin{tabular}{|r|c|c|}
                 \hline
-                Parameter & Zeigler-Nichols & SysId \\
-                \hline 
-                $K_p$ & 0.1 & 0.1 \\
-                $K_i$ & 0.01 & 0.01 \\
-                $K_d$ & 0.01 & 0.01 \\
+                Parameter & $K_p$ & $K_i$ \\
+                \hline
+                Motor 1 & 2.4 & 5 \\
+                Motor 2 & 2.8 & 5 \\
                 \hline
             \end{tabular}
-            \caption{PID Gains}
+            \caption{DC Motor PI Gains}
         \end{table}
 
-        A P controller is used to regulate the steering control signal, which modeled
+        A P controller is used to correct the steering control signal, which  is modeled
         as a disturbance from the 2D dynamics model.
 
-        The error of the pitch angle is regulated by a PID controller operating at 100Hz. 
-        
+        The error of the pitch angle is regulated by a PID controller operating at 100Hz.
         This results in a stable system in 1DOF space, controlling the body velocity requires the outermost loop to be closed at 20Hz.
         The final cascaded closed loop pid controller is shown in fig(5) with the gains in table(5)
 
@@ -917,17 +820,7 @@
             \end{tabular}
             \caption{PID Gains}
         \end{table}
-        \pagebreak{}
-        \subsection{LQR}
-        A Linear Quadratic Regulator (LQR) is used to control the system in 2DOF space.
-        This minimizes 
-        
-       
-        Selecting the Q and R matrixes as eq(7) and eq(8) respectively, 
-        the K feedback matrix in eq(9) is obtained by solving the Algebraic Riccati
-        equation of the discretized system eq(10) in MATLAB.
-        sample frequency determine based on rise time of simulated closed loop model. 
-        by Nyquist the system must then be sampled at least 200Hz. 
+      
 
         \pagebreak{}
         \section{Navigation System}
