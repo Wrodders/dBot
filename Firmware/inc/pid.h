@@ -3,10 +3,6 @@
 
 #include "../common/common.h"
 
-/* 
-Proportional Integral Derivative Algorithm
-*/
-
 struct PID{
     float ref;                   // u
     float error;                 // e
@@ -14,7 +10,8 @@ struct PID{
     float pTerm,iTerm,dTerm;    // Working Variables
     float kp,ki,kd;             // Preset with dt applied
     const float dt;             // Sample period [s]
-    float min, max;             // Saturation 
+    const float min;
+    const float max;            // Saturation 
     float out;                  // Controlled output signal
     bool en;                    // Enable PID Computation   
 }PID;
@@ -22,11 +19,6 @@ struct PID{
 static inline void pidEnable(struct PID *pid){pid->en = true;}                  
 static inline void pidDisable(struct PID *pid){pid->en = false;}
 static inline void pidClear(struct PID *pid){pid->iTerm=0; pid->lastErr=0; pid->out=0; pid->ref=0; pid->error=0;}  
-static inline void pidSetKp(struct PID *pid, float kp){pid->kp = kp;}  
-static inline void pidSetKi(struct PID *pid, float ki){pid->ki = ki * pid->dt;} // precompute save calculations 
-static inline void pidSetKd(struct PID *pid, float kd){pid->kd = kd / pid->dt;} //
-static inline void pidSetMin(struct PID* pid, float min){pid->min = min;}
-static inline void pidSetMax(struct PID* pid, float max){pid->min = max;}
 static inline void pidSetRef(struct PID* pid, float ref){pid->ref = ref;} 
 
 static struct PID pidInit(float min, float max, float kp, float ki, float kd, float deltaT){
@@ -44,18 +36,18 @@ static struct PID pidInit(float min, float max, float kp, float ki, float kd, fl
     return pid;
 }
 
+//@Brief: Steps through PID Algorithm at constant dt
+//@Description: Calculates correction signal from ref measurement error.  
 static float pidRun(struct PID* pid, const float measurement){
-    //@Brief: Steps through PID Algorithm at constant dt
-    //@Description: Calculates correction signal from ref measurement error.  
+
     if(pid->en == false){return 0;}
     pid->error = pid->ref - measurement;                // calculate error
     pid->pTerm = pid->error * pid->kp;                  
-    pid->iTerm += pid->error * pid->ki*pid->dt;                  
+    pid->iTerm += pid->error * pid->ki*pid->dt;         
     pid->iTerm = _clamp(pid->iTerm,pid->min , pid->max); // Apply Integrator Saturation    
     pid->dTerm = (pid->kd/pid->dt)*(pid->error - pid->lastErr);   
     pid->lastErr = pid->error;
     float y = pid->pTerm + pid->iTerm + pid->dTerm;    // calculate correction signal 
     return _clamp(y, pid->min, pid->max);              // Apply output Saturation
 }
-
 #endif // CONTROLLER_H

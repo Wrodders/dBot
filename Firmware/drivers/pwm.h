@@ -4,7 +4,7 @@
 #include "../common/common.h"
 #include <libopencm3/stm32/timer.h>
 
-static void pwmInit(uint32_t timPerif, uint32_t freq){
+static void pwmInit(uint32_t timPerif){
     //@Brief: Initializes a Timer peripheral for PWM mode
     timer_set_mode(timPerif,
                     TIM_CR1_CKD_CK_INT,  // No Clock Division

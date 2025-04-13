@@ -73,6 +73,28 @@ static struct IMU imuInit(const float alphaAccel, const float alphaGyro, const f
     return imu;
 }
 
+static void imuReset(struct IMU* imu){
+    // Reset Kalman Filter
+    imu->kal.rollK.angle = 0.0f;
+    imu->kal.rollK.bias = 0.0f;
+    imu->kal.pitchK.angle = 0.0f;
+    imu->kal.pitchK.bias = 0.0f;
+    imu->kal.roll = 0.0f;
+    imu->kal.pitch = 0.0f;
+    // Reset Complementary Filter
+    imu->comp.pitch = 0.0f;
+    imu->comp.roll = 0.0f;
+    imu->raw.pitch = 0.0f;
+    imu->raw.roll = 0.0f;
+    // Reset Low Pass Filter
+    imu->lpf.accel.x = 0.0f;
+    imu->lpf.accel.y = 0.0f;
+    imu->lpf.accel.z = 0.0f;
+    imu->lpf.gyro.x = 0.0f;
+    imu->lpf.gyro.y = 0.0f;
+    imu->lpf.gyro.z = 0.0f;
+}
+
 static void imuLinkSensor(struct IMU* imu, struct MPU6050* sensor){
     imu->sensor = sensor;
 }

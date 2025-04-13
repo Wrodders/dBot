@@ -7,15 +7,12 @@
  *        The messages are formatted as per the pub-rpc protocol
  */
 
-
-
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <unistd.h>
 #include <arpa/inet.h>
 
-#include "../common/coms.hpp"
 #include "../common/common.hpp"
+#include "../common/coms.hpp"
 
 #define UDP_PORT 5557      
 #define BUFFER_SIZE 512  

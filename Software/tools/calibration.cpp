@@ -1,12 +1,13 @@
-#include <opencv2/opencv.hpp>
-#include <iostream>
-#include <vector>
-#include <string>   // for std::string
-#include <cstdlib>  // for std::atoi
+/***************************************
+ * @file    calibration.cpp
+ * @brief   Camera calibration tool
+ * 
+ * 
+ * 
+ */
 
+ 
 #include "../inc/calibration.hpp"
-
-
 
 int main(int argc, char** argv) {
     // Validate input arguments

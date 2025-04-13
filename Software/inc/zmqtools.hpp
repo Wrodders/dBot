@@ -1,5 +1,7 @@
 #ifndef ZMQTOOLS_HPP
 #define ZMQTOOLS_HPP
+
+#include <zmq.hpp>
 #include "../common/common.hpp"
 
 

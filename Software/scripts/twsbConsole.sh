@@ -1,24 +1,28 @@
 #!/bin/bash
 # -------------------------------------------------- 
-#  @file    twsbConsole.cpp
+#  @file    twsbConsole.sh
 #  @brief   A simple console for debugging raw TWSB messages.
 
-# Ensure correct usage
-if [[ $# -lt 3 ]]; then
-    echo "Usage: $0 <serial_port> <baud_rate> <filter_chars>"
-    echo "Example: $0 /dev/ttyUSB0 115200 'A B C'"
-    exit 1
+# Default values
+DEFAULT_PORT="/dev/ttyUSB0"
+DEFAULT_BAUD= "230400"
+DEFAULT_FILTER="A B C D E"
+
+# Assign arguments or use defaults
+PORT="${1:-$DEFAULT_PORT}"
+BAUD="${2:-$DEFAULT_BAUD}"
+FILTER_CHARS="${@:3}"
+
+# If no filter characters are provided, use the default
+if [[ -z "$FILTER_CHARS" ]]; then
+    FILTER_CHARS="$DEFAULT_FILTER"
 fi
 
-PORT="$1"
-BAUD="$2"
-shift 2  # Remove first two arguments, leaving only the filter characters
-
 # Convert space-separated characters into grep pattern
-FILTER_PATTERN="^<($(echo "$@" | sed 's/ /|/g'))"
+FILTER_PATTERN="^<($(echo "$FILTER_CHARS" | sed 's/ /|/g'))"
 
-# Validate filter input (ensure each argument is a single ASCII character)
-for char in "$@"; do
+# Validate filter input 
+for char in $FILTER_CHARS; do
     if [[ ${#char} -ne 1 ]]; then
         echo "[ERROR] Each filter must be a single ASCII character."
         exit 1
@@ -35,9 +39,10 @@ fi
 # PROGRAM BEGIN #
 echo "[DEBUG_CONSOLE][INFO] TWSB DEBUG CONSOLE"
 echo "-------------------------"
-echo "[DEBUG_CONSOLE][INFO] Listening on $PORT at $BAUD baud. Filtering messages with '<$FILTER'."
+echo "[DEBUG_CONSOLE][INFO] Listening on $PORT at $BAUD baud. Filtering messages with '<$FILTER_CHARS>'."
 echo "[DEBUG_CONSOLE][INFO] Type 'exit' to quit."
 echo "-------------------------"
+
 # Background listener process to filter incoming messages
 ( cat "$PORT" | grep -E --line-buffered "$FILTER_PATTERN" ) &  
 LISTENER_PID=$!

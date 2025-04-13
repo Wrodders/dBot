@@ -71,7 +71,7 @@ namespace calib {
 
 //@brief: Calibrate the camera and compute the homography matrix
 //@return: 1 if successful, 0 if chessboard not found,
-int calibrateInversePerspectiveMap(const cv::Mat& undistorted, cv::Mat& homography_matrix, std::array<cv::Point2f, 4>& objPts, float horizon) {
+int calibrateInversePerspectiveMap(const cv::Mat& undistorted, cv::Mat& homography_matrix, std::array<cv::Point2f, 4>& objPts) {
     // Chessboard properties
     const cv::Size board_sz = cv::Size(5, 7);  // Internal corners (columns x rows)
     const int board_w = board_sz.width;

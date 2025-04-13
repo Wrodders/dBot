@@ -1,19 +1,16 @@
 #ifndef TWSB_H
 #define TWSB_H
 
-#include <unistd.h>
 #include <termios.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
 #include <queue>
-#include <syslog.h>
 
 #include "../common/common.hpp"
 #include "../common/coms.hpp"
 
-
 #define DEFAULT_PORT "/dev/ttyAMA0"
 #define DEFAULT_BAUD 115200
+#define SERCOMS_RX_BUFFER_SIZE 1024
 
 #define NODE_NAME "TWSB"
 
@@ -71,7 +68,6 @@ inline int get_bytes_available(int fd) {
 
 // ----------------- PC SERIAL Implementation Pub-RPC Protocol ----------------- //
 enum SERCOMS_DECODE_TELEM { COMS_TELEM_IDLE = 0, COMS_TELEM_ID, COMS_TELEM_DATA, COMS_TELEM_ERROR};
-
 struct SerComs {
     Message _telem_msg_rx;
     std::queue<Message> telemMsgQ;
@@ -133,6 +129,4 @@ void sercoms_grab_telemetry(int serialFd, struct SerComs& coms, struct Protocol&
     }
 }
 
-//*** TWSB Coms Console */
-#define NODE_NAME "TWSB"
 #endif // TWSB_H

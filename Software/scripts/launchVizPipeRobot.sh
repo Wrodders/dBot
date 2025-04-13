@@ -8,7 +8,7 @@ HOSTNAME=$(hostname)
 hostname
 case $HOSTNAME in
     "dbot")
-        PORT=5001 #sdasdasd
+        PORT=5001 # Pi Zero 2W uses hardware encoder
         ROT=2 # Rotate 180 degrees
         sudo gst-launch-1.0 -vv libcamerasrc ! \
             videoconvert  ! \
