@@ -1,35 +1,29 @@
 # Two Wheel Self Balancing Mobile Robot
 
-Self Balancing Robot using STM32 and PiZeroW
+Final Year Capstone Mechatronics Project. 
+Designed to be a cost effective platform for research and development of autonomous 
+mobile robotics. The non linear and unable dynamics of the Two Wheel Self Balancing Mobile Robot (TWSBMR)
+make it a challenging platform for control and navigation.
 
-Firmware Written using BareMetal Registers, Abstracted by device Peripheral Drivers. 
-
-Control & Dynamics Modeled in Matlab
-
-Software Prototyped in Python & Bash, ported to C/C++ when mature & performance demands. 
-
+Low Level motor control implemented on STM32F411RE microcontroller, using LibOpenCM3.
+High Level Monocular Navigation uses RaspberryPi 5 with the Pi Camera V3.
 [ComsTerm](https://github.com/Wrodders/ComsTerm) used as engineering UI. 
 
 ## Design
-![botISO](./Docs/DesingImgs/BotISO.png)
-![botFront](./Docs/DesingImgs/BotFront.png)
-![botRight](./Docs/DesingImgs/BotRight.png)
+![botISO](./Docs/Y3Report/images/V2CAD.png)
 
-## Electronics
+The project was built around milestones of autonomy:
 
-![pcb3D](./Docs/DesingImgs/pcb3d.png)
-![pcbLayout](./Docs/DesingImgs/pcbLayout.png)
-![pcbSchematic](./Docs/DesingImgs/pcbSchematic.png)
+* Stabilization
+* Positional Control
+* Teleoperation
+* Path Following 
+* Path Recovery 
+* Track Racing
 
-## Control
+![CurveSequence](./Docs/Y3Report/images/Chicane.png)
 
-### Cascaded PID Controller
-![Cascaded_Controller](Docs/Charts/CascadedPID.svg)
-
-
+![Cascaded_Controller](Docs/Charts/exports/CascadedPID.svg)
 
 
-
-
-
-
+![Video](example.mp4)
