@@ -107,12 +107,12 @@ int run(int argc, char* argv[]) {
     
     param_map.set_value(viz::P_PROG_MODE, viz::M_INIT);
     param_map.set_value(viz::P_LOOK_HRZ_HEIGHT,360);
-    param_map.set_value(viz::P_MAX_VEL, 0.35);
-    param_map.set_value(viz::P_NAV_EN, 0);
+    param_map.set_value(viz::P_MAX_VEL, 0.7);
+    param_map.set_value(viz::P_NAV_EN, 1);
     param_map.set_value(viz::P_KP, 1.1);
     param_map.set_value(viz::P_KI, 0.09);
-    param_map.set_value(viz::P_KD, 1.2);
-    param_map.set_value(viz::P_LOOKAHEAD, 0.9);
+    param_map.set_value(viz::P_KD, 2.0);
+    param_map.set_value(viz::P_LOOKAHEAD, 0.99);
     
     // ------------- Command Server & Trajectory Threads ----------------- //
     std::thread cmd_thread(cmd::command_server, std::ref(param_map));
