@@ -26,4 +26,4 @@ The project was built around milestones of autonomy:
 ![Cascaded_Controller](Docs/Charts/exports/CascadedPID.svg)
 
 
-![Video](example.mp4)
+![Video](output.gif)
