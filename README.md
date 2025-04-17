@@ -2,7 +2,7 @@
 
 Final Year Capstone Mechatronics Project. 
 Designed to be a cost effective platform for research and development of autonomous 
-mobile robotics. The non linear and unable dynamics of the Two Wheel Self Balancing Mobile Robot (TWSBMR)
+mobile robotics. The non linear and unstable dynamics of the Two Wheel Self Balancing Mobile Robot (TWSBMR)
 make it a challenging platform for control and navigation.
 
 Low Level motor control implemented on STM32F411RE microcontroller, using LibOpenCM3.
